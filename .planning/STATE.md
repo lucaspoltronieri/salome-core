@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: Not started
+last_updated: "2026-05-12T20:08:23.890Z"
+progress:
+  total_phases: 18
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+---
+
 # State: Migracao Salome Legacy para Financeiro Web
 
 ## Project Reference
@@ -5,14 +18,14 @@
 See: `.planning/PROJECT.md` (updated 2026-05-12)
 
 **Core value:** Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes e mantendo o legado operando sem interrupcao.
-**Current focus:** Phase 1 - Mapear Contas a Pagar legado
+**Current focus:** Phase 5 - Propor arquitetura do salome-financeiro-web
 
 ## Current Phase
 
-- **Phase:** 1
-- **Name:** Mapear Contas a Pagar legado
+- **Phase:** 5
+- **Name:** Propor arquitetura do salome-financeiro-web
 - **Status:** Not started
-- **Recommended next command:** `$gsd-map-codebase`
+- **Recommended next command:** `$gsd-discuss-phase 5`
 
 ## Guardrails
 
@@ -28,12 +41,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-12)
 - 2026-05-12: Inicializado planejamento GSD do projeto.
 - 2026-05-12: `AGENTS.md` lido antes da criacao dos artefatos.
 - 2026-05-12: Git inicializado em `C:\dev\salome-core`.
+- 2026-05-12: Mapas de Contas a Pagar, banco/queries e usuario/acesso adicionados em `.planning/codebase/`.
+- 2026-05-12: Fase de descoberta consolidada a partir dos mapas existentes.
 
 ## Next Steps
 
-1. Executar `$gsd-map-codebase` para mapear o codebase existente, com foco em `salome-legacy`.
-2. Executar `$gsd-discuss-phase 1` para consolidar perguntas e criterios do mapeamento de Contas a Pagar.
-3. Executar `$gsd-plan-phase 1` depois que o contexto da fase estiver claro.
+1. Executar `$gsd-discuss-phase 5` para consolidar a arquitetura alvo do `salome-financeiro-web`.
+2. Executar `$gsd-plan-phase 5` depois que o desenho de arquitetura estiver claro.
+3. Depois avançar para a primeira fase de implementacao da leitura Vaadin.
 
 ---
-*Last updated: 2026-05-12 after initialization*
+*Last updated: 2026-05-12 after codebase mapping*
