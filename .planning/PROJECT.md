@@ -2,46 +2,50 @@
 
 ## What This Is
 
-Este projeto organiza a migracao incremental do sistema legado da Expresso Salome para um modulo web financeiro moderno. O foco inicial e o dominio de Contas a Pagar: primeiro mapear o comportamento existente no legado Java 8 MVC Swing, depois criar uma aplicacao Vaadin que leia os mesmos dados e respeite as mesmas regras antes de permitir qualquer gravacao.
+Este projeto organiza a migracao incremental do sistema legado da Expresso Salome para um modulo web financeiro moderno. O foco inicial e o dominio de Contas a Pagar, e o mapeamento das fases 1 a 4 ja confirmou que o fluxo passa por `ContasPagar`, `NotaCompra`, `NotaCompraDuplicatas`, `NotaCompraRateio`, `NotaCompraProdutos`, `Extrato`, `Banco`, `Fornecedor`, `Filial` e `PlanoContas*`.
 
-O legado `salome-legacy` continua funcionando em producao durante toda a migracao. O novo sistema planejado e `salome-financeiro-web`, com Java 25, Spring Boot 4, Vaadin, MySQL, Maven, Flyway e acesso inicial somente leitura via `JdbcTemplate` ao banco legado.
+O legado `salome-legacy` continua funcionando durante toda a migracao. O novo sistema planejado e `salome-core`, com Java 25, Spring Boot 4, Vaadin, MySQL, Maven e Flyway. A estrategia agora e usar o mapeamento como fonte de verdade para espelhar primeiro o comportamento existente em leitura, manter o Contas a Pagar funcionando na nova stack e so depois evoluir para novas features.
 
 ## Core Value
 
-Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes e mantendo o legado operando sem interrupcao.
+Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes, espelhando primeiro o legado na nova stack e mantendo o legado operando sem interrupcao.
 
 ## Requirements
 
 ### Validated
 
-(None yet - ship to validate)
+- [x] O inventario tecnico do Contas a Pagar legado esta documentado em `.planning/codebase/`.
+- [x] As origens das principais regras financeiras foram rastreadas ate classe, metodo, botao, DAO, query e tabela quando aplicavel.
+- [x] As consultas prioritarias para a primeira tela web somente leitura ja estao identificadas.
+- [x] O mapeamento das fases 1 a 4 virou base oficial para as proximas fases de arquitetura e implementacao.
 
 ### Active
 
-- [ ] Mapear classes, telas, botoes, listeners, DAOs, queries, tabelas e regras de negocio do Contas a Pagar legado.
-- [ ] Documentar origem de cada regra encontrada com classe, metodo, botao, DAO, query e tabela quando aplicavel.
-- [ ] Mapear usuarios, login, perfil de usuario e permissoes usados pelo fluxo financeiro.
-- [ ] Mapear entidades e conceitos relacionados a `NotaCompra*`, rateio, produto, plano de contas, filial, fornecedor, banco, extrato, baixa, `ContaPagar`, `ContasPagar` e contas a receber relevantes para faturamento/CT-e.
-- [ ] Propor arquitetura do `salome-financeiro-web` antes de criar o projeto.
-- [ ] Criar uma primeira versao web Vaadin somente leitura antes de qualquer fluxo de gravacao.
-- [ ] Validar dados da tela web contra o comportamento e dados do legado.
-- [ ] Migrar gradualmente edicao, salvamento, exclusao controlada e baixa somente apos documentacao e testes das regras criticas.
+- [ ] Propor a arquitetura alvo do `salome-core` com separacao clara entre `ui`, `application`, `domain`, `infrastructure` e `security`.
+- [ ] Criar a primeira versao web Vaadin somente leitura para Contas a Pagar, espelhando o comportamento e os dados do legado com Services e Adapters/Repositories por baixo.
+- [ ] Reproduzir as consultas prioritarias de `ContasPagar`, `NotaCompra`, `NotaCompraDuplicatas` e `Extrato` na camada de leitura.
+- [ ] Validar os dados exibidos na web contra o comportamento e os dados do legado.
+- [ ] Migrar edicao, salvamento, exclusao controlada, rateio e baixa apenas depois que as regras criticas estiverem documentadas e testadas.
 - [ ] Evoluir depois para dashboard financeiro, fluxo de caixa previsto, importacao XML, associacao produto fiscal x produto sistema, portal de pagamentos, integracao Banco do Brasil, comprovantes e auditoria.
 
 ### Out of Scope
 
-- Alterar qualquer codigo em `salome-legacy` nesta fase - o objetivo atual e planejamento e preparacao para mapeamento.
-- Criar o projeto `salome-financeiro-web` nesta fase - isso so acontece depois do mapeamento e da proposta de arquitetura.
-- Refatorar codigo existente nesta fase - antes disso e preciso mapear e documentar comportamento.
-- Alterar banco de dados ou producao - nenhuma tabela, campo ou dado deve ser alterado agora.
-- Implementar telas Vaadin nesta fase - primeiro mapear, depois planejar, depois implementar.
-- Liberar gravacao antes de existir versao somente leitura validada - regra obrigatoria do projeto.
+- Alterar qualquer codigo em `salome-legacy` sem autorizacao explicita - o legado precisa continuar funcionando durante a migracao.
+- Alterar banco de dados de producao - qualquer evolucao de schema futura exige script SQL versionado.
+- Criar campos ou tabelas sem script SQL rastreavel - o novo modulo precisa manter governanca de schema.
+- Reescrever a tela Swing como arquitetura nova - a meta e migrar comportamento, nao copiar a UI.
+- Colocar regra de negocio ou SQL dentro da View Vaadin - a UI deve chamar Services.
+- Liberar gravacao antes de existir uma versao somente leitura validada - a leitura vem primeiro por seguranca financeira.
+- Migrar baixa, exclusao, rateio, fornecedor, produto, plano de contas, filial ou usuario logado sem documentacao previa - sao regras criticas.
+- Desacoplar o usuario logado do legado antes de existir substituicao equivalente no novo modulo - a estrutura atual ainda e a referencia.
 
 ## Context
 
 O sistema atual da Expresso Salome esta em Java 8, MVC e Swing, roda no desktop dos usuarios e conecta em um banco MySQL hospedado em VPS Hostinger. Ele esta em producao e deve continuar funcionando durante toda a migracao.
 
-O primeiro dominio e Contas a Pagar. O legado possui regras de negocio possivelmente distribuidadas entre telas Swing, botoes, listeners, classes internas, DAOs e queries. A migracao precisa identificar essas regras antes de traduzi-las para services, repositories/adapters e views Vaadin.
+O mapeamento tecnico ja mostrou como o dominio financeiro esta distribuido: `ContasPagar.java` monta SQL na propria view, `ContasPagarData` faz CRUD JDBC direto, `ContasPagarController` e uma fachada fina, e `ContasPagarBean` carrega flags `...Gravar` para update parcial. Em `NotaCompra`, a tela mistura leitura, importacao XML, criacao de fornecedor, rateio, duplicatas e geracao de NF-e. Esses mapas sao a referencia para construir a nova stack sem inventar comportamento novo antes de espelhar o legado.
+
+Os mapas tambem confirmaram regras sensiveis: duplicata baixada nao pode ser excluida, vencimento nao pode anteceder emissao, baixa cria `Extrato` e atualiza a duplicata, cheque baixa varias duplicatas na mesma transacao, rateio nao pode exceder o valor restante, e o usuario logado depende de `Conecta.getUsuario()` e de helpers de `UsuarioController`.
 
 Termos prioritarios para investigacao no legado:
 
@@ -86,13 +90,15 @@ Termos prioritarios para investigacao no legado:
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Inicializar apenas planejamento GSD agora | O pedido atual e preparar o projeto para mapeamento, sem criar app novo ou mexer no legado | Pending |
-| Usar `salome-legacy` como sistema legado e `salome-financeiro-web` como novo sistema alvo | Mantem fronteira clara entre codigo existente e modulo web futuro | Pending |
-| Comecar pelo Contas a Pagar | E o primeiro dominio de negocio definido para migracao incremental | Pending |
-| Usar Java 25, Spring Boot 4, Vaadin, MySQL, Maven, Flyway e `JdbcTemplate` inicialmente | Stack definida pelo projeto e adequada para leitura incremental do banco legado | Pending |
-| Criar versao web inicialmente somente leitura | Reduz risco financeiro e permite comparar dados com o legado antes de gravacao | Pending |
-| Preferir granularidade fina no GSD | Migracao financeira exige fases pequenas, revisaveis e documentadas | Pending |
-| Commitar documentos de planejamento | Mantem historico de decisoes e facilita auditoria da migracao | Pending |
+| Inicializar apenas planejamento GSD agora | O pedido atual era preparar o projeto para mapeamento, sem criar app novo ou mexer no legado | Accepted |
+| Usar `salome-legacy` como sistema legado e `salome-core` como novo sistema alvo | Mantem fronteira clara entre codigo existente e modulo web futuro | Accepted |
+| Comecar pelo Contas a Pagar | E o primeiro dominio de negocio definido para migracao incremental | Accepted |
+| Usar Java 25, Spring Boot 4, Vaadin, MySQL, Maven e Flyway no novo modulo | Stack definida pelo projeto e adequada para leitura incremental do banco legado | Accepted |
+| Criar versao web inicialmente somente leitura | Reduz risco financeiro e permite comparar dados com o legado antes de gravacao | Accepted |
+| Priorizar leitura de `ContasPagar`, `NotaCompra`, duplicatas e extrato antes de qualquer escrita | Segue a ordem real do legado e reduz o risco da primeira entrega web | Accepted |
+| Reaproveitar a semantica de identidade legada por enquanto | `Conecta.getUsuario()` e `UsuarioController` ainda carregam filial, banco e permissoes do fluxo atual | Accepted |
+| Preferir granularidade fina no GSD | Migracao financeira exige fases pequenas, revisaveis e documentadas | Accepted |
+| Commitar documentos de planejamento | Mantem historico de decisoes e facilita auditoria da migracao | Accepted |
 
 ## Evolution
 
@@ -112,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-12 after initialization*
+*Last updated: 2026-05-13 after codemap-driven migration update*

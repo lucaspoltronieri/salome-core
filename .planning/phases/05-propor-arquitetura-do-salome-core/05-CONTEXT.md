@@ -1,4 +1,4 @@
-# Phase 5: Propor arquitetura do salome-financeiro-web - Context
+# Phase 5: Propor arquitetura do salome-core - Context
 
 **Gathered:** 2026-05-12
 **Status:** Ready for planning
@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Esta fase define a arquitetura alvo do `salome-financeiro-web`: separacao de camadas, identidade e autorizacao, acesso a dados e limites entre UI e regras de negocio. A entrega desta fase nao implementa o CRUD completo no banco legado; ela trava as decisoes para que as proximas fases possam criar a primeira versao web com seguranca e sem SQL na View.
+Esta fase define a arquitetura alvo do `salome-core`: separacao de camadas, identidade e autorizacao, acesso a dados e limites entre UI e regras de negocio. A entrega desta fase nao implementa o CRUD completo no banco legado; ela trava as decisoes para que as proximas fases possam criar a primeira versao web com seguranca e sem SQL na View.
 
 </domain>
 
@@ -96,5 +96,5 @@ Esta fase define a arquitetura alvo do `salome-financeiro-web`: separacao de cam
 
 ---
 
-*Phase: 5-Propor arquitetura do salome-financeiro-web*
+*Phase: 5-Propor arquitetura do salome-core*
 *Context gathered: 2026-05-12*
