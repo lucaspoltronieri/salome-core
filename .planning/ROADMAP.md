@@ -16,8 +16,8 @@ Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois plane
 | 2 | Mapear usuarios, login e permissoes do legado | Complete | Entender usuario logado, perfis e permissoes que protegem o fluxo financeiro | SEC-01, SEC-02, SEC-03 | no |
 | 3 | Mapear tabelas, queries e regras relacionadas a NotaCompra | Complete | Documentar `NotaCompra*`, duplicatas, rateio, produtos, fornecedor, filial, plano de contas e dependencias relevantes | MAP-04, DATA-01, DATA-03 | no |
 | 4 | Mapear baixa, extrato bancario e banco | Complete | Documentar regras de baixa, banco, extrato, cheque e impactos financeiros | DATA-02 | no |
-| 5 | Propor arquitetura do salome-core | Next | Definir arquitetura alvo com separacao de UI, application, domain, infrastructure e security | ARCH-01, ARCH-02, ARCH-03, ARCH-04 | no |
-| 6 | Criar projeto Java 25 + Spring Boot 4 + Vaadin | Planned | Criar base tecnica do novo modulo sem regra financeira migrada ainda, preparada para espelhar o legado | ARCH-01, ARCH-02, ARCH-04 | yes |
+| 5 | Propor arquitetura do salome-core | Complete | Definir arquitetura alvo com separacao de UI, application, domain, infrastructure e security | ARCH-01, ARCH-02, ARCH-03, ARCH-04 | no |
+| 6 | Criar projeto Java 25 + Spring Boot 4 + Vaadin | Next | Criar base tecnica do novo modulo sem regra financeira migrada ainda, preparada para espelhar o legado | ARCH-01, ARCH-02, ARCH-04 | yes |
 | 7 | Criar tela Contas a Pagar somente leitura | Planned | Espelhar os dados do Contas a Pagar, `NotaCompra`, duplicatas e extrato em Vaadin via Services e Adapters/Repositories | READ-01, READ-02 | yes |
 | 8 | Validar dados da tela web contra o legado | Planned | Comparar o espelhamento web com o legado e documentar divergencias nas consultas prioritarias | READ-03 | yes |
 | 9 | Migrar edicao e salvamento de NotaCompra | Planned | Liberar escrita controlada de NotaCompra apos regras documentadas e testadas | WRITE-01 | yes |

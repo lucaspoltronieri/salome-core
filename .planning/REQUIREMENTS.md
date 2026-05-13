@@ -28,10 +28,10 @@
 
 ### Arquitetura
 
-- [ ] **ARCH-01**: Equipe pode revisar uma proposta de arquitetura para `salome-core` antes da criacao do projeto.
-- [ ] **ARCH-02**: Arquitetura proposta separa `ui`, `application`, `domain`, `infrastructure` e `security`.
-- [ ] **ARCH-03**: Arquitetura proposta impede regra pesada e SQL dentro de Views Vaadin.
-- [ ] **ARCH-04**: Arquitetura proposta usa Services para casos de uso e Repositories/Adapters para acesso ao banco legado.
+- [x] **ARCH-01**: Equipe pode revisar uma proposta de arquitetura para `salome-core` antes da criacao do projeto.
+- [x] **ARCH-02**: Arquitetura proposta separa `ui`, `application`, `domain`, `infrastructure` e `security`.
+- [x] **ARCH-03**: Arquitetura proposta impede regra pesada e SQL dentro de Views Vaadin.
+- [x] **ARCH-04**: Arquitetura proposta usa Services para casos de uso e Repositories/Adapters para acesso ao banco legado.
 
 ### Leitura Web Validada
 
@@ -87,10 +87,10 @@
 | DATA-01 | Phase 3 | Complete |
 | DATA-02 | Phase 4 | Complete |
 | DATA-03 | Phase 3 | Complete |
-| ARCH-01 | Phase 5 | Pending |
-| ARCH-02 | Phase 5 | Pending |
-| ARCH-03 | Phase 5 | Pending |
-| ARCH-04 | Phase 5 | Pending |
+| ARCH-01 | Phase 5 | Complete |
+| ARCH-02 | Phase 5 | Complete |
+| ARCH-03 | Phase 5 | Complete |
+| ARCH-04 | Phase 5 | Complete |
 | READ-01 | Phase 7 | Pending |
 | READ-02 | Phase 7 | Pending |
 | READ-03 | Phase 8 | Pending |

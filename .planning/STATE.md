@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 5 planned
-last_updated: "2026-05-13T12:38:10.333Z"
+status: planning
+stopped_at: Phase 5 complete
+last_updated: "2026-05-13T14:30:52.716Z"
 progress:
   total_phases: 18
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 100
 ---
 
 # State: Migracao Salome Legacy para Financeiro Web
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-13)
 
 **Core value:** Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes e mantendo o legado operando sem interrupcao.
-**Current focus:** Phase 5 - Propor arquitetura do salome-core usando o mapeamento das fases 1 a 4 como baseline
+**Current focus:** Phase 6 - Criar projeto Java 25 + Spring Boot 4 + Vaadin, usando a arquitetura aprovada na fase 5 como contrato
 
 ## Current Phase
 
-- **Phase:** 5
-- **Name:** Propor arquitetura do salome-core
-- **Status:** Ready to execute
-- **Recommended next command:** `$gsd-discuss-phase 5`
+- **Phase:** 6
+- **Name:** Criar projeto Java 25 + Spring Boot 4 + Vaadin
+- **Status:** Ready to discuss
+- **Recommended next command:** `$gsd-discuss-phase 6`
 
 ## Guardrails
 
@@ -48,19 +48,20 @@ See: `.planning/PROJECT.md` (updated 2026-05-13)
 - 2026-05-12: Fase de descoberta consolidada a partir dos mapas existentes.
 - 2026-05-13: Mapeamento das fases 1 a 4 formalizado como baseline da migracao.
 - 2026-05-13: Orientacao reforcada para espelhar o legado em leitura antes de novas features.
+- 2026-05-13: Phase 5 concluida com proposta de arquitetura em `docs/architecture/salome-core-architecture.md`.
 
 ## Session
 
-Last session: 2026-05-13T12:38:10.325Z
-Last Date: 2026-05-13T12:38:10.325Z
-Stopped At: Phase 5 planned
-Resume File: .planning/phases/05-propor-arquitetura-do-salome-core/05-01-PLAN.md
+Last session: 2026-05-13T14:30:30.361Z
+Last Date: 2026-05-13T14:30:30.361Z
+Stopped At: Phase 5 complete
+Resume File: .planning/phases/05-propor-arquitetura-do-salome-core/05-VERIFICATION.md
 
 ## Next Steps
 
-1. Executar `$gsd-discuss-phase 5` para consolidar a arquitetura alvo do `salome-core`.
-2. Executar `$gsd-plan-phase 5` depois que o desenho de arquitetura estiver claro.
-3. Depois avancar para a primeira fase de implementacao da leitura Vaadin baseada no legado espelhado.
+1. Executar `$gsd-discuss-phase 6` para consolidar a base tecnica do projeto Java 25 + Spring Boot 4 + Vaadin.
+2. Executar `$gsd-plan-phase 6` depois que o desenho da base tecnica estiver claro.
+3. Depois executar `$gsd-execute-phase 6` para criar a base tecnica sem regra financeira migrada.
 
 ---
-*Last updated: 2026-05-13 after codemap-driven migration update*
+*Last updated: 2026-05-13 after phase 5 completion*

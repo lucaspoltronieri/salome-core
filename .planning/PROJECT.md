@@ -18,10 +18,10 @@ Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras exi
 - [x] As origens das principais regras financeiras foram rastreadas ate classe, metodo, botao, DAO, query e tabela quando aplicavel.
 - [x] As consultas prioritarias para a primeira tela web somente leitura ja estao identificadas.
 - [x] O mapeamento das fases 1 a 4 virou base oficial para as proximas fases de arquitetura e implementacao.
+- [x] A arquitetura alvo do `salome-core` foi proposta em `docs/architecture/salome-core-architecture.md`, com separacao entre `ui`, `application`, `domain`, `infrastructure` e `security`.
 
 ### Active
 
-- [ ] Propor a arquitetura alvo do `salome-core` com separacao clara entre `ui`, `application`, `domain`, `infrastructure` e `security`.
 - [ ] Criar a primeira versao web Vaadin somente leitura para Contas a Pagar, espelhando o comportamento e os dados do legado com Services e Adapters/Repositories por baixo.
 - [ ] Reproduzir as consultas prioritarias de `ContasPagar`, `NotaCompra`, `NotaCompraDuplicatas` e `Extrato` na camada de leitura.
 - [ ] Validar os dados exibidos na web contra o comportamento e os dados do legado.
@@ -97,6 +97,7 @@ Termos prioritarios para investigacao no legado:
 | Criar versao web inicialmente somente leitura | Reduz risco financeiro e permite comparar dados com o legado antes de gravacao | Accepted |
 | Priorizar leitura de `ContasPagar`, `NotaCompra`, duplicatas e extrato antes de qualquer escrita | Segue a ordem real do legado e reduz o risco da primeira entrega web | Accepted |
 | Reaproveitar a semantica de identidade legada por enquanto | `Conecta.getUsuario()` e `UsuarioController` ainda carregam filial, banco e permissoes do fluxo atual | Accepted |
+| Usar arquitetura alvo documentada para `salome-core` antes de criar o projeto | Phase 5 consolidou camadas, fluxo de dependencia, adapters legados, Spring Security, Flyway e testes financeiros | Accepted |
 | Preferir granularidade fina no GSD | Migracao financeira exige fases pequenas, revisaveis e documentadas | Accepted |
 | Commitar documentos de planejamento | Mantem historico de decisoes e facilita auditoria da migracao | Accepted |
 
@@ -118,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after codemap-driven migration update*
+*Last updated: 2026-05-13 after phase 5 architecture proposal*
