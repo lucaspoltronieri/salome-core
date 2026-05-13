@@ -6,30 +6,30 @@
 
 ## Overview
 
-Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois planejar, depois implementar. As primeiras fases nao alteram o legado, nao alteram banco, nao criam tabelas, nao criam campos e nao implementam telas.
+Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois planejar, depois implementar. As fases de mapeamento ja estao completas e documentadas em `.planning/codebase/`, e o restante do plano parte desse conhecimento para chegar na primeira tela Vaadin somente leitura, espelhando o legado antes de criar novas features.
 
 ## Phases
 
-| # | Phase | Goal | Requirements | UI Hint |
-|---|-------|------|--------------|---------|
-| 1 | Mapear Contas a Pagar legado | Identificar tela, classes, botoes, listeners, DAOs, queries e tabelas principais do Contas a Pagar | MAP-01, MAP-02, MAP-03 | no |
-| 2 | Mapear usuarios, login e permissoes do legado | Entender usuario logado, perfis e permissoes que protegem o fluxo financeiro | SEC-01, SEC-02, SEC-03 | no |
-| 3 | Mapear tabelas, queries e regras relacionadas a NotaCompra | Documentar `NotaCompra*`, duplicatas, rateio, produtos, fornecedor, filial, plano de contas e dependencias relevantes | MAP-04, DATA-01, DATA-03 | no |
-| 4 | Mapear baixa, extrato bancario e banco | Documentar regras de baixa, banco, extrato, cheque e impactos financeiros | DATA-02 | no |
-| 5 | Propor arquitetura do salome-financeiro-web | Definir arquitetura alvo com separacao de UI, application, domain, infrastructure e security | ARCH-01, ARCH-02, ARCH-03, ARCH-04 | no |
-| 6 | Criar projeto Java 25 + Spring Boot 4 + Vaadin | Criar base tecnica do novo modulo sem regra financeira migrada ainda | ARCH-01, ARCH-02, ARCH-04 | yes |
-| 7 | Criar tela Contas a Pagar somente leitura | Exibir dados do Contas a Pagar em Vaadin via Services e Adapters/Repositories | READ-01, READ-02 | yes |
-| 8 | Validar dados da tela web contra o legado | Comparar dados web com legado e documentar divergencias | READ-03 | yes |
-| 9 | Migrar edicao e salvamento de NotaCompra | Liberar escrita controlada de NotaCompra apos regras documentadas e testadas | WRITE-01 | yes |
-| 10 | Migrar exclusao controlada | Implementar exclusao conforme permissoes e regras criticas documentadas | WRITE-02 | yes |
-| 11 | Migrar baixa de Contas a Pagar | Implementar baixa com testes e rastreabilidade de regras financeiras | WRITE-03 | yes |
-| 12 | Criar dashboard financeiro somente leitura | Adicionar visao analitica inicial sem gravacao | DASH-01 | yes |
-| 13 | Criar fluxo de caixa previsto somente leitura | Apresentar previsao financeira baseada nos dados mapeados | CASH-01 | yes |
-| 14 | Criar portal de importacao XML | Receber XML fiscal em fluxo web controlado | XML-01 | yes |
-| 15 | Criar associacao produto fiscal x produto sistema | Permitir conciliacao entre produto fiscal e cadastro interno | PROD-01 | yes |
-| 16 | Criar portal de pagamentos | Preparar operacao web de pagamentos | PAY-01 | yes |
-| 17 | Integrar Banco do Brasil | Integrar fluxo bancario conforme requisitos tecnicos e seguranca | BANK-01 | yes |
-| 18 | Salvar comprovantes e auditoria | Persistir comprovantes e trilha auditavel de operacoes financeiras | AUD-01 | yes |
+| # | Phase | Status | Goal | Requirements | UI Hint |
+|---|-------|--------|------|--------------|---------|
+| 1 | Mapear Contas a Pagar legado | Complete | Identificar tela, classes, botoes, listeners, DAOs, queries e tabelas principais do Contas a Pagar | MAP-01, MAP-02, MAP-03 | no |
+| 2 | Mapear usuarios, login e permissoes do legado | Complete | Entender usuario logado, perfis e permissoes que protegem o fluxo financeiro | SEC-01, SEC-02, SEC-03 | no |
+| 3 | Mapear tabelas, queries e regras relacionadas a NotaCompra | Complete | Documentar `NotaCompra*`, duplicatas, rateio, produtos, fornecedor, filial, plano de contas e dependencias relevantes | MAP-04, DATA-01, DATA-03 | no |
+| 4 | Mapear baixa, extrato bancario e banco | Complete | Documentar regras de baixa, banco, extrato, cheque e impactos financeiros | DATA-02 | no |
+| 5 | Propor arquitetura do salome-core | Next | Definir arquitetura alvo com separacao de UI, application, domain, infrastructure e security | ARCH-01, ARCH-02, ARCH-03, ARCH-04 | no |
+| 6 | Criar projeto Java 25 + Spring Boot 4 + Vaadin | Planned | Criar base tecnica do novo modulo sem regra financeira migrada ainda, preparada para espelhar o legado | ARCH-01, ARCH-02, ARCH-04 | yes |
+| 7 | Criar tela Contas a Pagar somente leitura | Planned | Espelhar os dados do Contas a Pagar, `NotaCompra`, duplicatas e extrato em Vaadin via Services e Adapters/Repositories | READ-01, READ-02 | yes |
+| 8 | Validar dados da tela web contra o legado | Planned | Comparar o espelhamento web com o legado e documentar divergencias nas consultas prioritarias | READ-03 | yes |
+| 9 | Migrar edicao e salvamento de NotaCompra | Planned | Liberar escrita controlada de NotaCompra apos regras documentadas e testadas | WRITE-01 | yes |
+| 10 | Migrar exclusao controlada | Planned | Implementar exclusao conforme permissoes e regras criticas documentadas | WRITE-02 | yes |
+| 11 | Migrar baixa de Contas a Pagar | Planned | Implementar baixa com testes e rastreabilidade de regras financeiras | WRITE-03 | yes |
+| 12 | Criar dashboard financeiro somente leitura | Planned | Adicionar visao analitica inicial sem gravacao | DASH-01 | yes |
+| 13 | Criar fluxo de caixa previsto somente leitura | Planned | Apresentar previsao financeira baseada nos dados mapeados | CASH-01 | yes |
+| 14 | Criar portal de importacao XML | Planned | Receber XML fiscal em fluxo web controlado | XML-01 | yes |
+| 15 | Criar associacao produto fiscal x produto sistema | Planned | Permitir conciliacao entre produto fiscal e cadastro interno | PROD-01 | yes |
+| 16 | Criar portal de pagamentos | Planned | Preparar operacao web de pagamentos | PAY-01 | yes |
+| 17 | Integrar Banco do Brasil | Planned | Integrar fluxo bancario conforme requisitos tecnicos e seguranca | BANK-01 | yes |
+| 18 | Salvar comprovantes e auditoria | Planned | Persistir comprovantes e trilha auditavel de operacoes financeiras | AUD-01 | yes |
 
 ## Phase Details
 
@@ -38,6 +38,8 @@ Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois plane
 **Goal:** Identificar a superficie real do Contas a Pagar no legado antes de qualquer implementacao.
 
 **Requirements:** MAP-01, MAP-02, MAP-03
+
+**Discovery artifacts:** `.planning/codebase/CONTAS-PAGAR-CLASSES-MAPA-TECNICO.md`, `.planning/codebase/CONTAS-PAGAR-LEGADO.md`
 
 **Success criteria:**
 1. Inventario aponta arquivos/classes do legado ligados a Contas a Pagar.
@@ -53,6 +55,8 @@ Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois plane
 
 **Requirements:** SEC-01, SEC-02, SEC-03
 
+**Discovery artifacts:** `.planning/codebase/USUARIO-ACESSO-MAPA.md`
+
 **Success criteria:**
 1. Fluxo de login e usuario logado esta documentado.
 2. Permissoes relacionadas a Contas a Pagar estao mapeadas.
@@ -63,6 +67,8 @@ Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois plane
 **Goal:** Documentar dados e regras de `NotaCompra*` que sustentam Contas a Pagar.
 
 **Requirements:** MAP-04, DATA-01, DATA-03
+
+**Discovery artifacts:** `.planning/codebase/CONTAS-PAGAR-CLASSES-MAPA-TECNICO.md`, `.planning/codebase/CONTAS-PAGAR-MAPA-BANCO-QUERIES.md`
 
 **Success criteria:**
 1. Tabelas e relacionamentos de NotaCompra, duplicata, rateio, fornecedor, filial e plano de contas estao documentados.
@@ -75,12 +81,14 @@ Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois plane
 
 **Requirements:** DATA-02
 
+**Discovery artifacts:** `.planning/codebase/CONTAS-PAGAR-MAPA-BANCO-QUERIES.md`
+
 **Success criteria:**
 1. Fluxos de baixa, banco, extrato e cheque estao rastreados ate origem no legado.
 2. Regras criticas e casos de erro estao documentados.
 3. Riscos e testes obrigatorios para baixa estao listados.
 
-### Phase 5: Propor arquitetura do salome-financeiro-web
+### Phase 5: Propor arquitetura do salome-core
 
 **Goal:** Definir a arquitetura alvo antes de criar o novo projeto.
 
@@ -105,18 +113,18 @@ Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois plane
 
 ### Phase 7: Criar tela Contas a Pagar somente leitura
 
-**Goal:** Exibir Contas a Pagar em web sem gravacao.
+**Goal:** Espelhar Contas a Pagar em web sem gravacao.
 
 **Requirements:** READ-01, READ-02
 
 **Success criteria:**
 1. Usuario acessa tela Vaadin de Contas a Pagar.
-2. Dados sao carregados por Service e Repository/Adapter.
+2. Dados sao carregados por Service e Repository/Adapter com base nas consultas mapeadas do legado.
 3. Tela nao contem SQL nem regra financeira pesada.
 
 ### Phase 8: Validar dados da tela web contra o legado
 
-**Goal:** Confirmar que leitura web reproduz dados esperados antes de evoluir para escrita.
+**Goal:** Confirmar que o espelhamento web reproduz dados esperados antes de evoluir para escrita.
 
 **Requirements:** READ-03
 
@@ -236,3 +244,4 @@ Este roadmap segue a ordem obrigatoria do projeto: primeiro mapear, depois plane
 
 ---
 *Roadmap created: 2026-05-12*
+*Last updated: 2026-05-13 after codemap-driven migration update*
