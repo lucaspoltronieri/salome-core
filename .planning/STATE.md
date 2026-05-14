@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_execute
-stopped_at: Phase 7 planned
-last_updated: "2026-05-14T13:18:32.512Z"
+status: planning
+stopped_at: Phase 8 context gathered
+last_updated: "2026-05-14T15:16:55.128Z"
 progress:
   total_phases: 18
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # State: Migracao Salome Legacy para Financeiro Web
@@ -20,22 +20,22 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-13)
 
 **Core value:** Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes e mantendo o legado operando sem interrupcao.
-**Current focus:** Phase 7 - Criar tela Contas a Pagar somente leitura, usando a base Vaadin da fase 6 e o recorte de duplicatas vinculado a NotaCompra
+**Current focus:** Phase 8 - Validar dados da tela web contra o legado
 
 ## Current Phase
 
-- **Phase:** 7
-- **Name:** Criar tela Contas a Pagar somente leitura
-- **Status:** Ready to execute
-- **Recommended next command:** `$gsd-execute-phase 7`
+- **Phase:** 8
+- **Name:** Validar dados da tela web contra o legado
+- **Status:** Ready to plan
+- **Recommended next command:** `$gsd-plan-phase 8`
 
 ## Guardrails
 
 - Nao alterar `salome-legacy` sem autorizacao explicita.
 - Nao alterar banco de producao.
-- Nao criar projeto `salome-core` ainda.
-- Nao criar tabelas, campos ou migrations ainda.
-- Nao implementar telas ainda.
+- Nao criar campo/tabela sem gerar script SQL versionado.
+- Nao colocar regra de negocio dentro da View Vaadin.
+- Nao colocar SQL dentro da View Vaadin.
 - Mapear e documentar regras antes de migrar comportamento.
 - Espelhar primeiro o Contas a Pagar legado em leitura na nova stack e so depois introduzir novas features.
 
@@ -50,19 +50,20 @@ See: `.planning/PROJECT.md` (updated 2026-05-13)
 - 2026-05-13: Orientacao reforcada para espelhar o legado em leitura antes de novas features.
 - 2026-05-13: Phase 5 concluida com proposta de arquitetura em `docs/architecture/salome-core-architecture.md`.
 - 2026-05-14: Phase 7 planejada com pesquisa e plano executavel para tela Vaadin somente leitura de duplicatas/NotaCompra.
+- 2026-05-14: Phase 7 executada com fila Vaadin read-only de duplicatas, filtros Hoje/Vencidas/Proximos/Todas e verificacao estatica documentada.
 
 ## Session
 
-Last session: 2026-05-14T13:18:32.472Z
-Last Date: 2026-05-14T13:18:32.472Z
-Stopped At: Phase 7 planned
-Resume File: .planning/phases/07-criar-tela-contas-a-pagar-somente-leitura/07-01-PLAN.md
+Last session: 2026-05-14T15:16:55.097Z
+Last Date: 2026-05-14T15:16:55.097Z
+Stopped At: Phase 8 context gathered
+Resume File: .planning/phases/08-validar-dados-da-tela-web-contra-o-legado/08-CONTEXT.md
 
 ## Next Steps
 
-1. Revisar `.planning/phases/07-criar-tela-contas-a-pagar-somente-leitura/07-01-PLAN.md`.
-2. Executar `$gsd-execute-phase 7` para implementar a tela Vaadin somente leitura.
-3. Depois executar `$gsd-plan-phase 8` para preparar a validacao dos dados web contra o legado.
+1. Instalar/expor JDK 25 e Maven no PATH e executar `mvn test`.
+2. Revisar `.planning/phases/07-criar-tela-contas-a-pagar-somente-leitura/07-VERIFICATION.md`.
+3. Executar `$gsd-plan-phase 8` para preparar a validacao dos dados web contra o legado.
 
 ---
-*Last updated: 2026-05-14 after phase 7 planning*
+*Last updated: 2026-05-14 after phase 7 execution*
