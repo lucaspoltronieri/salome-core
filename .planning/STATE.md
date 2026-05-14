@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 9 context gathered
-last_updated: "2026-05-14T20:23:43.534Z"
+last_updated: "2026-05-14T20:34:37.012Z"
 progress:
   total_phases: 18
   completed_phases: 4
-  total_plans: 4
+  total_plans: 8
   completed_plans: 4
-  percent: 100
+  percent: 50
 ---
 
 # State: Migracao Salome Legacy para Financeiro Web
@@ -26,8 +26,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 
 - **Phase:** 9
 - **Name:** Migrar NotaCompra completa
-- **Status:** Context discussion in progress
-- **Recommended next command:** `$gsd-discuss-phase 9`
+- **Status:** Ready to execute
+- **Recommended next command:** `$gsd-execute-phase 9`
 
 ## Guardrails
 
@@ -68,7 +68,7 @@ Resume File: .planning/phases/09-migrar-notacompra-completa/09-CONTEXT.md
 2. Configurar `SALOME_LEGACY_DB_*` para um MySQL legado seguro de desenvolvimento/homologacao.
 3. Rodar a validacao local da fase 8 conforme `docs/setup/salome-core-local.md`.
 4. Revisar `.planning/phases/08-validar-dados-da-tela-web-contra-o-legado/08-VALIDATION.md` e resolver divergencias antes da fase 9.
-5. Planejar a fase 9 como `NotaCompra` completa: cabecalho, fornecedor, filial, produtos, duplicatas, rateio, plano de contas, inclusao, edicao, salvamento, exclusao, auditoria, permissoes e testes.
+5. Executar a fase 9 como `NotaCompra` completa em ondas: fundacao, Documento Entrada/cabecalho, secoes operacionais e fechamento com exclusao/XML/auditoria.
 
 ---
 *Last updated: 2026-05-14 after complete Contas a Pagar scope correction*
