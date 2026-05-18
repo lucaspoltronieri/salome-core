@@ -11,9 +11,10 @@ A fase 5 entrega apenas um contrato arquitetural revisavel. Ela nao cria
 `pom.xml`, codigo Java, Views Vaadin, configuracao Spring Boot, scripts Flyway
 ou qualquer alteracao no banco.
 
-O objetivo inicial do `salome-core` continua sendo espelhar a tela de Contas a
-Pagar em modo web somente leitura, lendo os mesmos dados do banco legado e
-mantendo o legado em operacao.
+O objetivo do `salome-core` e migrar o Contas a Pagar completo para web, com
+equivalencia funcional ao legado e mantendo o legado em operacao durante a
+migracao. A primeira tela somente leitura e apenas um checkpoint tecnico para
+validar dados e reduzir risco antes de liberar escrita financeira.
 
 ## Escopo e nao escopo
 
@@ -23,7 +24,8 @@ Escopo desta proposta:
 - Definir a direcao de dependencia entre UI, services, dominio e adapters.
 - Definir a fronteira de acesso ao banco legado.
 - Definir como o usuario logado do legado sera adaptado para Spring Security.
-- Definir a politica read-first e a preparacao para escrita futura.
+- Definir a politica read-first como checkpoint e a preparacao para migracao
+  completa de escrita, baixa, exclusao, rateio, produtos e duplicatas.
 - Definir regras de governanca para schema, Flyway e testes financeiros.
 
 Fora do escopo desta fase:
@@ -64,7 +66,7 @@ transacoes futuras e composicao de read models.
 
 Exemplos esperados:
 
-- `ContasPagarQueryService`
+- `GestaoPagamentosService`
 - `NotaCompraQueryService`
 - `NotaCompraDuplicataQueryService`
 - `ExtratoQueryService`
@@ -74,7 +76,7 @@ Exemplos esperados:
 - `PlanoContasLookupService`
 
 Quando escrita for liberada em fases futuras, esta camada tambem deve receber
-commands explicitos, como `SalvarContaPagarCommand`, `BaixarDuplicataCommand` ou
+commands explicitos, como `SalvarDuplicataNotaCompraCommand`, `BaixarDuplicataCommand` ou
 `ExcluirNotaCompraCommand`. Esses commands substituem o padrao legado de beans
 mutaveis com flags `...Gravar`.
 
@@ -176,10 +178,13 @@ Frases de contrato:
 A View Vaadin nunca acessa SQL, JDBC ou tabela. O Service nunca conhece detalhe
 visual da tela. O adapter nunca chama Vaadin.
 
-## Politica read-first e escrita futura
+## Politica read-first e migracao completa
 
 A primeira entrega funcional do `salome-core` deve ser somente leitura. Isso e
-uma regra de seguranca financeira e uma decisao de migracao.
+uma regra de seguranca financeira e uma decisao de migracao, mas nao define o
+escopo final do modulo. O objetivo aprovado e migrar Contas a Pagar completo,
+incluindo `NotaCompra`, produtos, duplicatas, rateio, baixa, banco, extrato,
+cheque, permissoes, edicao, salvamento, exclusao e auditoria.
 
 O desenho de repositories pode ser CRUD-capable desde o inicio, mas a interface
 exposta para a primeira tela deve permitir apenas consultas. Escrita, exclusao,
@@ -198,7 +203,8 @@ Leitura e escrita devem ter modelos separados:
 - Entidades/value objects para regras financeiras.
 
 Esse desenho preserva D-05: os repositories podem ser preparados para CRUD
-futuro, mas o primeiro fluxo web permanece read-only.
+completo, mas o primeiro fluxo web permanece read-only ate a validacao de dados
+passar.
 
 ## Integracao com banco legado
 
@@ -206,7 +212,7 @@ O acesso ao banco legado deve ficar em `infrastructure.legacy`.
 
 Families iniciais de adapters/repositories:
 
-- `LegacyContasPagarRepository`
+- `LegacyGestaoPagamentosRepository`
 - `LegacyNotaCompraRepository`
 - `LegacyNotaCompraDuplicataRepository`
 - `LegacyNotaCompraRateioRepository`
@@ -222,7 +228,7 @@ Origem dos primeiros adapters:
 
 | Adapter alvo | Origem principal no legado | Tabelas principais |
 | --- | --- | --- |
-| `LegacyContasPagarRepository` | `ContasPagar.java`, `ContasPagarController`, `ContasPagarData` | `ContasPagar`, `Fornecedor`, `Filial`, `Banco`, `PlanoContasCentroCusto` |
+| `LegacyGestaoPagamentosRepository` | `NotaCompraDuplicatasConsulta.java`, `NotaCompraDuplicatas.java`, `NotaCompra.java` | `NotaCompraDuplicatas`, `NotaCompra`, `Fornecedor`, `Filial`, `Extrato`, `NotaCompraProdutos`, `NotaCompraRateio` |
 | `LegacyNotaCompraRepository` | `NotaCompra.java`, `NotaCompraController`, `NotaCompraData` | `NotaCompra`, `Fornecedor`, `Filial` |
 | `LegacyNotaCompraDuplicataRepository` | `NotaCompraDuplicatas.java`, `NotaCompraDuplicatasData` | `NotaCompraDuplicatas`, `NotaCompra`, `Extrato` |
 | `LegacyExtratoRepository` | `Extrato.java`, `ExtratoData`, baixa e cheque | `Extrato`, `Banco`, `Operaca`, `v_saldobancariotalao` |
@@ -238,12 +244,20 @@ comportamento com controle direto.
 
 As queries prioritarias para leitura devem seguir a ordem documentada:
 
-- `ContasPagar` - grade principal.
+- `NotaCompraDuplicatas` + `NotaCompra` - grade principal real de Contas a Pagar.
 - `NotaCompra` - grade principal de compras.
 - `NotaCompraDuplicatas` - parcelas e vinculo com `Extrato`.
 - `Extrato` - lancamento bancario e baixa.
 - `NotaCompraRateio` e `NotaCompraProdutos` - detalhes da nota.
 - Lookups de `Fornecedor`, `Filial`, `Banco`, `PlanoContas` e `PlanoContasCentroCusto`.
+
+Nota de correcao da fase 11: a familia legada `ContasPagar.java`,
+`ContasPagarController`, `ContasPagarData`, `ContasPagarBean` e
+`ContasPagarTable` deve ser tratada como codigo morto ate prova contraria. A
+tabela `contaspagar` nao existe no banco de producao analisado, e o fluxo ativo
+de Contas a Pagar usa `NotaCompraDuplicatas` com `NotaCompra`. Nao criar
+adapter, command ou migracao de schema para `contaspagar` sem decisao de produto
+e script SQL versionado.
 
 ## Seguranca e usuario logado
 
@@ -368,6 +382,8 @@ Checklist operacional:
 - O documento nao cria migration.
 - O documento nao altera `salome-legacy`.
 - O documento preserva read-only first.
+- O documento preserva que read-only first nao reduz o escopo final: Contas a
+  Pagar deve ser migrado completo.
 - O documento documenta Spring Security com adapter legado.
 - O documento cita as referencias canonicas de mapeamento.
 - O documento prepara futuras fases sem liberar mutacoes agora.

@@ -2,13 +2,15 @@
 
 ## What This Is
 
-Este projeto organiza a migracao incremental do sistema legado da Expresso Salome para um modulo web financeiro moderno. O foco inicial e o dominio de Contas a Pagar, e o mapeamento das fases 1 a 4 ja confirmou que o fluxo passa por `ContasPagar`, `NotaCompra`, `NotaCompraDuplicatas`, `NotaCompraRateio`, `NotaCompraProdutos`, `Extrato`, `Banco`, `Fornecedor`, `Filial` e `PlanoContas*`.
+Este projeto organiza a migracao completa do sistema legado da Expresso Salome para um modulo web financeiro moderno. O foco inicial e migrar o dominio de Contas a Pagar inteiro, com equivalencia funcional ao fluxo legado realmente ativo: `NotaCompra`, `NotaCompraDuplicatas`, `NotaCompraRateio`, `NotaCompraProdutos`, baixa, extrato, banco, fornecedor, produto, filial, plano de contas, usuario logado e permissoes.
 
-O legado `salome-legacy` continua funcionando durante toda a migracao. O novo sistema planejado e `salome-core`, com Java 25, Spring Boot 4, Vaadin, MySQL, Maven e Flyway. A estrategia agora e usar o mapeamento como fonte de verdade para espelhar primeiro o comportamento existente em leitura, manter o Contas a Pagar funcionando na nova stack e so depois evoluir para novas features.
+Nota de correcao da fase 11: a familia `ContasPagar.java` / `ContasPagarController` / `ContasPagarData` / `ContasPagarBean` / `ContasPagarTable` foi reclassificada como codigo morto ate prova contraria. A tabela `contaspagar` nao existe no banco de producao analisado e o DAO legado usa exclusivamente essa tabela. O "Contas a Pagar" real do sistema deve ser tratado como o fluxo baseado em `NotaCompraDuplicatas` e `NotaCompra`.
+
+O legado `salome-legacy` continua funcionando durante toda a migracao. O novo sistema planejado e `salome-core`, com Java 25, Spring Boot 4, Vaadin, MySQL, Maven e Flyway. A estrategia e usar o mapeamento como fonte de verdade para entregar o Contas a Pagar web com todas as funcionalidades operacionais equivalentes ao legado. A etapa somente leitura das fases 7 e 8 fica registrada como baseline tecnico historico; daqui para frente o escopo aprovado e operacional completo, nao leitura parcial.
 
 ## Core Value
 
-Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes, espelhando primeiro o legado na nova stack e mantendo o legado operando sem interrupcao.
+Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes e entregando no `salome-core` um modulo web funcionalmente equivalente ao legado, mantendo o legado operando sem interrupcao durante a migracao.
 
 ## Requirements
 
@@ -22,10 +24,12 @@ Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras exi
 
 ### Active
 
-- [ ] Criar a primeira versao web Vaadin somente leitura para Contas a Pagar, espelhando o comportamento e os dados do legado com Services e Adapters/Repositories por baixo.
-- [ ] Reproduzir as consultas prioritarias de `ContasPagar`, `NotaCompra`, `NotaCompraDuplicatas` e `Extrato` na camada de leitura.
-- [ ] Validar os dados exibidos na web contra o comportamento e os dados do legado.
-- [ ] Migrar edicao, salvamento, exclusao controlada, rateio e baixa apenas depois que as regras criticas estiverem documentadas e testadas.
+- [x] Criar a primeira versao web Vaadin somente leitura para Contas a Pagar, espelhando o comportamento e os dados do legado com Services e Adapters/Repositories por baixo.
+- [x] Reproduzir as consultas prioritarias de `NotaCompra`, `NotaCompraDuplicatas`, produtos, rateio e `Extrato` na camada de leitura, sem depender da tabela morta `contaspagar`.
+- [ ] Validar os dados exibidos na web contra o comportamento e os dados do legado como apoio a homologacao da migracao completa.
+- [ ] Migrar `NotaCompra` completa, sem recorte parcial: cabecalho, produtos, duplicatas, rateio, fornecedor, filial, plano de contas, edicao, inclusao, salvamento, exclusao e auditoria conforme o legado.
+- [ ] Migrar baixa de Contas a Pagar completa: pagamento, extrato, banco, cheque, datas, bloqueios, permissoes e transacoes equivalentes ao legado.
+- [ ] Homologar paridade operacional do Contas a Pagar: tudo que o usuario faz no legado para o dominio precisa existir no `salome-core`, com regras rastreadas e testes nas regras financeiras criticas.
 - [ ] Evoluir depois para dashboard financeiro, fluxo de caixa previsto, importacao XML, associacao produto fiscal x produto sistema, portal de pagamentos, integracao Banco do Brasil, comprovantes e auditoria.
 
 ### Out of Scope
@@ -35,7 +39,7 @@ Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras exi
 - Criar campos ou tabelas sem script SQL rastreavel - o novo modulo precisa manter governanca de schema.
 - Reescrever a tela Swing como arquitetura nova - a meta e migrar comportamento, nao copiar a UI.
 - Colocar regra de negocio ou SQL dentro da View Vaadin - a UI deve chamar Services.
-- Liberar gravacao antes de existir uma versao somente leitura validada - a leitura vem primeiro por seguranca financeira.
+- Tratar a versao somente leitura como entrega final do Contas a Pagar - ela foi apenas baseline tecnico historico; a meta aprovada e migracao completa.
 - Migrar baixa, exclusao, rateio, fornecedor, produto, plano de contas, filial ou usuario logado sem documentacao previa - sao regras criticas.
 - Desacoplar o usuario logado do legado antes de existir substituicao equivalente no novo modulo - a estrutura atual ainda e a referencia.
 
@@ -43,7 +47,7 @@ Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras exi
 
 O sistema atual da Expresso Salome esta em Java 8, MVC e Swing, roda no desktop dos usuarios e conecta em um banco MySQL hospedado em VPS Hostinger. Ele esta em producao e deve continuar funcionando durante toda a migracao.
 
-O mapeamento tecnico ja mostrou como o dominio financeiro esta distribuido: `ContasPagar.java` monta SQL na propria view, `ContasPagarData` faz CRUD JDBC direto, `ContasPagarController` e uma fachada fina, e `ContasPagarBean` carrega flags `...Gravar` para update parcial. Em `NotaCompra`, a tela mistura leitura, importacao XML, criacao de fornecedor, rateio, duplicatas e geracao de NF-e. Esses mapas sao a referencia para construir a nova stack sem inventar comportamento novo antes de espelhar o legado.
+O mapeamento tecnico inicial tratava `ContasPagar.java` como candidato de migracao, mas a fase 11 corrigiu esse entendimento: essa familia aponta para uma tabela inexistente no banco analisado e deve ser preservada apenas como referencia historica/codigo morto. O dominio financeiro ativo esta distribuido principalmente em `NotaCompra`, `NotaCompraDuplicatas`, `NotaCompraProdutos`, `NotaCompraRateio`, `Extrato`, banco/caixa e permissoes. Esses mapas sao a referencia para construir a nova stack sem inventar comportamento novo antes de espelhar o legado.
 
 Os mapas tambem confirmaram regras sensiveis: duplicata baixada nao pode ser excluida, vencimento nao pode anteceder emissao, baixa cria `Extrato` e atualiza a duplicata, cheque baixa varias duplicatas na mesma transacao, rateio nao pode exceder o valor restante, e o usuario logado depende de `Conecta.getUsuario()` e de helpers de `UsuarioController`.
 
@@ -80,7 +84,8 @@ Termos prioritarios para investigacao no legado:
 - **Legacy safety**: Nao alterar `salome-legacy` sem autorizacao explicita - o legado permanece produtivo durante a migracao.
 - **Production database**: Nao alterar banco de producao - qualquer evolucao futura de schema exige script SQL versionado.
 - **Migration order**: Primeiro mapear, depois planejar, depois implementar - reduz risco em regras financeiras.
-- **Read-only first**: Antes de liberar gravacao, criar versao somente leitura - validacao de dados vem antes de comandos mutaveis.
+- **Complete Contas a Pagar**: O escopo aprovado e migrar o modulo inteiro com equivalencia funcional ao legado, nao entregar apenas leitura ou recortes parciais.
+- **Operational completeness**: Da fase 9 em diante, fases de implementacao devem entregar fluxo operacional completo do recorte aprovado, com escrita, validacoes, permissoes, auditoria e testes quando o legado possuir essas funcoes.
 - **Architecture**: Views Vaadin chamam Services; Services chamam Repositories/Adapters; Repositories/Adapters acessam banco - sem regra pesada ou SQL na View.
 - **Traceability**: Toda regra migrada deve apontar origem no legado - classe, metodo, botao, DAO, query e tabela quando existir.
 - **Testing**: Regras criticas de financeiro exigem teste antes de migracao operacional.
@@ -94,8 +99,10 @@ Termos prioritarios para investigacao no legado:
 | Usar `salome-legacy` como sistema legado e `salome-core` como novo sistema alvo | Mantem fronteira clara entre codigo existente e modulo web futuro | Accepted |
 | Comecar pelo Contas a Pagar | E o primeiro dominio de negocio definido para migracao incremental | Accepted |
 | Usar Java 25, Spring Boot 4, Vaadin, MySQL, Maven e Flyway no novo modulo | Stack definida pelo projeto e adequada para leitura incremental do banco legado | Accepted |
-| Criar versao web inicialmente somente leitura | Reduz risco financeiro e permite comparar dados com o legado antes de gravacao | Accepted |
-| Priorizar leitura de `ContasPagar`, `NotaCompra`, duplicatas e extrato antes de qualquer escrita | Segue a ordem real do legado e reduz o risco da primeira entrega web | Accepted |
+| Tratar a tela somente leitura como baseline historico, nao como destino | A leitura das fases 7 e 8 ajuda a validar dados, mas nao atende o objetivo de migrar o modulo completo | Superseded |
+| Nao planejar recortes parciais para funcoes operacionais do Contas a Pagar | O usuario reafirmou que a migracao deve cobrir as funcoes completas do legado dentro do dominio | Accepted |
+| Migrar Contas a Pagar completo, 100% equivalente ao legado | O objetivo do projeto nao e um modulo parcial: `NotaCompra`, produtos, duplicatas, rateio, baixa, exclusao, edicao, salvamento, permissoes e auditoria precisam funcionar no `salome-core` como funcionam no legado | Accepted |
+| Fazer a fase 9 como `NotaCompra` completa | O menor recorte aprovado para escrita e a nota completa: cabecalho, produtos, duplicatas e rateio no mesmo fluxo, com testes e rastreabilidade | Accepted |
 | Reaproveitar a semantica de identidade legada por enquanto | `Conecta.getUsuario()` e `UsuarioController` ainda carregam filial, banco e permissoes do fluxo atual | Accepted |
 | Usar arquitetura alvo documentada para `salome-core` antes de criar o projeto | Phase 5 consolidou camadas, fluxo de dependencia, adapters legados, Spring Security, Flyway e testes financeiros | Accepted |
 | Preferir granularidade fina no GSD | Migracao financeira exige fases pequenas, revisaveis e documentadas | Accepted |
@@ -119,4 +126,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after phase 5 architecture proposal*
+*Last updated: 2026-05-14 after scope correction to complete Contas a Pagar migration*
