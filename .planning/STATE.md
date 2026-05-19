@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 11 context gathered
-last_updated: "2026-05-18T14:39:33.508Z"
+status: verifying
+stopped_at: Phase 12 context gathered
+last_updated: "2026-05-19T17:54:34.162Z"
 progress:
   total_phases: 18
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 15
-  completed_plans: 12
-  percent: 80
+  completed_plans: 15
+  percent: 100
 ---
 
 # State: Migracao Salome Legacy para Financeiro Web
@@ -26,8 +26,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 
 - **Phase:** 11
 - **Name:** Homologar paridade operacional do Contas a Pagar
-- **Status:** Ready to execute
-- **Recommended next command:** `$gsd-plan-phase 11`
+- **Status:** Gaps found during verification
+- **Recommended next command:** `$gsd-plan-phase 11 --gaps`
 
 ## Guardrails
 
@@ -57,18 +57,18 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 
 ## Session
 
-Last session: 2026-05-18T14:22:32.891Z
-Last Date: 2026-05-18T14:22:32.891Z
-Stopped At: Phase 11 context gathered
-Resume File: .planning/phases/11-homologar-paridade-operacional-do-contas-a-pagar/11-CONTEXT.md
+Last session: 2026-05-19T17:54:34.143Z
+Last Date: 2026-05-19T17:54:34.143Z
+Stopped At: Phase 12 context gathered
+Resume File: .planning/phases/12-criar-dashboard-financeiro-operacional/12-CONTEXT.md
 
 ## Next Steps
 
-1. Instalar/expor JDK 25 e Maven no PATH e executar `mvn test`.
+1. Instalar/expor Maven ou adicionar Maven Wrapper e executar `mvn test`.
 2. Configurar `SALOME_LEGACY_DB_*` para um MySQL legado seguro de desenvolvimento/homologacao.
-3. Rodar a validacao local da fase 8 conforme `docs/setup/salome-core-local.md`.
-4. Revisar `.planning/phases/08-validar-dados-da-tela-web-contra-o-legado/08-VALIDATION.md` e resolver divergencias antes da fase 9.
-5. Executar a fase 9 como `NotaCompra` completa em ondas: fundacao, Documento Entrada/cabecalho, secoes operacionais e fechamento com exclusao/XML/auditoria.
+3. Fechar os bloqueios de produtos e rateio registrados em `11-HOMOLOGATION.md`.
+4. Rodar homologacao manual/operatoria e atualizar o aceite final.
+5. Reexecutar verificacao da fase 11 antes de marcar `FULL-08` como completo.
 
 ---
 *Last updated: 2026-05-14 after complete Contas a Pagar scope correction*
