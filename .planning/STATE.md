@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 13 context gathered
-last_updated: "2026-05-25T17:28:31.493Z"
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-05-25T17:42:49.154Z"
 progress:
   total_phases: 18
   completed_phases: 8
-  total_plans: 19
-  completed_plans: 17
-  percent: 89
+  total_plans: 24
+  completed_plans: 18
+  percent: 75
 ---
 
 # State: Migracao Salome Legacy para Financeiro Web
@@ -26,8 +26,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 
 - **Phase:** 13
 - **Name:** Criar fluxo de caixa previsto operacional
-- **Status:** Ready to execute
-- **Recommended next command:** `$gsd-execute-phase 13 ${GSD_WS}`
+- **Current Plan:** 2 of 2
+- **Status:** Wave 2 pending
+- **Recommended next command:** `$gsd-execute-phase 13 --wave 2 ${GSD_WS}`
 
 ## Guardrails
 
@@ -55,13 +56,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 - 2026-05-14: Phase 7 executada com fila Vaadin read-only de duplicatas, filtros Hoje/Vencidas/Proximos/Todas e verificacao estatica documentada.
 - 2026-05-14: Escopo corrigido por decisao do usuario: v1 deve migrar Contas a Pagar completo, 100% equivalente ao legado. Read-only permanece apenas como checkpoint; Phase 9 passa a ser `NotaCompra` completa.
 - 2026-05-20: Phase 12 concluida com dashboard financeiro operacional.
+- 2026-05-25: Phase 13 plan 01 concluida com forecast read-model, service boundary, adapter legacy e testes de semantica.
 
 ## Session
 
-Last session: 2026-05-25T17:06:55.516Z
-Last Date: 2026-05-25T17:06:55.516Z
-Stopped At: Phase 13 context gathered
-Resume File: .planning/phases/13-criar-fluxo-de-caixa-previsto-operacional/13-CONTEXT.md
+Last session: 2026-05-25T17:42:49.147Z
+Last Date: 2026-05-25T17:42:49.147Z
+Stopped At: Completed 13-01-PLAN.md
+Resume File: None
 
 ## Next Steps
 
