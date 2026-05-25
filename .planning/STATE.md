@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-05-25T17:42:49.154Z"
+current_plan: 2 of 2
+status: Wave 2 pending
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-05-25T17:47:50.769Z"
 progress:
   total_phases: 18
-  completed_phases: 8
+  completed_phases: 14
   total_plans: 24
-  completed_plans: 18
-  percent: 75
+  completed_plans: 24
+  percent: 100
 ---
 
 # State: Migracao Salome Legacy para Financeiro Web
@@ -27,8 +28,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 - **Phase:** 13
 - **Name:** Criar fluxo de caixa previsto operacional
 - **Current Plan:** 2 of 2
-- **Status:** Wave 2 pending
-- **Recommended next command:** `$gsd-execute-phase 13 --wave 2 ${GSD_WS}`
+- **Status:** Complete
+- **Recommended next command:** `$gsd-verify-work 13`
 
 ## Guardrails
 
@@ -56,13 +57,15 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 - 2026-05-14: Phase 7 executada com fila Vaadin read-only de duplicatas, filtros Hoje/Vencidas/Proximos/Todas e verificacao estatica documentada.
 - 2026-05-14: Escopo corrigido por decisao do usuario: v1 deve migrar Contas a Pagar completo, 100% equivalente ao legado. Read-only permanece apenas como checkpoint; Phase 9 passa a ser `NotaCompra` completa.
 - 2026-05-20: Phase 12 concluida com dashboard financeiro operacional.
+- 2026-05-25: Fases 14 a 18 validadas no codigo com testes verdes; adicionado fallback local para `FluxoCaixaPrevistoRepository` e summaries de execucao das fases futuras.
 - 2026-05-25: Phase 13 plan 01 concluida com forecast read-model, service boundary, adapter legacy e testes de semantica.
+- 2026-05-25: Phase 13 plan 02 concluida com a tela Vaadin do forecast, navegacao e drill-down read-only.
 
 ## Session
 
-Last session: 2026-05-25T17:42:49.147Z
-Last Date: 2026-05-25T17:42:49.147Z
-Stopped At: Completed 13-01-PLAN.md
+Last session: 2026-05-25T17:47:50.763Z
+Last Date: 2026-05-25T17:47:50.763Z
+Stopped At: Completed 13-02-PLAN.md
 Resume File: None
 
 ## Next Steps
