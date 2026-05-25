@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 12 context gathered
-last_updated: "2026-05-19T17:54:34.162Z"
+status: planning
+stopped_at: Phase 13 context gathered
+last_updated: "2026-05-25T17:06:55.531Z"
 progress:
   total_phases: 18
-  completed_phases: 7
-  total_plans: 15
-  completed_plans: 15
+  completed_phases: 8
+  total_plans: 17
+  completed_plans: 17
   percent: 100
 ---
 
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-14)
 
 **Core value:** Modernizar o Contas a Pagar com seguranca, preservando as regras financeiras existentes, entregando equivalencia funcional completa no `salome-core` e mantendo o legado operando sem interrupcao.
-**Current focus:** Phase 11 - homologar-paridade-operacional-do-contas-a-pagar
+**Current focus:** Phase 13 - criar-fluxo-de-caixa-previsto-operacional
 
 ## Current Phase
 
-- **Phase:** 11
-- **Name:** Homologar paridade operacional do Contas a Pagar
-- **Status:** Gaps found during verification
-- **Recommended next command:** `$gsd-plan-phase 11 --gaps`
+- **Phase:** 13
+- **Name:** Criar fluxo de caixa previsto operacional
+- **Status:** Ready to plan
+- **Recommended next command:** `$gsd-plan-phase 13 ${GSD_WS}`
 
 ## Guardrails
 
@@ -54,13 +54,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 - 2026-05-14: Phase 7 planejada com pesquisa e plano executavel para tela Vaadin somente leitura de duplicatas/NotaCompra.
 - 2026-05-14: Phase 7 executada com fila Vaadin read-only de duplicatas, filtros Hoje/Vencidas/Proximos/Todas e verificacao estatica documentada.
 - 2026-05-14: Escopo corrigido por decisao do usuario: v1 deve migrar Contas a Pagar completo, 100% equivalente ao legado. Read-only permanece apenas como checkpoint; Phase 9 passa a ser `NotaCompra` completa.
+- 2026-05-20: Phase 12 concluida com dashboard financeiro operacional.
 
 ## Session
 
-Last session: 2026-05-19T17:54:34.143Z
-Last Date: 2026-05-19T17:54:34.143Z
-Stopped At: Phase 12 context gathered
-Resume File: .planning/phases/12-criar-dashboard-financeiro-operacional/12-CONTEXT.md
+Last session: 2026-05-25T17:06:55.516Z
+Last Date: 2026-05-25T17:06:55.516Z
+Stopped At: Phase 13 context gathered
+Resume File: .planning/phases/13-criar-fluxo-de-caixa-previsto-operacional/13-CONTEXT.md
 
 ## Next Steps
 
