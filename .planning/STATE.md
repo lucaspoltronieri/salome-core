@@ -27,7 +27,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-14)
 - **Phase:** 13
 - **Name:** Criar fluxo de caixa previsto operacional
 - **Status:** Ready to execute
-- **Recommended next command:** `$gsd-plan-phase 13 ${GSD_WS}`
+- **Recommended next command:** `$gsd-execute-phase 13 ${GSD_WS}`
 
 ## Guardrails
 
