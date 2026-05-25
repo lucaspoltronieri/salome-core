@@ -14,7 +14,7 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Dashboard analitico amplo | Mistura previsao, indicadores e relatorios mais gerais de tesouraria | |
-| Previsao payables-driven | Usa duplicatas e baixa como base principal da previsao | ✓ |
+| Previsao payables-driven | Usa duplicatas e baixa como base principal da previsao | x |
 | Tesouraria completa | Inclui inflows, outflows, bancos e operacoes bancarias novas | |
 
 **User's choice:** Previsao payables-driven
@@ -27,7 +27,7 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Landing page leve | Interface visual, com pouco detalhe operacional | |
-| Painel operacional denso | Mostra linha do tempo, saldos projetados e drill-down | ✓ |
+| Painel operacional denso | Mostra linha do tempo, saldos projetados e drill-down | x |
 | Fluxo com acoes sensiveis | Permite baixa, reversao e pagamentos direto na tela | |
 
 **User's choice:** Painel operacional denso
@@ -40,7 +40,7 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Mes atual apenas | Janela fixa e simples, sem ajuste de horizonte | |
-| Mes atual com horizonte configuravel | Mantem um padrao curto e permite ampliar para revisao | ✓ |
+| Mes atual com horizonte configuravel | Mantem um padrao curto e permite ampliar para revisao | x |
 | Horizonte aberto por default | Mostra um periodo amplo sem foco inicial | |
 
 **User's choice:** Mes atual com horizonte configuravel
@@ -53,7 +53,7 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Listagem simples por vencimento | Apenas uma grade ordenada cronologicamente | |
-| Linha do tempo com saldos projetados | Destaca proximidade, saldo e compromissos futuros | ✓ |
+| Linha do tempo com saldos projetados | Destaca proximidade, saldo e compromissos futuros | x |
 | Relatorio consolidado por status | Prioriza agregados acima do detalhamento | |
 
 **User's choice:** Linha do tempo com saldos projetados
@@ -64,7 +64,7 @@
 ## the agent's Discretion
 
 - O usuario pediu para seguir direto e aceitar a recomendacao tecnica sem perguntas adicionais.
-- A composicao visual exata da linha do tempo, cards ou grade ficou a criterio do agente, desde que permaneça densa, legivel e sem adornos de marketing.
+- A composicao visual exata da linha do tempo, cards ou grade ficou a criterio do agente, desde que permanece densa, legivel e sem adornos de marketing.
 
 ## Deferred Ideas
 

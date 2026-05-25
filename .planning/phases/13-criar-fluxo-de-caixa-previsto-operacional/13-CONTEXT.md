@@ -37,7 +37,7 @@ O fluxo de caixa desta fase e um painel de previsao operacional, nao um modulo b
 
 ### the agent's Discretion
 - O usuario pediu para seguir direto e usar a recomendacao tecnica, entao a decisao padrao e a versao mais completa e operacional dentro do escopo da fase.
-- A composicao visual exata da linha do tempo, cards ou grade fica para o planner, desde que permaneça densa, legivel e sem adornos de marketing.
+- A composicao visual exata da linha do tempo, cards ou grade fica para o planner, desde que permanece densa, legivel e sem adornos de marketing.
 
 </decisions>
 
