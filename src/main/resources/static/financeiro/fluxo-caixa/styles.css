@@ -31,29 +31,71 @@ body {
 }
 
 .sidebar {
-    background: #12313d;
-    color: #f7fbfc;
-    padding: 24px 18px;
+    background: #17343b;
+    color: #eef7f5;
+    padding: 22px 18px;
     display: flex;
     flex-direction: column;
     gap: 28px;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .brand {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .brand-mark {
-    width: 42px;
-    height: 42px;
+    width: 34px;
+    height: 34px;
     display: grid;
     place-items: center;
-    background: #e7f7f1;
-    color: var(--blue);
-    font-weight: 800;
-    border-radius: 8px;
+    background: #eef7f5;
+    color: #17343b;
+    font-weight: 700;
+}
+
+.brand-logo {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+}
+
+.brand-sub {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #b5c8d0;
+    text-align: center;
+}
+
+.sidebar-credit {
+    font-size: 11px;
+    color: #8fa6ae;
+    text-align: center;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.sidebar .sidebar-credit a {
+    color: #6cc0a7;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 0;
+    border-left: 0;
+    font-size: 11px;
+    display: inline;
+}
+
+.sidebar .sidebar-credit a:hover {
+    text-decoration: underline;
 }
 
 .brand small,
@@ -70,33 +112,37 @@ body {
     color: #b5c8d0;
 }
 
-nav {
+.sidebar nav {
     display: grid;
-    gap: 6px;
+    gap: 8px;
 }
 
-nav a {
-    color: #d5e4ea;
+.sidebar a {
+    color: #d9e7e5;
     text-decoration: none;
     padding: 10px 12px;
-    border-radius: 8px;
+    border-left: 3px solid transparent;
     font-size: 14px;
 }
 
-nav a.active,
-nav a:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
+.sidebar a.active {
+    background: rgba(255, 255, 255, .08);
+    border-left-color: #6cc0a7;
 }
 
 .sidebar-note {
     margin-top: auto;
-    padding: 14px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    padding: 12px;
 }
 
-.sidebar-note span,
+.sidebar-note span {
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 11px;
+    font-weight: 700;
+}
+
 .pill {
     color: var(--blue);
     background: #e3f4f0;
@@ -144,13 +190,14 @@ h2 {
 
 .filters {
     display: grid;
-    grid-template-columns: repeat(4, minmax(100px, 1fr));
+    grid-template-columns: 150px 150px minmax(180px, 1fr) 130px;
     gap: 10px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 14px;
     box-shadow: var(--shadow);
+    align-items: end;
 }
 
 .filters label {
@@ -173,7 +220,7 @@ h2 {
 }
 
 .filters .search {
-    grid-column: span 3;
+    grid-column: auto;
 }
 
 .filters button {
@@ -237,6 +284,14 @@ h2 {
 
 .kpi.negativo strong {
     color: var(--red);
+}
+
+.kpi.alerta strong {
+    color: var(--amber);
+}
+
+.kpi.neutro strong {
+    color: var(--text);
 }
 
 .kpi small {
@@ -493,8 +548,15 @@ h2 {
 }
 
 .balance-item span {
-    color: var(--green);
     font-weight: 800;
+}
+
+.balance-item span.pos {
+    color: var(--green);
+}
+
+.balance-item span.neg {
+    color: var(--red);
 }
 
 .section-divider {
@@ -617,6 +679,486 @@ dd {
     word-break: break-word;
 }
 
+.panel.block {
+    display: block;
+}
+
+/* Conciliacao com o saldo bancario */
+.workspace.projection {
+    grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.4fr);
+}
+
+.conciliacao {
+    display: grid;
+    gap: 6px;
+}
+
+.concil-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #f8fbfc;
+    font-size: 14px;
+}
+
+.concil-row strong {
+    font-variant-numeric: tabular-nums;
+}
+
+.concil-row.entrada strong {
+    color: var(--green);
+}
+
+.concil-row.saida strong {
+    color: var(--red);
+}
+
+.concil-row.muted {
+    opacity: 0.75;
+    font-size: 13px;
+    padding: 8px 12px;
+}
+
+.concil-row.total {
+    background: var(--surface-2);
+    border-color: #c6e7de;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.concil-row.total.positivo strong {
+    color: var(--green);
+}
+
+.concil-row.total.negativo strong {
+    color: var(--red);
+}
+
+/* Grafico de saldo projetado */
+.projecao-chart {
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+}
+
+.proj-svg {
+    width: 100%;
+    height: 240px;
+    display: block;
+}
+
+.proj-line {
+    fill: none;
+    stroke: var(--blue-2);
+    stroke-width: 2.4;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.proj-area {
+    fill: rgba(21, 107, 127, 0.12);
+    stroke: none;
+}
+
+.proj-area.has-neg {
+    fill: rgba(199, 81, 70, 0.10);
+}
+
+.proj-zero {
+    stroke: var(--line);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+}
+
+.dot-neg {
+    fill: var(--red);
+}
+
+text.axis {
+    fill: var(--muted);
+    font-size: 11px;
+    font-family: inherit;
+}
+
+/* Cards de horizonte (a pagar / a receber) */
+.horizon-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+/* Grupos com 5 cards (Hoje/Amanha/Semana/Mes/Atraso) */
+.horizon-grid.cinco {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 1280px) {
+    .horizon-grid.cinco {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .horizon-grid.cinco {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.horizon-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #f8fbfc;
+    overflow: hidden;
+    align-self: start;
+}
+
+.horizon-card.active {
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    border-color: var(--blue-2);
+}
+
+.horizon-head {
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 14px 16px;
+    cursor: pointer;
+    display: grid;
+    gap: 6px;
+    border-left: 4px solid transparent;
+}
+
+.horizon-head:disabled {
+    cursor: default;
+}
+
+.horizon-card.positivo .horizon-head {
+    border-left-color: var(--green);
+}
+
+.horizon-card.negativo .horizon-head {
+    border-left-color: var(--red);
+}
+
+.horizon-card.alerta .horizon-head {
+    border-left-color: var(--amber);
+}
+
+.horizon-card.neutro .horizon-head {
+    border-left-color: var(--line);
+}
+
+.horizon-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.horizon-title {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+}
+
+.horizon-twisty {
+    color: var(--muted);
+    transition: transform 0.15s ease;
+    font-size: 14px;
+}
+
+.horizon-card.active .horizon-twisty {
+    transform: rotate(180deg);
+    color: var(--blue-2);
+}
+
+.horizon-value {
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+}
+
+.horizon-card.positivo .horizon-value {
+    color: var(--green);
+}
+
+.horizon-card.negativo .horizon-value {
+    color: var(--red);
+}
+
+.horizon-card.alerta .horizon-value {
+    color: var(--amber);
+}
+
+.horizon-meta {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+/* Painel largo de detalhe (abaixo da linha de cards) */
+.horizon-detail {
+    margin-top: 14px;
+    border: 1px solid var(--blue-2);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.detail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+}
+
+.detail-head strong {
+    font-size: 15px;
+}
+
+.detail-head span {
+    color: var(--muted);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.conta-cols {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+}
+
+.conta-cols span:first-child {
+    flex: 1;
+}
+
+.conta-cols .col-qtd {
+    flex: 0 0 60px;
+    text-align: right;
+}
+
+.conta-cols .col-valor {
+    flex: 0 0 140px;
+    text-align: right;
+}
+
+/* Arvore de plano de contas no drill */
+.conta-tree {
+    overflow: auto;
+}
+
+.conta-tree.wide {
+    max-height: 460px;
+}
+
+.conta-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    border-top: 1px solid #eef2f4;
+}
+
+.conta-node:hover {
+    background: var(--surface-2);
+}
+
+.conta-node.sintetica .conta-label {
+    font-weight: 700;
+}
+
+.conta-twisty {
+    width: 12px;
+    flex: 0 0 12px;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+    user-select: none;
+}
+
+.conta-node.open > .conta-twisty {
+    transform: rotate(90deg);
+}
+
+.conta-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.conta-qtd {
+    flex: 0 0 60px;
+    text-align: right;
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.conta-value {
+    flex: 0 0 140px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.conta-doc {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    border: 0;
+    border-top: 1px dashed #eef2f4;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.conta-doc:hover {
+    background: var(--surface-2);
+}
+
+.conta-doc .doc-name {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.conta-doc .doc-person {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.conta-doc .doc-filial {
+    flex: 0 0 70px;
+    text-align: right;
+    color: var(--blue);
+    font-weight: 700;
+}
+
+.conta-doc .doc-venc {
+    flex: 0 0 90px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.conta-doc .doc-value {
+    flex: 0 0 140px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+/* Itens/produtos no drawer */
+.drawer-itens {
+    margin-top: 18px;
+}
+
+.itens-title {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.itens-retry {
+    margin-left: 6px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: var(--blue-2);
+    cursor: pointer;
+}
+
+.itens-retry:hover {
+    background: #f0f6f9;
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+}
+
+.item-row .item-name {
+    min-width: 0;
+}
+
+.item-row .item-name small {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.item-row .item-value {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Cards retrospectivos */
+.retro-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.retro-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    background: #f8fbfc;
+    display: grid;
+    gap: 8px;
+}
+
+.retro-card strong {
+    font-size: 21px;
+    font-variant-numeric: tabular-nums;
+}
+
+.retro-card.positivo strong {
+    color: var(--green);
+}
+
+.retro-card.negativo strong {
+    color: var(--red);
+}
+
+.retro-card small {
+    color: var(--muted);
+    font-size: 12px;
+}
+
 @media (max-width: 1100px) {
     .app-shell {
         grid-template-columns: 1fr;
@@ -630,14 +1172,27 @@ dd {
     .workspace,
     .workspace.three,
     .workspace.two,
+    .workspace.projection,
     .kpi-grid,
     .summary-grid {
         grid-template-columns: 1fr;
+    }
+
+    .horizon-grid,
+    .retro-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .filters,
     .filters .search {
         grid-template-columns: 1fr;
         grid-column: auto;
+    }
+}
+
+@media (max-width: 620px) {
+    .horizon-grid,
+    .retro-grid {
+        grid-template-columns: 1fr;
     }
 }

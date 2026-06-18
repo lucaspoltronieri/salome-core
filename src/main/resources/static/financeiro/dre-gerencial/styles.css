@@ -28,7 +28,7 @@ body {
 
 .app-shell {
     display: grid;
-    grid-template-columns: 238px minmax(0, 1fr);
+    grid-template-columns: 260px minmax(0, 1fr);
     min-height: 100vh;
 }
 
@@ -39,11 +39,16 @@ body {
     display: flex;
     flex-direction: column;
     gap: 28px;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .brand {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 10px;
 }
 
@@ -55,6 +60,44 @@ body {
     background: #eef7f5;
     color: #17343b;
     font-weight: 700;
+}
+
+.brand-logo {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+}
+
+.brand-sub {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #b5c8d0;
+    text-align: center;
+}
+
+.sidebar-credit {
+    font-size: 11px;
+    color: #8fa6ae;
+    text-align: center;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.sidebar .sidebar-credit a {
+    color: #6cc0a7;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 0;
+    border-left: 0;
+    font-size: 11px;
+    display: inline;
+}
+
+.sidebar .sidebar-credit a:hover {
+    text-decoration: underline;
 }
 
 .brand small,
@@ -865,6 +908,8 @@ button.ghost {
 
     .sidebar {
         position: static;
+        height: auto;
+        overflow: visible;
     }
 
     .filters {

@@ -1,7 +1,9 @@
 const state = { snapshot: null };
 
 const fmtMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const fmtMoneyShort = new Intl.NumberFormat("pt-BR", { notation: "compact", style: "currency", currency: "BRL", maximumFractionDigits: 1 });
 const fmtDate = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
+const fmtDayMonth = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" });
 
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("#filters");
@@ -32,26 +34,28 @@ async function load() {
 }
 
 function render(snapshot) {
-    document.querySelector("#periodLabel").textContent = `${date(snapshot.inicio)} a ${date(snapshot.fim)}`;
     document.querySelector("#dataMode").textContent = snapshot.demonstrativo
         ? "Modo demonstrativo: dados de exemplo, sem conexao com o MySQL legado."
         : "Dados reais do legado em modo read-only.";
     renderAlerts(snapshot.alertas);
     renderKpis(snapshot.kpis);
-    renderSummaries(snapshot.resumos || []);
-    renderChart(snapshot.serie);
-    renderRanks("#costCenterList", snapshot.porCentroCusto);
+    renderConciliacao(snapshot);
+    renderProjecao(snapshot.projecao || []);
+    renderHorizonteCards("#aPagar", "#aPagarDetail", snapshot.aPagar || []);
+    renderHorizonteCards("#aReceber", "#aReceberDetail", snapshot.aReceber || []);
+    renderRetrospectivo(snapshot.retrospectivo || []);
     renderBankBalances(snapshot.saldosBancarios || []);
-    renderDrillTrees();
-    renderMovements(snapshot.movimentos);
+    renderRanks("#costCenterList", snapshot.porCentroCusto);
+    renderMovements(snapshot.movimentos || []);
 }
 
 function renderAlerts(alerts) {
-    document.querySelector("#alerts").innerHTML = alerts.map(alert => `<div class="alert">${escapeHtml(alert)}</div>`).join("");
+    document.querySelector("#alerts").innerHTML = (alerts || [])
+        .map(alert => `<div class="alert">${escapeHtml(alert)}</div>`).join("");
 }
 
 function renderKpis(kpis) {
-    document.querySelector("#kpis").innerHTML = kpis.map(kpi => `
+    document.querySelector("#kpis").innerHTML = (kpis || []).map(kpi => `
         <article class="kpi ${kpi.tom}">
             <small>${escapeHtml(kpi.titulo)}</small>
             <strong>${fmtMoney.format(kpi.valor)}</strong>
@@ -60,59 +64,206 @@ function renderKpis(kpis) {
     `).join("");
 }
 
-function renderSummaries(summaries) {
-    document.querySelector("#summaryCards").innerHTML = summaries.map(summary => `
-        <article class="summary-card ${summary.tom}">
-            <div class="summary-head">
-                <h2>${escapeHtml(summary.titulo)}</h2>
-                <span>${escapeHtml(summary.detalhe)}</span>
-            </div>
-            <div class="summary-values">
-                <div><small>Previsto</small><strong>${fmtMoney.format(summary.previsto)}</strong></div>
-                <div><small>Realizado</small><strong>${fmtMoney.format(summary.realizado)}</strong></div>
-                <div><small>Diferenca</small><strong>${fmtMoney.format(summary.diferenca)}</strong></div>
-            </div>
-        </article>
+function renderConciliacao(snapshot) {
+    const aReceberMes = horizonteValor(snapshot.aReceber, "MES");
+    const aPagarMes = horizonteValor(snapshot.aPagar, "MES");
+    const atrasoReceber = horizonteValor(snapshot.aReceber, "ATRASO");
+    const atrasoPagar = horizonteValor(snapshot.aPagar, "ATRASO");
+    const projecao = snapshot.projecao || [];
+    const projetado = projecao.length ? projecao[projecao.length - 1].saldoProjetado : snapshot.saldoBancarioAtual;
+    const rows = [
+        ["Saldo bancario hoje", snapshot.saldoBancarioAtual, "base"],
+        ["+ A receber (mes)", aReceberMes, "entrada"],
+        ["+ A receber em atraso", atrasoReceber, "entrada muted"],
+        ["- A pagar (mes)", -Math.abs(aPagarMes), "saida"],
+        ["- A pagar em atraso", -Math.abs(atrasoPagar), "saida muted"],
+        ["= Saldo projetado (fim do mes)", projetado, projetado >= 0 ? "total positivo" : "total negativo"]
+    ];
+    document.querySelector("#conciliacao").innerHTML = rows.map(([label, value, cls]) => `
+        <div class="concil-row ${cls}">
+            <span>${escapeHtml(label)}</span>
+            <strong>${fmtMoney.format(value || 0)}</strong>
+        </div>
     `).join("");
 }
 
-function renderChart(serie) {
-    const max = Math.max(1, ...serie.map(point => Math.max(
-        Math.abs(point.saldoPrevisto || 0),
-        Math.abs(point.saldoRealizado || 0)
-    )));
-    const slice = serie.length > 64 ? serie.filter((_, index) => index % Math.ceil(serie.length / 64) === 0) : serie;
-    document.querySelector("#cashChart").innerHTML = slice.map(point => {
-        const realHeight = Math.max(2, Math.round(Math.abs(point.saldoRealizado || 0) / max * 100));
-        const plannedHeight = Math.max(2, Math.round(Math.abs(point.saldoPrevisto || 0) / max * 100));
-        return `
-            <div class="bar-day" title="${date(point.data)} | Realizado ${fmtMoney.format(point.saldoRealizado)} | Previsto ${fmtMoney.format(point.saldoPrevisto)}">
-                <span class="bar realizado" style="height:${realHeight}%"></span>
-                <span class="bar previsto" style="height:${plannedHeight}%"></span>
-            </div>
-        `;
-    }).join("");
-}
-
-function renderRanks(selector, groups) {
-    const target = document.querySelector(selector);
-    if (!target) {
+function renderProjecao(serie) {
+    const host = document.querySelector("#projecaoChart");
+    const range = document.querySelector("#projecaoRange");
+    if (!serie.length) {
+        host.innerHTML = `<div class="empty-state">Sem previsao de movimentos para o periodo.</div>`;
+        range.textContent = "";
         return;
     }
-    groups = groups || [];
-    const max = Math.max(1, ...groups.map(group => Math.abs(group.saldo || 0)));
-    target.innerHTML = groups.map(group => {
-        const width = Math.max(4, Math.round(Math.abs(group.saldo || 0) / max * 100));
-        return `
-            <div class="rank-item">
-                <div class="rank-row">
-                    <strong>${escapeHtml(group.chave)}</strong>
-                    <span>${fmtMoney.format(group.saldo)}</span>
-                </div>
-                <div class="meter"><span style="width:${width}%"></span></div>
-            </div>
-        `;
-    }).join("");
+    range.textContent = `${date(serie[0].data)} a ${date(serie[serie.length - 1].data)}`;
+
+    const width = 720;
+    const height = 240;
+    const padX = 44;
+    const padY = 24;
+    const values = serie.map(point => point.saldoProjetado);
+    const max = Math.max(...values, 0);
+    const min = Math.min(...values, 0);
+    const span = max - min || 1;
+    const stepX = serie.length > 1 ? (width - padX * 2) / (serie.length - 1) : 0;
+    const x = index => padX + index * stepX;
+    const y = value => padY + (height - padY * 2) * (1 - (value - min) / span);
+    const zeroY = y(0);
+
+    const points = serie.map((point, index) => `${x(index).toFixed(1)},${y(point.saldoProjetado).toFixed(1)}`).join(" ");
+    const areaPoints = `${x(0).toFixed(1)},${zeroY.toFixed(1)} ${points} ${x(serie.length - 1).toFixed(1)},${zeroY.toFixed(1)}`;
+    const negative = values.some(value => value < 0);
+
+    const labelStep = Math.max(1, Math.ceil(serie.length / 8));
+    const xLabels = serie.map((point, index) => index % labelStep === 0 || index === serie.length - 1
+        ? `<text class="axis" x="${x(index).toFixed(1)}" y="${(height - 4).toFixed(1)}" text-anchor="middle">${dayMonth(point.data)}</text>`
+        : "").join("");
+
+    const dots = serie.map((point, index) => point.saldoProjetado < 0
+        ? `<circle cx="${x(index).toFixed(1)}" cy="${y(point.saldoProjetado).toFixed(1)}" r="2.6" class="dot-neg"></circle>`
+        : "").join("");
+
+    host.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="proj-svg">
+            <polygon class="proj-area ${negative ? "has-neg" : ""}" points="${areaPoints}"></polygon>
+            <line class="proj-zero" x1="${padX}" y1="${zeroY.toFixed(1)}" x2="${width - padX}" y2="${zeroY.toFixed(1)}"></line>
+            <polyline class="proj-line" points="${points}"></polyline>
+            ${dots}
+            <text class="axis" x="${padX}" y="${(padY - 8).toFixed(1)}" text-anchor="start">${fmtMoneyShort.format(max)}</text>
+            <text class="axis" x="${padX}" y="${(height - padY + 14).toFixed(1)}" text-anchor="start">${fmtMoneyShort.format(min)}</text>
+            ${xLabels}
+        </svg>`;
+}
+
+function renderHorizonteCards(gridSelector, detailSelector, cards) {
+    renderDrillCards(gridSelector, detailSelector, cards, horizonteMeta, "Nada previsto.");
+}
+
+function horizonteMeta(card) {
+    return `${card.quantidade} conta(s) ${rangeLabel(card)}`;
+}
+
+function retrospectivoMeta(card) {
+    return `${card.quantidade} lancamento(s) &middot; ${escapeHtml(card.detalhe || "")}`;
+}
+
+function renderDrillCards(gridSelector, detailSelector, cards, metaFn, vazio) {
+    const grid = document.querySelector(gridSelector);
+    const detail = document.querySelector(detailSelector);
+    detail.innerHTML = "";
+    detail.style.display = "none";
+    if (!cards.length) {
+        grid.innerHTML = `<div class="empty-state">${escapeHtml(vazio)}</div>`;
+        return;
+    }
+    grid.innerHTML = "";
+    cards.forEach(card => grid.appendChild(buildDrillCard(card, grid, detail, metaFn)));
+}
+
+function buildDrillCard(card, grid, detail, metaFn) {
+    const wrap = document.createElement("article");
+    wrap.className = `horizon-card ${card.tom}`;
+    const hasDetail = (card.contas || []).length > 0;
+
+    const head = document.createElement("button");
+    head.type = "button";
+    head.className = "horizon-head";
+    head.innerHTML = `
+        <div class="horizon-top">
+            <span class="horizon-title">${escapeHtml(card.titulo)}</span>
+            <span class="horizon-twisty">${hasDetail ? "▾" : ""}</span>
+        </div>
+        <strong class="horizon-value">${fmtMoney.format(card.valor || 0)}</strong>
+        <span class="horizon-meta">${metaFn(card)}</span>`;
+    wrap.appendChild(head);
+
+    if (!hasDetail) {
+        head.disabled = true;
+        return wrap;
+    }
+
+    head.addEventListener("click", () => {
+        const jaAtivo = wrap.classList.contains("active");
+        grid.querySelectorAll(".horizon-card.active").forEach(card => card.classList.remove("active"));
+        if (jaAtivo) {
+            detail.style.display = "none";
+            detail.innerHTML = "";
+            return;
+        }
+        wrap.classList.add("active");
+        renderDrillDetail(detail, card, metaFn);
+        detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    return wrap;
+}
+
+function renderDrillDetail(detail, card, metaFn) {
+    detail.style.display = "block";
+    detail.innerHTML = `
+        <div class="detail-head">
+            <strong>${escapeHtml(card.titulo)}</strong>
+            <span>${metaFn(card)} &middot; ${fmtMoney.format(card.valor || 0)}</span>
+        </div>
+        <div class="conta-cols">
+            <span>Plano de contas</span>
+            <span class="col-qtd">Qtd</span>
+            <span class="col-valor">Valor</span>
+        </div>
+        <div class="conta-tree wide"></div>`;
+    const tree = detail.querySelector(".conta-tree");
+    (card.contas || []).forEach(node => tree.appendChild(renderContaNo(node)));
+}
+
+function renderContaNo(node) {
+    const wrap = document.createElement("div");
+    wrap.className = "conta-branch";
+
+    const expandable = (node.filhos || []).length > 0 || (node.documentos || []).length > 0;
+    const row = document.createElement("div");
+    row.className = `conta-node ${node.sintetica ? "sintetica" : "analitica"}`;
+    row.style.paddingLeft = `${10 + (node.nivel - 1) * 18}px`;
+    row.innerHTML = `
+        <span class="conta-twisty">${expandable ? "▸" : ""}</span>
+        <span class="conta-label">${escapeHtml(node.descricao)}</span>
+        <span class="conta-qtd">${node.quantidade}</span>
+        <span class="conta-value">${fmtMoney.format(node.valor || 0)}</span>`;
+    wrap.appendChild(row);
+
+    if (!expandable) {
+        return wrap;
+    }
+
+    const children = document.createElement("div");
+    children.className = "conta-children";
+    children.style.display = "none";
+    (node.filhos || []).forEach(child => children.appendChild(renderContaNo(child)));
+    (node.documentos || []).forEach(doc => children.appendChild(renderContaDoc(doc, node.nivel)));
+    wrap.appendChild(children);
+
+    row.addEventListener("click", () => {
+        const open = row.classList.toggle("open");
+        children.style.display = open ? "block" : "none";
+    });
+    return wrap;
+}
+
+function renderContaDoc(doc, nivelPai) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "conta-doc";
+    item.style.paddingLeft = `${10 + (nivelPai + 1) * 18}px`;
+    item.innerHTML = `
+        <span class="doc-name">${escapeHtml(doc.documento)}</span>
+        <span class="doc-person">${escapeHtml(doc.clienteFornecedor)}</span>
+        <span class="doc-filial">${escapeHtml(doc.filial || "-")}</span>
+        <span class="doc-venc">${date(doc.dataVencimento)}</span>
+        <span class="doc-value">${fmtMoney.format(doc.valor || 0)}</span>`;
+    item.addEventListener("click", () => openDocDrawer(doc));
+    return item;
+}
+
+function renderRetrospectivo(cards) {
+    renderDrillCards("#retrospectivo", "#retrospectivoDetail", cards, retrospectivoMeta, "Sem lancamentos no periodo.");
 }
 
 function renderBankBalances(balances) {
@@ -128,11 +279,36 @@ function renderBankBalances(balances) {
                 <small>${balance.contaCaixa ? "Conta caixa" : "Conta bancaria"}</small>
             </div>
             <div>
-                <span>${fmtMoney.format(balance.saldoBancario || 0)}</span>
+                <span class="${(balance.saldoBancario || 0) < 0 ? "neg" : "pos"}">${fmtMoney.format(balance.saldoBancario || 0)}</span>
                 <small>Limite ${fmtMoney.format(balance.limite || 0)}</small>
             </div>
         </div>
     `).join("");
+}
+
+function renderRanks(selector, groups) {
+    const target = document.querySelector(selector);
+    if (!target) {
+        return;
+    }
+    groups = groups || [];
+    if (!groups.length) {
+        target.innerHTML = `<div class="empty-state">Sem despesas no periodo.</div>`;
+        return;
+    }
+    const max = Math.max(1, ...groups.map(group => Math.abs(group.saldo || 0)));
+    target.innerHTML = groups.map(group => {
+        const width = Math.max(4, Math.round(Math.abs(group.saldo || 0) / max * 100));
+        return `
+            <div class="rank-item">
+                <div class="rank-row">
+                    <strong>${escapeHtml(group.chave)}</strong>
+                    <span>${fmtMoney.format(group.saldo)}</span>
+                </div>
+                <div class="meter"><span style="width:${width}%"></span></div>
+            </div>
+        `;
+    }).join("");
 }
 
 function renderMovements(movements) {
@@ -156,6 +332,8 @@ function renderMovements(movements) {
 }
 
 function openDrawer(movement) {
+    document.querySelector("#drawerEyebrow").textContent = "Origem do movimento";
+    document.querySelector("#drawerItens").innerHTML = "";
     document.querySelector("#drawerTitle").textContent = movement.documento;
     const origin = movement.origin || {};
     const pairs = [
@@ -187,105 +365,80 @@ function openDrawer(movement) {
     document.querySelector("#drawer").classList.add("open");
 }
 
-const API = "/api/financeiro/fluxo-caixa";
-
-function periodParams() {
-    const form = document.querySelector("#filters");
-    return `inicio=${encodeURIComponent(form.inicio.value)}&fim=${encodeURIComponent(form.fim.value)}`;
+function openDocDrawer(doc) {
+    document.querySelector("#drawerEyebrow").textContent = "Detalhe da conta";
+    document.querySelector("#drawerTitle").textContent = doc.documento;
+    const pairs = [
+        ["Pessoa", doc.clienteFornecedor],
+        ["Filial", doc.filial],
+        ["Vencimento", date(doc.dataVencimento)],
+        ["Valor", fmtMoney.format(doc.valor || 0)],
+        ["Origem", doc.origemTipo]
+    ];
+    document.querySelector("#drawerDetails").innerHTML = pairs.map(([key, value]) => `
+        <dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value ?? "Nao informado")}</dd>
+    `).join("");
+    const itens = document.querySelector("#drawerItens");
+    itens.innerHTML = "";
+    document.querySelector("#drawer").classList.add("open");
+    carregarItensDoDoc(doc, itens);
 }
 
-function stripPrefix(id) {
-    return String(id).replace(/^[A-Za-z]+/, "");
-}
-
-async function fetchNodes(url) {
+// Drill ate produtos (nota de compra) ou CT-es (fatura) reaproveitando os endpoints existentes.
+async function carregarItensDoDoc(doc, host) {
+    let url = null;
+    let titulo = "Itens";
+    const nota = /^NC-(\d+)/.exec(doc.documento || "");
+    const fatura = /^FAT-(\d+)/.exec(doc.documento || "");
+    if (doc.origemTipo === "NOTA_COMPRA_DUPLICATA" && nota) {
+        url = `/api/financeiro/fluxo-caixa/notas/${nota[1]}/produtos`;
+        titulo = "Produtos da nota";
+    } else if (doc.origemTipo === "FATURA_ABERTA" && fatura) {
+        url = `/api/financeiro/fluxo-caixa/faturas/${fatura[1]}/ctes`;
+        titulo = "CT-es da fatura";
+    } else {
+        return;
+    }
+    host.innerHTML = `<p class="itens-title">${escapeHtml(titulo)}</p><div class="drill-loading">Carregando...</div>`;
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            return [];
+            throw new Error(`HTTP ${response.status}`);
         }
-        return await response.json();
-    } catch (error) {
-        return [];
-    }
-}
-
-// descend(node) -> null (leaf) | async () => [{ node, descend }]
-function makeLevel(urlFn, childDescend) {
-    return node => {
-        if (!node.temFilhos) {
-            return null;
-        }
-        return async () => {
-            const kids = await fetchNodes(urlFn(node));
-            return kids.map(kid => ({ node: kid, descend: childDescend }));
-        };
-    };
-}
-
-const ctesLevel = makeLevel(node => `${API}/faturas/${stripPrefix(node.id)}/ctes`, () => null);
-const faturasLevel = makeLevel(node => `${API}/clientes/${node.id}/faturas?${periodParams()}`, ctesLevel);
-const produtosLevel = makeLevel(node => `${API}/notas/${stripPrefix(node.id)}/produtos`, () => null);
-const notasLevel = makeLevel(node => `${API}/fornecedores/${node.id}/notas?${periodParams()}`, produtosLevel);
-
-function renderDrillTrees() {
-    buildTree("#clientesTree", `${API}/clientes?${periodParams()}`, faturasLevel);
-    buildTree("#fornecedoresTree", `${API}/fornecedores?${periodParams()}`, notasLevel);
-}
-
-function buildTree(selector, rootUrl, rootDescend) {
-    const container = document.querySelector(selector);
-    container.innerHTML = `<div class="drill-loading">Carregando...</div>`;
-    fetchNodes(rootUrl).then(nodes => {
-        container.innerHTML = "";
+        const nodes = await response.json();
         if (!nodes.length) {
-            container.innerHTML = `<div class="drill-empty">Sem dados no periodo.</div>`;
+            host.innerHTML = `<p class="itens-title">${escapeHtml(titulo)}</p><div class="empty-state">Sem itens.</div>`;
             return;
         }
-        nodes.forEach(node => container.appendChild(renderDrillNode({ node, descend: rootDescend })));
-    });
+        host.innerHTML = `<p class="itens-title">${escapeHtml(titulo)}</p>` + nodes.map(node => `
+            <div class="item-row">
+                <span class="item-name">${escapeHtml(node.titulo)}<small>${escapeHtml(node.detalhe || "")}</small></span>
+                <span class="item-value">${fmtMoney.format(node.valor || 0)}</span>
+            </div>
+        `).join("");
+    } catch (error) {
+        host.innerHTML = `<p class="itens-title">${escapeHtml(titulo)}</p>`
+            + `<div class="empty-state">Falha ao carregar itens. <button type="button" class="itens-retry">Tentar novamente</button></div>`;
+        host.querySelector(".itens-retry").addEventListener("click", () => carregarItensDoDoc(doc, host));
+    }
 }
 
-function renderDrillNode(item) {
-    const { node, descend } = item;
-    const loader = descend ? descend(node) : null;
-    const wrap = document.createElement("div");
+function horizonteValor(cards, codigo) {
+    const card = (cards || []).find(item => item.codigo === codigo);
+    return card ? card.valor : 0;
+}
 
-    const row = document.createElement("div");
-    row.className = "drill-node" + (loader ? "" : " leaf");
-    row.innerHTML = `
-        <span class="drill-twisty">${loader ? "›" : ""}</span>
-        <span class="drill-label">${escapeHtml(node.titulo)}<small>${escapeHtml(node.detalhe || "")}</small></span>
-        <span class="drill-value">${fmtMoney.format(node.valor || 0)}</span>`;
-    wrap.appendChild(row);
-
-    if (!loader) {
-        return wrap;
+function rangeLabel(card) {
+    if (card.codigo === "ATRASO") {
+        return "&middot; vencidas";
     }
-
-    const childBox = document.createElement("div");
-    childBox.className = "drill-children";
-    childBox.style.paddingLeft = "16px";
-    childBox.style.display = "none";
-    wrap.appendChild(childBox);
-
-    let loaded = false;
-    row.addEventListener("click", async () => {
-        const open = row.classList.toggle("open");
-        childBox.style.display = open ? "grid" : "none";
-        if (open && !loaded) {
-            loaded = true;
-            childBox.innerHTML = `<div class="drill-loading">Carregando...</div>`;
-            const kids = await loader();
-            childBox.innerHTML = "";
-            if (!kids.length) {
-                childBox.innerHTML = `<div class="drill-empty">Sem itens.</div>`;
-                return;
-            }
-            kids.forEach(kid => childBox.appendChild(renderDrillNode(kid)));
-        }
-    });
-    return wrap;
+    if (card.codigo === "HOJE") {
+        return `&middot; vence hoje`;
+    }
+    if (card.codigo === "AMANHA") {
+        return `&middot; ${date(card.de)}`;
+    }
+    return `&middot; ate ${date(card.ate)}`;
 }
 
 function iso(dateValue) {
@@ -297,6 +450,13 @@ function date(value) {
         return "-";
     }
     return fmtDate.format(new Date(`${value}T00:00:00Z`));
+}
+
+function dayMonth(value) {
+    if (!value) {
+        return "";
+    }
+    return fmtDayMonth.format(new Date(`${value}T00:00:00Z`));
 }
 
 function flowDate(movement) {

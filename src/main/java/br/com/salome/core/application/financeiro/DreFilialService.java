@@ -67,8 +67,12 @@ public class DreFilialService {
     private static final String CONTA_SEM_CC = "Sem centro de custo";
     private static final String CONTA_BANCARIAS_EXTRATO = "Despesas Bancarias Extrato";
 
-    private static final int FILIAL_SEM_ID = 0;
-    private static final String FILIAL_SEM_NOME = "Sem filial";
+    // Filiais reais da empresa (idFilial -> id canonico reportavel). Maua (7) consolida em Osasco (1).
+    // Qualquer outra idFilial e parceiro (entrega terceirizada, custo ja em Contas a Pagar) -> excluida.
+    private static final int FILIAL_SPO = 1;
+    private static final Map<Integer, Integer> FILIAL_CANON = Map.of(1, 1, 7, 1, 2, 2, 4, 4, 5, 5);
+    private static final Map<Integer, String> FILIAL_NOME = Map.of(
+            1, "Osasco (SPO)", 2, "S.J. Rio Preto (SJP)", 4, "Campinas (CAM)", 5, "Ribeirao Preto (RIB)");
 
     private static final List<String> ORDEM_SECOES = List.of(RECEITA, DEDUCOES, CUSTOS_SERVICOS,
             DESPESAS_COMERCIAIS, DESPESAS_ADMINISTRATIVAS, DEPRECIACAO_AMORTIZACAO, RESULTADO_FINANCEIRO,
@@ -150,8 +154,15 @@ public class DreFilialService {
         BigDecimal pedagioTotal = pedagioPorFilial.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal resultadoAjustadoTotal = resultadoTotal.subtract(pedagioTotal);
 
+        // Marcos consolidados (receita liquida -> resultado liquido) pela mesma classificacao por secao
+        // do DRE gerencial, para que os cards do topo batam linha a linha com o gerencial. O overhead nao
+        // entra como ajuste aqui (impostos/financeiro/seguro ja estao nas proprias secoes); por isso o
+        // resultado liquido consolidado reconcilia com o resultadoTotal do rateio.
+        MarcosConsolidados marcos = marcosConsolidados(movimentos, plano);
+
         return new DreFilialSnapshot(normalizado.inicio(), normalizado.fim(), Instant.now(clock), regimeEfetivo,
-                ag.receitaTotal(), ag.despesaDiretaTotal(), ag.overheadPool(), despesaTotal, resultadoTotal,
+                ag.receitaTotal(), marcos.receitaLiquida(), marcos.margemBruta(), marcos.ebitda(),
+                ag.despesaDiretaTotal(), ag.overheadPool(), despesaTotal, resultadoTotal,
                 percentual(resultadoTotal, ag.receitaTotal()), pedagioTotal, repasse.total(), percent,
                 transferencia.total(), resultadoAjustadoTotal, linhas.size(),
                 linhas, alertasDashboard(ag, pedagioTotal, repasse.total(), percent, transferencia.total()),
@@ -170,8 +181,7 @@ public class DreFilialService {
         List<FinanceiroMovimento> movimentos = movimentosDoRegime(normalizado, regimeEfetivo);
         Agrupamento ag = agrupar(movimentos, plano);
 
-        String nome = ag.nomePorFilial().getOrDefault(idFilial, idFilial == FILIAL_SEM_ID
-                ? FILIAL_SEM_NOME : "Filial " + idFilial);
+        String nome = nomeFilial(idFilial, ag);
         BigDecimal receitaTotalFilial = ag.receitaPorFilial().getOrDefault(idFilial, BigDecimal.ZERO);
         BigDecimal despesaDiretaFilial = ag.despesaDiretaPorFilial().getOrDefault(idFilial, BigDecimal.ZERO);
         BigDecimal overhead = ag.overheadPorFilial().getOrDefault(idFilial, BigDecimal.ZERO);
@@ -187,7 +197,17 @@ public class DreFilialService {
                 .add(transferenciaAjuste);
 
         List<FinanceiroMovimento> filialMovs = movimentos.stream()
-                .filter(m -> filialKey(m) == idFilial)
+                .filter(m -> {
+                    if (m.natureza() == FinanceiroNatureza.RECEITA) {
+                        return canonicalKey(m) == idFilial;
+                    }
+                    Atribuicao atrib = classificar(m, plano);
+                    if (ehDespesaComum(atrib.secao(), atrib.contaDescricao())) {
+                        return false; // despesa comum entra como rateio (marco), nao nas secoes diretas
+                    }
+                    Integer canon = canonical(m.filialId());
+                    return canon != null && canon == idFilial;
+                })
                 .toList();
 
         Map<String, BigDecimal> soma = somasPorSecao(filialMovs, plano);
@@ -228,7 +248,7 @@ public class DreFilialService {
                 calculada("EBITDA", "EBITDA caixa gerencial", ebitda, receitaLiquida),
                 calculada("EBIT", "EBIT caixa gerencial", ebit, receitaLiquida),
                 calculada("RESULTADO_DIRETO", "Resultado direto da filial", resultadoDireto, receitaLiquida),
-                calculada("OVERHEAD_RATEADO", "Overhead rateado (bolo sem filial)", overheadAjuste, receitaLiquida),
+                calculada("OVERHEAD_RATEADO", "Despesas comuns rateadas (impostos/financeiro/seguro)", overheadAjuste, receitaLiquida),
                 calculada("RESULTADO_LIQUIDO", "Resultado liquido (reconcilia caixa)", resultadoLiquido, receitaLiquida),
                 calculada("PEDAGIO", "Pedagio off-book (vale-pedagio por placa)", pedagioAjuste, receitaLiquida),
                 calculada("REPASSE_RECEBIDO", "Repasse recebido de outras filiais", repasseRecebido, receitaLiquida),
@@ -239,14 +259,15 @@ public class DreFilialService {
 
         List<String> alertas = new ArrayList<>();
         alertas.add("Despesa direta da filial: " + despesaDiretaFilial.setScale(2, RoundingMode.HALF_UP)
-                + ". Overhead rateado (bolo sem filial, por receita): " + overhead.setScale(2, RoundingMode.HALF_UP) + ".");
+                + ". Despesas comuns rateadas (impostos/financeiro/seguro, por receita): "
+                + overhead.setScale(2, RoundingMode.HALF_UP) + ".");
         alertas.addAll(alertasDashboard(ag, pedagio, repasse.total(), percent, transferencia.total()));
 
         return new DreFilialDetalhe(idFilial, nome, regimeEfetivo, normalizado.inicio(), normalizado.fim(),
                 Instant.now(clock), receitaTotalFilial, despesaDiretaFilial, overhead, despesaTotal, resultado,
                 percentual(resultado, receitaTotalFilial), pedagio, repasseRecebido, repassePago, transferenciaAjuste,
                 resultadoAjustado, percentual(resultadoAjustado, receitaTotalFilial),
-                resumos(receitaLiquida, margemBruta, ebitda, resultadoLiquidoAjustado), linhas, secoes, alertas,
+                resumos(receitaLiquida, margemBruta, ebitda, resultadoLiquido), linhas, secoes, alertas,
                 repository.demonstrativo());
     }
 
@@ -262,22 +283,29 @@ public class DreFilialService {
         BigDecimal transferenciaDespesa = BigDecimal.ZERO;
 
         for (FinanceiroMovimento m : movimentos) {
-            int id = filialKey(m);
-            nomePorFilial.putIfAbsent(id, id == FILIAL_SEM_ID ? FILIAL_SEM_NOME : m.filial());
             if (m.natureza() == FinanceiroNatureza.RECEITA) {
+                // Receita sempre cai numa das 4 filiais (CT-e e emitido por filial da empresa; Maua->Osasco).
+                int id = canonicalKey(m);
                 receitaPorFilial.merge(id, m.valor(), BigDecimal::add);
+                nomePorFilial.putIfAbsent(id, FILIAL_NOME.getOrDefault(id, "Filial " + id));
                 continue;
             }
             // Despesa: transferencia entre contas nao e P&L e fica fora do resultado (igual ao DRE caixa).
-            String secao = classificar(m, plano).secao();
+            Atribuicao atrib = classificar(m, plano);
+            String secao = atrib.secao();
             if (TRANSFERENCIA.equals(secao)) {
                 transferenciaDespesa = transferenciaDespesa.add(m.valor());
                 continue;
             }
-            if (id == FILIAL_SEM_ID) {
+            // Despesas comuns (impostos, financeiras, seguro) e despesa sem filial/parceira -> rateadas por
+            // receita entre as 4 filiais. As demais (pessoal/admin, frota/custos, comerciais) ficam diretas
+            // na filial onde foram lancadas. Maua->Osasco.
+            Integer canon = canonical(m.filialId());
+            if (canon == null || ehDespesaComum(secao, atrib.contaDescricao())) {
                 overheadPool = overheadPool.add(m.valor());
             } else {
-                despesaDiretaPorFilial.merge(id, m.valor(), BigDecimal::add);
+                despesaDiretaPorFilial.merge(canon, m.valor(), BigDecimal::add);
+                nomePorFilial.putIfAbsent(canon, FILIAL_NOME.getOrDefault(canon, "Filial " + canon));
             }
         }
 
@@ -285,10 +313,10 @@ public class DreFilialService {
         filiais.addAll(receitaPorFilial.keySet());
         filiais.addAll(despesaDiretaPorFilial.keySet());
         if (overheadPool.signum() != 0 && filiais.isEmpty()) {
-            filiais.add(FILIAL_SEM_ID);
+            filiais.add(FILIAL_SPO);
         }
 
-        // Rateia o overhead por receita entre as filiais; se ninguem tiver receita, joga em "Sem filial".
+        // Rateia o overhead por receita entre as 4 filiais; se ninguem tiver receita, joga no HQ (Osasco).
         LinkedHashMap<Integer, BigDecimal> receitaNum = new LinkedHashMap<>();
         for (Integer id : filiais) {
             receitaNum.put(id, receitaPorFilial.getOrDefault(id, BigDecimal.ZERO));
@@ -297,9 +325,9 @@ public class DreFilialService {
         Map<Integer, BigDecimal> overheadPorFilial;
         if (receitaDenom.signum() == 0) {
             overheadPorFilial = new LinkedHashMap<>();
-            filiais.add(FILIAL_SEM_ID);
-            overheadPorFilial.put(FILIAL_SEM_ID, overheadPool);
-            nomePorFilial.putIfAbsent(FILIAL_SEM_ID, FILIAL_SEM_NOME);
+            filiais.add(FILIAL_SPO);
+            overheadPorFilial.put(FILIAL_SPO, overheadPool);
+            nomePorFilial.putIfAbsent(FILIAL_SPO, FILIAL_NOME.get(FILIAL_SPO));
         } else {
             overheadPorFilial = ratear(overheadPool, receitaNum, receitaDenom);
         }
@@ -309,6 +337,24 @@ public class DreFilialService {
 
         return new Agrupamento(filiais, receitaPorFilial, despesaDiretaPorFilial, overheadPorFilial, nomePorFilial,
                 receitaTotal, despesaDiretaTotal, overheadPool, transferenciaDespesa);
+    }
+
+    /**
+     * Marcos consolidados (todas as filiais) a partir das mesmas somas por secao do DRE gerencial.
+     * A secao TRANSFERENCIA fica de fora (nao e P&L, igual ao DRE caixa), entao o resultado liquido
+     * consolidado reconcilia com o {@code resultadoTotal} do rateio por filial.
+     */
+    private MarcosConsolidados marcosConsolidados(List<FinanceiroMovimento> movimentos, Map<String, PlanoConta> plano) {
+        Map<String, BigDecimal> soma = somasPorSecao(movimentos, plano);
+        BigDecimal receita = soma.getOrDefault(RECEITA, BigDecimal.ZERO);
+        BigDecimal deducoes = soma.getOrDefault(DEDUCOES, BigDecimal.ZERO);
+        BigDecimal receitaLiquida = receita.add(deducoes);
+        BigDecimal custos = soma.getOrDefault(CUSTOS_SERVICOS, BigDecimal.ZERO);
+        BigDecimal margemBruta = receitaLiquida.add(custos);
+        BigDecimal comerciais = soma.getOrDefault(DESPESAS_COMERCIAIS, BigDecimal.ZERO);
+        BigDecimal administrativas = soma.getOrDefault(DESPESAS_ADMINISTRATIVAS, BigDecimal.ZERO);
+        BigDecimal ebitda = margemBruta.add(comerciais).add(administrativas);
+        return new MarcosConsolidados(receitaLiquida, margemBruta, ebitda);
     }
 
     /** Rateia {@code total} pelos numeradores, jogando o residuo do arredondamento no maior. */
@@ -342,8 +388,9 @@ public class DreFilialService {
             BigDecimal percent, BigDecimal transferenciaTotal) {
         List<String> alertas = new ArrayList<>();
         if (ag.overheadPool().compareTo(new BigDecimal("0.01")) >= 0) {
-            alertas.add("Overhead de " + ag.overheadPool().setScale(2, RoundingMode.HALF_UP)
-                    + " (despesas do bolo sem filial no legado) rateado por receita entre as filiais.");
+            alertas.add("Despesas comuns (impostos, financeiras, seguro + sem filial) de "
+                    + ag.overheadPool().setScale(2, RoundingMode.HALF_UP)
+                    + " rateadas por receita entre as 4 filiais.");
         }
         if (ag.transferenciaDespesa().signum() != 0) {
             alertas.add("Transferencias de " + ag.transferenciaDespesa().setScale(2, RoundingMode.HALF_UP)
@@ -387,15 +434,22 @@ public class DreFilialService {
         BigDecimal total = BigDecimal.ZERO;
         if (fracao.signum() != 0) {
             for (RepasseInterFilial r : repository.listarRepasseTransferencia(filtro)) {
-                if (r.origem() == null || r.destino() == null || r.frete() == null) {
+                if (r.frete() == null) {
+                    continue;
+                }
+                Integer origem = canonical(r.origem());
+                Integer destino = canonical(r.destino());
+                // Repasse so entre filiais reais. Entrega por parceiro (destino nulo) nao remunera
+                // (custo ja em Contas a Pagar); transferencia intra-grupo (ex.: Osasco<->Maua) tambem nao.
+                if (origem == null || destino == null || origem.equals(destino)) {
                     continue;
                 }
                 BigDecimal valor = r.frete().multiply(fracao).setScale(2, RoundingMode.HALF_UP);
                 if (valor.signum() == 0) {
                     continue;
                 }
-                pago.merge(r.origem(), valor, BigDecimal::add);
-                recebido.merge(r.destino(), valor, BigDecimal::add);
+                pago.merge(origem, valor, BigDecimal::add);
+                recebido.merge(destino, valor, BigDecimal::add);
                 total = total.add(valor);
             }
         }
@@ -416,14 +470,19 @@ public class DreFilialService {
             if (!normaliza(m.centroCusto()).contains("transfer")) {
                 continue;
             }
-            lancado.merge(filialKey(m), m.valor(), BigDecimal::add);
+            lancado.merge(canonicalKey(m), m.valor(), BigDecimal::add);
         }
         BigDecimal total = lancado.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         if (total.signum() == 0) {
             return new TransferenciaFilial(Map.of(), total);
         }
         LinkedHashMap<Integer, BigDecimal> peso = new LinkedHashMap<>();
-        repository.listarPesoPorFilial(filtro).forEach((k, v) -> peso.put(k, v == null ? BigDecimal.ZERO : v));
+        repository.listarPesoPorFilial(filtro).forEach((k, v) -> {
+            Integer canon = canonical(k);
+            if (canon != null) {
+                peso.merge(canon, v == null ? BigDecimal.ZERO : v, BigDecimal::add);
+            }
+        });
         BigDecimal denom = peso.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         Map<Integer, BigDecimal> cota = denom.signum() == 0 ? Map.of() : ratear(total, peso, denom);
         Map<Integer, BigDecimal> ajuste = new LinkedHashMap<>();
@@ -448,19 +507,15 @@ public class DreFilialService {
             if (p.data() == null || p.data().isBefore(filtro.inicio()) || p.data().isAfter(filtro.fim())) {
                 continue;
             }
-            Integer filial = placaFilial.get(p.placa());
-            int id = filial == null ? FILIAL_SEM_ID : filial;
-            porFilial.merge(id, p.valor(), BigDecimal::add);
+            // Placa nao mapeada ou de filial parceira -> joga no HQ (Osasco); valores irrisorios.
+            Integer canon = canonical(placaFilial.get(p.placa()));
+            porFilial.merge(canon == null ? FILIAL_SPO : canon, p.valor(), BigDecimal::add);
         }
         return porFilial;
     }
 
     private String nomeFilial(int id, Agrupamento ag) {
-        String nome = ag.nomePorFilial().get(id);
-        if (nome != null) {
-            return nome;
-        }
-        return id == FILIAL_SEM_ID ? FILIAL_SEM_NOME : "Filial " + id;
+        return FILIAL_NOME.getOrDefault(id, ag.nomePorFilial().getOrDefault(id, "Filial " + id));
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -509,8 +564,26 @@ public class DreFilialService {
         return "sim".equals(normaliza(movimento.dmr()));
     }
 
-    private int filialKey(FinanceiroMovimento movimento) {
-        return movimento.filialId() == null ? FILIAL_SEM_ID : movimento.filialId();
+    /** idFilial canonico (uma das 4 filiais reais) ou null se for parceiro/sem filial. Maua(7)->Osasco(1). */
+    private Integer canonical(Integer idFilial) {
+        return idFilial == null ? null : FILIAL_CANON.get(idFilial);
+    }
+
+    /** Como {@link #canonical} mas com fallback no HQ (Osasco) para receita/casos sem filial real. */
+    private int canonicalKey(FinanceiroMovimento movimento) {
+        Integer canon = canonical(movimento.filialId());
+        return canon == null ? FILIAL_SPO : canon;
+    }
+
+    /**
+     * Despesa "comum" a todas as filiais, rateada por receita: impostos, despesas financeiras e seguro
+     * (seguro dentro de Administrativas). As demais despesas ficam diretas na filial onde foram lancadas.
+     */
+    private boolean ehDespesaComum(String secao, String contaDescricao) {
+        if (IMPOSTOS.equals(secao) || RESULTADO_FINANCEIRO.equals(secao)) {
+            return true;
+        }
+        return DESPESAS_ADMINISTRATIVAS.equals(secao) && normaliza(contaDescricao).contains("seguro");
     }
 
     private Map<String, PlanoConta> planoMap() {
@@ -819,5 +892,8 @@ public class DreFilialService {
     }
 
     private record TransferenciaFilial(Map<Integer, BigDecimal> ajuste, BigDecimal total) {
+    }
+
+    private record MarcosConsolidados(BigDecimal receitaLiquida, BigDecimal margemBruta, BigDecimal ebitda) {
     }
 }

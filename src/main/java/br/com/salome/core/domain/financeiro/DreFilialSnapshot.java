@@ -12,6 +12,10 @@ import java.util.List;
  *
  * <p>O {@code pedagioTotal} e um custo off-book (vale-pedagio por placa, fora do bolo do legado); o
  * {@code resultadoAjustadoTotal} (= resultadoTotal - pedagioTotal) ja considera esse custo.
+ *
+ * <p>Os marcos consolidados {@code receitaLiquidaTotal}, {@code margemBrutaTotal}, {@code ebitdaTotal}
+ * e {@code resultadoTotal} usam a mesma classificacao por secao do DRE gerencial e batem, linha a
+ * linha, com os cards do gerencial no mesmo periodo/regime.
  */
 public record DreFilialSnapshot(
         LocalDate inicio,
@@ -19,6 +23,9 @@ public record DreFilialSnapshot(
         Instant atualizadoEm,
         String regime,
         BigDecimal receitaTotal,
+        BigDecimal receitaLiquidaTotal,
+        BigDecimal margemBrutaTotal,
+        BigDecimal ebitdaTotal,
         BigDecimal despesaDiretaTotal,
         BigDecimal overheadTotal,
         BigDecimal despesaTotal,

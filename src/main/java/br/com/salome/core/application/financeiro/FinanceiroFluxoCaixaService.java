@@ -1,20 +1,25 @@
 package br.com.salome.core.application.financeiro;
 
+import br.com.salome.core.domain.financeiro.FinanceiroContaNo;
 import br.com.salome.core.domain.financeiro.FinanceiroDashboardSnapshot;
 import br.com.salome.core.domain.financeiro.FinanceiroDrillNode;
 import br.com.salome.core.domain.financeiro.FinanceiroFiltro;
 import br.com.salome.core.domain.financeiro.FinanceiroGrupo;
+import br.com.salome.core.domain.financeiro.FinanceiroHorizonteCard;
 import br.com.salome.core.domain.financeiro.FinanceiroKpi;
 import br.com.salome.core.domain.financeiro.FinanceiroMovimento;
 import br.com.salome.core.domain.financeiro.FinanceiroNatureza;
-import br.com.salome.core.domain.financeiro.FinanceiroResumoPrevistoRealizado;
+import br.com.salome.core.domain.financeiro.FinanceiroProjecaoPonto;
+import br.com.salome.core.domain.financeiro.FinanceiroRetrospectivoCard;
 import br.com.salome.core.domain.financeiro.FinanceiroSaldoBanco;
-import br.com.salome.core.domain.financeiro.FinanceiroSeriePonto;
 import br.com.salome.core.domain.financeiro.FinanceiroStatus;
+import br.com.salome.core.domain.financeiro.PlanoConta;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -23,10 +28,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Monta o dashboard estrategico do Fluxo de Caixa: cards de horizonte (a pagar / a receber por
+ * vencimento a partir de hoje), projecao de saldo conciliada com o saldo bancario e cards
+ * retrospectivos do periodo. O DRE permanece isolado (este service nao toca naquele dominio).
+ */
 @Service
 public class FinanceiroFluxoCaixaService {
 
@@ -44,56 +55,80 @@ public class FinanceiroFluxoCaixaService {
     }
 
     public FinanceiroDashboardSnapshot dashboard(FinanceiroFiltro filtro) {
-        FinanceiroFiltro normalizado = filtro == null ? FinanceiroFiltro.padrao() : filtro.normalizado();
-        List<FinanceiroMovimento> movimentosResumo = repository.listarMovimentos(normalizado).stream()
+        FinanceiroFiltro tela = filtro == null ? FinanceiroFiltro.padrao() : filtro.normalizado();
+        LocalDate hoje = LocalDate.now(clock);
+        LocalDate fimMes = hoje.with(TemporalAdjusters.lastDayOfMonth());
+
+        // Carrega uma janela ampla o suficiente para capturar atrasados (passado) e o que vence ate
+        // o fim do mes, alem do periodo da tela. Uma unica leitura serve a tudo.
+        List<FinanceiroMovimento> todos = repository.listarMovimentos(janelaPrevisao(tela, hoje, fimMes)).stream()
                 .filter(movimento -> !movimento.receitaExcluida())
-                .filter(movimento -> intersectaPeriodo(movimento, normalizado))
-                .filter(movimento -> filtraNatureza(movimento, normalizado.natureza()))
-                .filter(movimento -> filtraBusca(movimento, normalizado.busca()))
+                // Despesas "caixa 2" (duplicata No. Duplicata = "A VISTA") nao sao reais: ignoradas aqui,
+                // isolado do DRE (regime caixa validado) que continua usando listarMovimentos sem este filtro.
+                .filter(movimento -> !movimento.duplicataAVista())
+                .toList();
+
+        // Movimentos do periodo da tela: alimentam tabela, retrospectivo e rankings.
+        List<FinanceiroMovimento> movimentosResumo = todos.stream()
+                .filter(movimento -> intersectaPeriodo(movimento, tela))
+                .filter(movimento -> filtraBusca(movimento, tela.busca()))
                 .sorted(Comparator.comparing(FinanceiroMovimento::dataFluxo, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(FinanceiroMovimento::clienteFornecedor)
                         .thenComparing(FinanceiroMovimento::documento))
                 .toList();
 
         List<FinanceiroMovimento> movimentosTabela = movimentosResumo.stream()
-                .filter(movimento -> dentroPeriodoFluxo(movimento, normalizado))
-                .filter(movimento -> filtraStatus(movimento, normalizado.status()))
+                .filter(movimento -> dentroPeriodoFluxo(movimento, tela))
                 .filter(this::visivelNaTabela)
                 .toList();
 
-        BigDecimal receitasPrevistas = somaPrevisto(movimentosResumo, normalizado, FinanceiroNatureza.RECEITA);
-        BigDecimal receitasRealizadas = somaRealizado(movimentosResumo, normalizado, FinanceiroNatureza.RECEITA);
-        BigDecimal despesasPrevistas = somaPrevisto(movimentosResumo, normalizado, FinanceiroNatureza.DESPESA);
-        BigDecimal despesasRealizadas = somaRealizado(movimentosResumo, normalizado, FinanceiroNatureza.DESPESA);
-        BigDecimal saldoPrevisto = receitasPrevistas.subtract(despesasPrevistas);
-        BigDecimal saldoRealizado = receitasRealizadas.subtract(despesasRealizadas);
-        BigDecimal diferencaRecebimento = receitasRealizadas.subtract(receitasPrevistas);
-        BigDecimal diferencaPagamento = despesasPrevistas.subtract(despesasRealizadas);
-        BigDecimal diferencaSaldo = saldoRealizado.subtract(saldoPrevisto);
-        List<FinanceiroSaldoBanco> saldosBancarios = repository.listarSaldosBancarios(normalizado);
-        BigDecimal saldoBancario = saldosBancarios.stream()
+        List<FinanceiroSaldoBanco> saldosBancarios = repository.listarSaldosBancarios(tela);
+        BigDecimal saldoBancarioAtual = saldosBancarios.stream()
                 .map(FinanceiroSaldoBanco::saldoBancario)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        Map<String, String> descricaoPlano = repository.listarPlanoContas().stream()
+                .filter(plano -> plano.classificacao() != null && !plano.classificacao().isBlank())
+                .collect(Collectors.toMap(PlanoConta::classificacao, PlanoConta::descricao, (a, b) -> a, LinkedHashMap::new));
+
+        List<FinanceiroMovimento> previstos = todos.stream()
+                .filter(movimento -> movimento.status() == FinanceiroStatus.PREVISTO)
+                .filter(movimento -> movimento.dataVencimento() != null)
+                .filter(movimento -> movimento.valor() != null && movimento.valor().signum() > 0)
+                .toList();
+
+        List<FinanceiroHorizonteCard> aPagar = horizontes(previstos, FinanceiroNatureza.DESPESA, hoje, fimMes, descricaoPlano);
+        List<FinanceiroHorizonteCard> aReceber = horizontes(previstos, FinanceiroNatureza.RECEITA, hoje, fimMes, descricaoPlano);
+        List<FinanceiroProjecaoPonto> projecao = projecao(previstos, hoje, fimMes, saldoBancarioAtual);
+        List<FinanceiroRetrospectivoCard> retrospectivo = retrospectivo(movimentosResumo, tela, descricaoPlano);
+
+        BigDecimal aReceberMes = valorDoHorizonte(aReceber, "MES");
+        BigDecimal aPagarMes = valorDoHorizonte(aPagar, "MES");
+        BigDecimal saldoProjetadoFimMes = projecao.isEmpty()
+                ? saldoBancarioAtual
+                : projecao.get(projecao.size() - 1).saldoProjetado();
+
+        List<FinanceiroKpi> kpis = List.of(
+                new FinanceiroKpi("Saldo bancario atual", saldoBancarioAtual,
+                        "Saldo conciliado por banco (extrato)", tom(saldoBancarioAtual)),
+                new FinanceiroKpi("A receber ate o fim do mes", aReceberMes,
+                        "Faturas e CT-es a vencer de hoje ao fim do mes", "positivo"),
+                new FinanceiroKpi("A pagar ate o fim do mes", aPagarMes,
+                        "Contas a vencer de hoje ao fim do mes", "negativo"),
+                new FinanceiroKpi("Saldo projetado fim do mes", saldoProjetadoFimMes,
+                        "Saldo atual + a receber - a pagar (inclui atrasados)", tom(saldoProjetadoFimMes)));
+
         return new FinanceiroDashboardSnapshot(
-                normalizado.inicio(),
-                normalizado.fim(),
+                tela.inicio(),
+                tela.fim(),
                 Instant.now(clock),
-                List.of(
-                        new FinanceiroKpi("Saldo realizado", saldoRealizado, "Recebido menos pago no periodo", tom(saldoRealizado)),
-                        new FinanceiroKpi("Saldo previsto", saldoPrevisto, "Previsto por vencimento no periodo", tom(saldoPrevisto)),
-                        new FinanceiroKpi("Diferenca do periodo", diferencaSaldo, "Realizado menos previsto", tom(diferencaSaldo)),
-                        new FinanceiroKpi("Saldo bancos/caixa", saldoBancario, "Posicao atual por banco, fora do periodo", tom(saldoBancario))),
-                List.of(
-                        new FinanceiroResumoPrevistoRealizado("Recebimentos", receitasPrevistas, receitasRealizadas,
-                                diferencaRecebimento, "Realizado maior indica juros/outros recebimentos; menor indica aberto/abatimento.",
-                                tom(diferencaRecebimento)),
-                        new FinanceiroResumoPrevistoRealizado("Pagamentos", despesasPrevistas, despesasRealizadas,
-                                diferencaPagamento, "Positivo indica contas previstas ainda nao pagas; negativo indica pagamento acima do previsto.",
-                                tom(diferencaPagamento))),
-                serie(normalizado, movimentosResumo),
-                grupos(movimentosResumo, FinanceiroMovimento::dmr, 10),
+                kpis,
+                saldoBancarioAtual,
+                aPagar,
+                aReceber,
+                projecao,
+                retrospectivo,
                 grupos(movimentosResumo.stream()
                         .filter(movimento -> movimento.natureza() == FinanceiroNatureza.DESPESA)
                         .toList(), FinanceiroMovimento::centroCusto, 10),
@@ -101,9 +136,235 @@ public class FinanceiroFluxoCaixaService {
                 saldosBancarios,
                 grupos(movimentosResumo, FinanceiroMovimento::clienteFornecedor, 12),
                 movimentosTabela,
-                alertas(movimentosResumo, movimentosTabela, repository.demonstrativo()),
+                alertas(movimentosResumo, repository.demonstrativo()),
                 repository.demonstrativo());
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Previsao futura: cards de horizonte e projecao de saldo
+    // ---------------------------------------------------------------------------------------------
+
+    private List<FinanceiroHorizonteCard> horizontes(List<FinanceiroMovimento> previstos, FinanceiroNatureza natureza,
+            LocalDate hoje, LocalDate fimMes, Map<String, String> descricaoPlano) {
+        LocalDate amanha = hoje.plusDays(1);
+        LocalDate fimSemana = hoje.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        return List.of(
+                card("HOJE", "Hoje", natureza, hoje, hoje, previstos,
+                        venc -> venc.equals(hoje), descricaoPlano),
+                card("AMANHA", "Amanha", natureza, amanha, amanha, previstos,
+                        venc -> venc.equals(amanha), descricaoPlano),
+                card("SEMANA", "Esta semana", natureza, hoje, fimSemana, previstos,
+                        venc -> !venc.isBefore(hoje) && !venc.isAfter(fimSemana), descricaoPlano),
+                card("MES", "Este mes", natureza, hoje, fimMes, previstos,
+                        venc -> !venc.isBefore(hoje) && !venc.isAfter(fimMes), descricaoPlano),
+                card("ATRASO", "Em atraso", natureza, null, hoje.minusDays(1), previstos,
+                        venc -> venc.isBefore(hoje), descricaoPlano));
+    }
+
+    private FinanceiroHorizonteCard card(String codigo, String titulo, FinanceiroNatureza natureza, LocalDate de,
+            LocalDate ate, List<FinanceiroMovimento> previstos, Predicate<LocalDate> dentroDoVencimento,
+            Map<String, String> descricaoPlano) {
+        List<FinanceiroMovimento> doBucket = previstos.stream()
+                .filter(movimento -> movimento.natureza() == natureza)
+                .filter(movimento -> dentroDoVencimento.test(movimento.dataVencimento()))
+                .toList();
+        BigDecimal valor = doBucket.stream().map(FinanceiroMovimento::valor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<FinanceiroContaNo> contas = FinanceiroPlanoContasArvore.construir(doBucket, descricaoPlano);
+        return new FinanceiroHorizonteCard(codigo, titulo, natureza, de, ate, valor, doBucket.size(),
+                tomHorizonte(codigo, natureza, valor), contas);
+    }
+
+    /**
+     * Curva diaria de saldo projetado, de hoje ate o fim do mes. Parte do saldo bancario atual e
+     * acumula recebimentos previstos (entradas) menos pagamentos previstos (saidas). Os atrasados
+     * (vencimento anterior a hoje) sao exigiveis e entram no primeiro ponto (hoje).
+     */
+    private List<FinanceiroProjecaoPonto> projecao(List<FinanceiroMovimento> previstos, LocalDate hoje,
+            LocalDate fimMes, BigDecimal saldoBancarioAtual) {
+        List<FinanceiroProjecaoPonto> pontos = new ArrayList<>();
+        BigDecimal saldo = saldoBancarioAtual;
+        for (LocalDate dia = hoje; !dia.isAfter(fimMes); dia = dia.plusDays(1)) {
+            boolean primeiroDia = dia.equals(hoje);
+            LocalDate ref = dia;
+            Predicate<FinanceiroMovimento> noDia = movimento -> {
+                LocalDate venc = movimento.dataVencimento();
+                return venc.equals(ref) || (primeiroDia && venc.isBefore(hoje));
+            };
+            BigDecimal entradas = previstos.stream()
+                    .filter(movimento -> movimento.natureza() == FinanceiroNatureza.RECEITA)
+                    .filter(noDia)
+                    .map(FinanceiroMovimento::valor)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal saidas = previstos.stream()
+                    .filter(movimento -> movimento.natureza() == FinanceiroNatureza.DESPESA)
+                    .filter(noDia)
+                    .map(FinanceiroMovimento::valor)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            saldo = saldo.add(entradas).subtract(saidas);
+            pontos.add(new FinanceiroProjecaoPonto(dia, entradas, saidas, saldo));
+        }
+        return pontos;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Retrospectivo: o que de fato entrou/saiu no periodo do filtro
+    // ---------------------------------------------------------------------------------------------
+
+    private List<FinanceiroRetrospectivoCard> retrospectivo(List<FinanceiroMovimento> movimentos, FinanceiroFiltro tela,
+            Map<String, String> descricaoPlano) {
+        List<FinanceiroMovimento> realizados = movimentos.stream()
+                .filter(movimento -> movimento.status() == FinanceiroStatus.REALIZADO)
+                .filter(movimento -> noPeriodo(movimento.dataBaixa(), tela))
+                .toList();
+        return List.of(
+                retrospectivoCard("RECEBIDO_CLIENTES", "Recebido de clientes", realizados,
+                        movimento -> origemEh(movimento, "FATURA_BAIXA"), "positivo",
+                        "Baixas de fatura no periodo", descricaoPlano),
+                retrospectivoCard("PAGO_FORNECEDORES", "Pago a fornecedores", realizados,
+                        movimento -> origemEh(movimento, "NOTA_COMPRA_DUPLICATA"), "negativo",
+                        "Duplicatas pagas via banco", descricaoPlano),
+                retrospectivoCard("PAGO_EXTRATO", "Pago via extrato bancario", realizados,
+                        movimento -> origemEh(movimento, "EXTRATO_AVULSO"), "negativo",
+                        "Tarifas, juros e debitos diretos", descricaoPlano),
+                // Pagamento caixa (tela pagamento caixa) + caixa em especie: despesa diaria em dinheiro,
+                // mostrada em destaque mas FORA do fluxo bancario/projecao (segue a logica do DRE caixa).
+                retrospectivoCard("PAGO_CAIXA", "Pago em dinheiro (caixa)", realizados,
+                        movimento -> origemEh(movimento, "CAIXA_DINHEIRO", "PAGAMENTO_CAIXA"), "alerta",
+                        "Pagamento caixa e especie - fora do fluxo bancario", descricaoPlano));
+    }
+
+    private FinanceiroRetrospectivoCard retrospectivoCard(String codigo, String titulo,
+            List<FinanceiroMovimento> realizados, Predicate<FinanceiroMovimento> filtro, String tom, String detalhe,
+            Map<String, String> descricaoPlano) {
+        List<FinanceiroMovimento> selecionados = realizados.stream().filter(filtro).toList();
+        BigDecimal valor = selecionados.stream().map(FinanceiroMovimento::valor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        String tomFinal = valor.signum() == 0 ? "neutro" : tom;
+        List<FinanceiroContaNo> contas = FinanceiroPlanoContasArvore.construir(selecionados, descricaoPlano);
+        return new FinanceiroRetrospectivoCard(codigo, titulo, valor, selecionados.size(), detalhe, tomFinal, contas);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Apoio
+    // ---------------------------------------------------------------------------------------------
+
+    private FinanceiroFiltro janelaPrevisao(FinanceiroFiltro tela, LocalDate hoje, LocalDate fimMes) {
+        LocalDate lookback = hoje.minusMonths(6);
+        LocalDate inicio = tela.inicio().isBefore(lookback) ? tela.inicio() : lookback;
+        LocalDate fim = tela.fim().isAfter(fimMes) ? tela.fim() : fimMes;
+        return new FinanceiroFiltro(inicio, fim, tela.busca(), "TODOS", "TODAS");
+    }
+
+    private BigDecimal valorDoHorizonte(List<FinanceiroHorizonteCard> cards, String codigo) {
+        return cards.stream()
+                .filter(card -> card.codigo().equals(codigo))
+                .map(FinanceiroHorizonteCard::valor)
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
+    }
+
+    private boolean origemEh(FinanceiroMovimento movimento, String... tipos) {
+        String nome = movimento.origemTipo().name();
+        for (String tipo : tipos) {
+            if (nome.equals(tipo)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean dentroPeriodoFluxo(FinanceiroMovimento movimento, FinanceiroFiltro filtro) {
+        LocalDate data = movimento.dataFluxo();
+        return data != null && !data.isBefore(filtro.inicio()) && !data.isAfter(filtro.fim());
+    }
+
+    private boolean intersectaPeriodo(FinanceiroMovimento movimento, FinanceiroFiltro filtro) {
+        return noPeriodo(movimento.dataCompetencia(), filtro)
+                || noPeriodo(movimento.dataVencimento(), filtro)
+                || noPeriodo(movimento.dataBaixa(), filtro)
+                || dentroPeriodoFluxo(movimento, filtro);
+    }
+
+    private boolean filtraBusca(FinanceiroMovimento movimento, String busca) {
+        if (busca == null || busca.isBlank()) {
+            return true;
+        }
+        String needle = busca.toLowerCase(Locale.ROOT);
+        return List.of(movimento.clienteFornecedor(), movimento.banco(), movimento.centroCusto(), movimento.planoContas(),
+                        movimento.dmr(), movimento.documento(), movimento.historico())
+                .stream()
+                .filter(Objects::nonNull)
+                .map(valor -> valor.toLowerCase(Locale.ROOT))
+                .anyMatch(valor -> valor.contains(needle));
+    }
+
+    private boolean visivelNaTabela(FinanceiroMovimento movimento) {
+        return temBancoInformado(movimento) || movimento.origemTipo().name().equals("CTE_ABERTO");
+    }
+
+    private boolean temBancoInformado(FinanceiroMovimento movimento) {
+        return movimento.banco() != null && !"Nao informado".equals(movimento.banco());
+    }
+
+    private boolean noPeriodo(LocalDate data, FinanceiroFiltro filtro) {
+        return data != null && !data.isBefore(filtro.inicio()) && !data.isAfter(filtro.fim());
+    }
+
+    private List<FinanceiroGrupo> grupos(List<FinanceiroMovimento> movimentos, Function<FinanceiroMovimento, String> chave,
+            int limite) {
+        return movimentos.stream()
+                .collect(Collectors.groupingBy(chave, Collectors.toList()))
+                .entrySet()
+                .stream()
+                .map(entry -> grupo(entry.getKey(), entry.getValue()))
+                .sorted(Comparator.comparing(FinanceiroGrupo::saldo, Comparator.comparing(BigDecimal::abs)).reversed())
+                .limit(limite)
+                .toList();
+    }
+
+    private FinanceiroGrupo grupo(String chave, List<FinanceiroMovimento> movimentos) {
+        BigDecimal receitas = movimentos.stream()
+                .filter(movimento -> movimento.natureza() == FinanceiroNatureza.RECEITA)
+                .map(FinanceiroMovimento::valor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal despesas = movimentos.stream()
+                .filter(movimento -> movimento.natureza() == FinanceiroNatureza.DESPESA)
+                .map(FinanceiroMovimento::valor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new FinanceiroGrupo(chave, receitas, despesas, receitas.subtract(despesas), movimentos.size());
+    }
+
+    private List<String> alertas(List<FinanceiroMovimento> movimentosResumo, boolean demonstrativo) {
+        List<String> alertas = new ArrayList<>();
+        if (demonstrativo) {
+            alertas.add("Modo demonstrativo ativo: dados de exemplo. Ligue o datasource legado para ver os lancamentos reais.");
+        }
+        long extratoAvulso = movimentosResumo.stream()
+                .filter(movimento -> movimento.origemTipo().name().equals("EXTRATO_AVULSO")).count();
+        if (extratoAvulso > 0) {
+            alertas.add(extratoAvulso + " lancamentos vieram direto do extrato bancario.");
+        }
+        alertas.add("Transferencias entre contas (TED/TRANSF/DOC/PIX/TEV) sao ignoradas para nao inflar receitas e despesas.");
+        alertas.add("Receitas do tomador Expresso Salome e do banco 34 foram removidas do painel.");
+        return alertas;
+    }
+
+    private String tom(BigDecimal valor) {
+        return valor.signum() >= 0 ? "positivo" : "negativo";
+    }
+
+    private String tomHorizonte(String codigo, FinanceiroNatureza natureza, BigDecimal valor) {
+        if (valor.signum() == 0) {
+            return "neutro";
+        }
+        if ("ATRASO".equals(codigo)) {
+            return "alerta";
+        }
+        return natureza == FinanceiroNatureza.RECEITA ? "positivo" : "negativo";
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Drill lazy (mantido para compatibilidade dos endpoints existentes)
+    // ---------------------------------------------------------------------------------------------
 
     public List<FinanceiroDrillNode> clientes(FinanceiroFiltro filtro) {
         return repository.listarClientes(normalizado(filtro));
@@ -131,156 +392,5 @@ public class FinanceiroFluxoCaixaService {
 
     private FinanceiroFiltro normalizado(FinanceiroFiltro filtro) {
         return filtro == null ? FinanceiroFiltro.padrao() : filtro.normalizado();
-    }
-
-    private boolean dentroPeriodoFluxo(FinanceiroMovimento movimento, FinanceiroFiltro filtro) {
-        LocalDate data = movimento.dataFluxo();
-        return data != null && !data.isBefore(filtro.inicio()) && !data.isAfter(filtro.fim());
-    }
-
-    private boolean intersectaPeriodo(FinanceiroMovimento movimento, FinanceiroFiltro filtro) {
-        return noPeriodo(movimento.dataCompetencia(), filtro)
-                || noPeriodo(movimento.dataVencimento(), filtro)
-                || noPeriodo(movimento.dataBaixa(), filtro)
-                || dentroPeriodoFluxo(movimento, filtro);
-    }
-
-    private boolean filtraStatus(FinanceiroMovimento movimento, String status) {
-        return "TODOS".equalsIgnoreCase(status) || movimento.status().name().equalsIgnoreCase(status);
-    }
-
-    private boolean filtraNatureza(FinanceiroMovimento movimento, String natureza) {
-        return "TODAS".equalsIgnoreCase(natureza) || movimento.natureza().name().equalsIgnoreCase(natureza);
-    }
-
-    private boolean filtraBusca(FinanceiroMovimento movimento, String busca) {
-        if (busca == null || busca.isBlank()) {
-            return true;
-        }
-        String needle = busca.toLowerCase(Locale.ROOT);
-        return List.of(movimento.clienteFornecedor(), movimento.banco(), movimento.centroCusto(), movimento.planoContas(),
-                        movimento.dmr(), movimento.documento(), movimento.historico())
-                .stream()
-                .filter(Objects::nonNull)
-                .map(valor -> valor.toLowerCase(Locale.ROOT))
-                .anyMatch(valor -> valor.contains(needle));
-    }
-
-    private boolean visivelNaTabela(FinanceiroMovimento movimento) {
-        return temBancoInformado(movimento) || movimento.origemTipo().name().equals("CTE_ABERTO");
-    }
-
-    private boolean temBancoInformado(FinanceiroMovimento movimento) {
-        return movimento.banco() != null && !"Nao informado".equals(movimento.banco());
-    }
-
-    private BigDecimal soma(List<FinanceiroMovimento> movimentos, FinanceiroNatureza natureza, FinanceiroStatus status) {
-        return movimentos.stream()
-                .filter(movimento -> movimento.natureza() == natureza && movimento.status() == status)
-                .map(FinanceiroMovimento::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal somaPrevisto(List<FinanceiroMovimento> movimentos, FinanceiroFiltro filtro,
-            FinanceiroNatureza natureza) {
-        return movimentos.stream()
-                .filter(movimento -> movimento.natureza() == natureza)
-                .filter(movimento -> noPeriodo(movimento.dataVencimento(), filtro))
-                .map(FinanceiroMovimento::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal somaRealizado(List<FinanceiroMovimento> movimentos, FinanceiroFiltro filtro,
-            FinanceiroNatureza natureza) {
-        return movimentos.stream()
-                .filter(movimento -> movimento.natureza() == natureza && movimento.status() == FinanceiroStatus.REALIZADO)
-                .filter(movimento -> noPeriodo(movimento.dataBaixa(), filtro))
-                .map(FinanceiroMovimento::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private boolean noPeriodo(LocalDate data, FinanceiroFiltro filtro) {
-        return data != null && !data.isBefore(filtro.inicio()) && !data.isAfter(filtro.fim());
-    }
-
-    private List<FinanceiroSeriePonto> serie(FinanceiroFiltro filtro, List<FinanceiroMovimento> movimentos) {
-        List<FinanceiroSeriePonto> pontos = new ArrayList<>();
-        for (LocalDate data = filtro.inicio(); !data.isAfter(filtro.fim()); data = data.plusDays(1)) {
-            BigDecimal receitasPrevistas = somaPorVencimento(movimentos, data, FinanceiroNatureza.RECEITA);
-            BigDecimal receitasRealizadas = somaPorBaixa(movimentos, data, FinanceiroNatureza.RECEITA);
-            BigDecimal despesasPrevistas = somaPorVencimento(movimentos, data, FinanceiroNatureza.DESPESA);
-            BigDecimal despesasRealizadas = somaPorBaixa(movimentos, data, FinanceiroNatureza.DESPESA);
-            pontos.add(new FinanceiroSeriePonto(data, receitasPrevistas, receitasRealizadas, despesasPrevistas,
-                    despesasRealizadas, receitasPrevistas.subtract(despesasPrevistas),
-                    receitasRealizadas.subtract(despesasRealizadas)));
-        }
-        return pontos;
-    }
-
-    private BigDecimal somaPorVencimento(List<FinanceiroMovimento> movimentos, LocalDate data,
-            FinanceiroNatureza natureza) {
-        return movimentos.stream()
-                .filter(movimento -> movimento.natureza() == natureza)
-                .filter(movimento -> data.equals(movimento.dataVencimento()))
-                .map(FinanceiroMovimento::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal somaPorBaixa(List<FinanceiroMovimento> movimentos, LocalDate data,
-            FinanceiroNatureza natureza) {
-        return movimentos.stream()
-                .filter(movimento -> movimento.natureza() == natureza && movimento.status() == FinanceiroStatus.REALIZADO)
-                .filter(movimento -> data.equals(movimento.dataBaixa()))
-                .map(FinanceiroMovimento::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private List<FinanceiroGrupo> grupos(List<FinanceiroMovimento> movimentos, Function<FinanceiroMovimento, String> chave,
-            int limite) {
-        return movimentos.stream()
-                .collect(Collectors.groupingBy(chave, Collectors.toList()))
-                .entrySet()
-                .stream()
-                .map(entry -> grupo(entry.getKey(), entry.getValue()))
-                .sorted(Comparator.comparing(FinanceiroGrupo::saldo, Comparator.comparing(BigDecimal::abs)).reversed())
-                .limit(limite)
-                .toList();
-    }
-
-    private FinanceiroGrupo grupo(String chave, List<FinanceiroMovimento> movimentos) {
-        BigDecimal receitas = movimentos.stream()
-                .filter(movimento -> movimento.natureza() == FinanceiroNatureza.RECEITA)
-                .map(FinanceiroMovimento::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal despesas = movimentos.stream()
-                .filter(movimento -> movimento.natureza() == FinanceiroNatureza.DESPESA)
-                .map(FinanceiroMovimento::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new FinanceiroGrupo(chave, receitas, despesas, receitas.subtract(despesas), movimentos.size());
-    }
-
-    private List<String> alertas(List<FinanceiroMovimento> movimentosResumo, List<FinanceiroMovimento> movimentosTabela,
-            boolean demonstrativo) {
-        List<String> alertas = new ArrayList<>();
-        if (demonstrativo) {
-            alertas.add("Modo demonstrativo ativo: os 4 movimentos visiveis sao amostras. Ligue o datasource legado para ver todos os lancamentos reais.");
-        }
-        if (movimentosTabela.size() < movimentosResumo.size()) {
-            alertas.add("O filtro de status afeta a tabela; KPIs e graficos comparam previsto x realizado do periodo completo.");
-        }
-        long semDmr = movimentosResumo.stream().filter(movimento -> "Nao informado".equals(movimento.dmr())).count();
-        long extratoAvulso = movimentosResumo.stream().filter(movimento -> movimento.origemTipo().name().equals("EXTRATO_AVULSO")).count();
-        if (semDmr > 0) {
-            alertas.add(semDmr + " movimentos sem DMR/plano classificado.");
-        }
-        if (extratoAvulso > 0) {
-            alertas.add(extratoAvulso + " lancamentos vieram direto do extrato bancario.");
-        }
-        alertas.add("Receitas do tomador Expresso Salome e do banco 34 foram removidas do painel.");
-        return alertas;
-    }
-
-    private String tom(BigDecimal valor) {
-        return valor.signum() >= 0 ? "positivo" : "negativo";
     }
 }

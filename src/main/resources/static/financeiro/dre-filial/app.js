@@ -86,25 +86,51 @@ function render(snapshot) {
 }
 
 function renderResumos(snapshot) {
+    // Mesmos cards do DRE gerencial: batem linha a linha no mesmo periodo/regime.
     const cards = [
-        { titulo: "Receita realizada", valor: snapshot.receitaTotal, detalhe: `${snapshot.filiais || 0} filial(is) no periodo`,
-          tom: tom(snapshot.receitaTotal) },
-        { titulo: "Resultado (reconcilia caixa)", valor: snapshot.resultadoTotal,
-          detalhe: `Margem ${Number(snapshot.margemMediaPct || 0).toFixed(2)}% · receita - despesa - overhead`,
-          tom: tom(snapshot.resultadoTotal) },
-        { titulo: "Pedagio (off-book)", valor: snapshot.pedagioTotal, detalhe: "Vale-pedagio por placa, fora do caixa",
-          tom: "negativo" },
-        { titulo: "Resultado ajustado", valor: snapshot.resultadoAjustadoTotal,
-          detalhe: "Resultado menos pedagio",
-          tom: tom(snapshot.resultadoAjustadoTotal) }
+        { titulo: "Receita liquida", valor: snapshot.receitaLiquidaTotal, detalhe: "Receita emitida menos deducoes",
+          tom: tom(snapshot.receitaLiquidaTotal) },
+        { titulo: "Margem bruta", valor: snapshot.margemBrutaTotal, detalhe: "Receita liquida menos custos dos servicos",
+          tom: tom(snapshot.margemBrutaTotal) },
+        { titulo: "EBITDA", valor: snapshot.ebitdaTotal, detalhe: "Resultado operacional antes de depreciacao e financeiro",
+          tom: tom(snapshot.ebitdaTotal) },
+        { titulo: "Resultado liquido", valor: snapshot.resultadoTotal, detalhe: "Bate com o DRE gerencial no periodo",
+          tom: tom(snapshot.resultadoTotal) }
     ];
-    document.querySelector("#resumos").innerHTML = cards.map(card => `
+    document.querySelector("#resumos").innerHTML = cards.map(kpiCard).join("");
+    renderAjustes(snapshot);
+}
+
+// Ajustes proprios da visao por filial (nao existem no DRE gerencial): pedagio off-book e o
+// resultado ja considerando esse custo. So aparecem quando ha valor no periodo.
+function renderAjustes(snapshot) {
+    const repasseLiq = Number(snapshot.repasseTotal || 0);
+    const cards = [];
+    if (Number(snapshot.pedagioTotal || 0) !== 0) {
+        cards.push({ titulo: "Pedagio (off-book)", valor: snapshot.pedagioTotal,
+            detalhe: "Vale-pedagio por placa, fora do DRE gerencial", tom: "negativo" });
+    }
+    if (repasseLiq !== 0) {
+        cards.push({ titulo: "Repasse inter-filial", valor: snapshot.repasseTotal,
+            detalhe: `${Number(snapshot.repassePercentualPct || 0).toFixed(0)}% do frete transferido · zero-sum`,
+            tom: "positivo" });
+    }
+    if (Number(snapshot.resultadoAjustadoTotal || 0) !== Number(snapshot.resultadoTotal || 0)) {
+        cards.push({ titulo: "Resultado ajustado", valor: snapshot.resultadoAjustadoTotal,
+            detalhe: "Resultado liquido menos pedagio off-book", tom: tom(snapshot.resultadoAjustadoTotal) });
+    }
+    document.querySelector("#ajustesLabel").hidden = cards.length === 0;
+    document.querySelector("#ajustes").innerHTML = cards.map(kpiCard).join("");
+}
+
+function kpiCard(card) {
+    return `
         <article class="kpi ${card.tom}">
             <small>${escapeHtml(card.titulo)}</small>
             <strong>${fmtMoney.format(card.valor || 0)}</strong>
             <small>${escapeHtml(card.detalhe || "")}</small>
         </article>
-    `).join("");
+    `;
 }
 
 function renderRanking(snapshot) {
@@ -176,7 +202,7 @@ function renderDetalhe(detalhe) {
     document.querySelector("#drawerTitle").textContent = detalhe.nome;
     document.querySelector("#drawerSub").textContent =
         `${date(detalhe.inicio)} a ${date(detalhe.fim)} - regime ${REGIME_LABEL[detalhe.regime] || detalhe.regime}`
-        + ` (overhead rateado: ${fmtMoney.format(detalhe.overhead || 0)})`;
+        + ` (comuns rateadas: ${fmtMoney.format(detalhe.overhead || 0)})`;
     document.querySelector("#drawerResumos").innerHTML = (detalhe.resumos || []).map(item => `
         <article class="kpi ${item.tom}">
             <small>${escapeHtml(item.titulo)}</small>

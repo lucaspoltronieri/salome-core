@@ -1,6 +1,12 @@
 # Build
 /target/
 
+# Codigo legado (referencia local, NAO versionar)
+/salome-legacy/
+
+# Exports gerados
+ctes-sem-fatura-*.xlsx
+
 # Segredos / credenciais (NUNCA commitar)
 google-service-account.json
 *service-account*.json

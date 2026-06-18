@@ -153,21 +153,34 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
         return mapa;
     }
 
+    /**
+     * Saldo por banco calculado a partir do {@code extrato} (as colunas {@code banco.saldo}/{@code saldo_extr}
+     * estao defasadas e {@code extrato.saldo}/{@code saldo_extr} sao sempre nulos no legado). Debito conta
+     * negativo e credito positivo. O {@code saldoBancario} (usado como base do fluxo) considera somente os
+     * lancamentos conciliados ({@code dataConciliacao} preenchida) — e o "Saldo Bancario" da tela de Extrato;
+     * o {@code saldoOperacional} considera todos os lancamentos (inclui pendentes), como o "Saldo" da tela.
+     */
     @Override
     public List<FinanceiroSaldoBanco> listarSaldosBancarios(FinanceiroFiltro filtro) {
         return jdbcTemplate.query("""
                 SELECT
                     b.idBanco bancoId,
                     CONCAT(IFNULL(b.conta, ''), IF(IFNULL(b.nome, '') = '', '', CONCAT(' - ', b.nome))) banco,
-                    COALESCE(b.saldo, 0) saldoOperacional,
-                    COALESCE(b.saldo_extr, b.saldo, 0) saldoBancario,
+                    COALESCE((
+                        SELECT SUM(CASE WHEN UPPER(COALESCE(e.deb_credt, '')) LIKE 'D%%' THEN -e.valor ELSE e.valor END)
+                        FROM extrato e WHERE e.idBanco = b.idBanco
+                    ), 0) saldoOperacional,
+                    COALESCE((
+                        SELECT SUM(CASE WHEN UPPER(COALESCE(e.deb_credt, '')) LIKE 'D%%' THEN -e.valor ELSE e.valor END)
+                        FROM extrato e WHERE e.idBanco = b.idBanco AND e.dataConciliacao IS NOT NULL
+                    ), 0) saldoBancario,
                     COALESCE(b.limite, 0) limite,
                     IF(UPPER(COALESCE(b.contaCaixa, '')) = 'SIM', 1, 0) contaCaixa
                 FROM banco b
                 WHERE b.idBanco IN (%s)
                 ORDER BY contaCaixa DESC, b.conta, b.nome
                 """.formatted(BANCOS_FLUXO_IDS), (rs, rowNum) -> new FinanceiroSaldoBanco(integerOrNull(rs, "bancoId"), rs.getString("banco"),
-                decimal(rs, "saldoOperacional"), decimal(rs, "saldoBancario"), decimal(rs, "limite"),
+                decimalComSinal(rs, "saldoOperacional"), decimalComSinal(rs, "saldoBancario"), decimal(rs, "limite"),
                 rs.getInt("contaCaixa") == 1));
     }
 
@@ -363,10 +376,14 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                   AND COALESCE(e.idNotaCompraDuplicata, 0) = 0
                   AND COALESCE(e.idFatura, 0) = 0
                   AND COALESCE(e.idCheque, 0) = 0
+                  -- Exclui transferencias entre contas Salome (nao sao receita/despesa). TED/TRANSF/
+                  -- TRANSFER pegam por substring; DOC/PIX/TEV usam fronteira de palavra (REGEXP) para
+                  -- nao casar com termos como DOCUMENTO.
                   AND UPPER(COALESCE(e.historico, '')) NOT LIKE '%%TED%%'
                   AND UPPER(COALESCE(e.historico, '')) NOT LIKE '%%TRANSF%%'
                   AND UPPER(COALESCE(e.historico, '')) NOT LIKE '%%TRANSFER%%'
                   AND UPPER(COALESCE(e.historico, '')) NOT LIKE '%%SAQUE%%'
+                  AND UPPER(COALESCE(e.historico, '')) NOT REGEXP '(^|[^A-Z])(DOC|PIX|TEV)([^A-Z]|$)'
                   AND NOT EXISTS (
                       SELECT 1
                       FROM notacompraduplicatas ncd
@@ -1007,5 +1024,11 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
     private BigDecimal decimal(ResultSet rs, String column) throws SQLException {
         BigDecimal value = rs.getBigDecimal(column);
         return value == null ? BigDecimal.ZERO : value.abs();
+    }
+
+    /** Como {@link #decimal} porem preserva o sinal (saldos podem ser negativos). */
+    private BigDecimal decimalComSinal(ResultSet rs, String column) throws SQLException {
+        BigDecimal value = rs.getBigDecimal(column);
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

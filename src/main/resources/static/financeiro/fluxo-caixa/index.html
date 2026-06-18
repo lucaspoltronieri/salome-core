@@ -4,38 +4,36 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Salome Core - Fluxo de Caixa</title>
-    <link rel="stylesheet" href="/financeiro/fluxo-caixa/styles.css?v=20260612-1">
+    <link rel="stylesheet" href="/financeiro/fluxo-caixa/styles.css?v=20260618-1">
 </head>
 <body>
 <div class="app-shell">
     <aside class="sidebar">
         <div class="brand">
-            <span class="brand-mark">S</span>
-            <div>
-                <strong>Salome Core</strong>
-                <small>Financeiro</small>
-            </div>
+            <img class="brand-logo" src="/financeiro/salome-logo-vermelho-sem-subtitulo.png" alt="Expresso Salomé">
+            <span class="brand-sub">CORE · Financeiro</span>
         </div>
         <nav>
             <a class="active" href="/financeiro/fluxo-caixa/">Fluxo de caixa</a>
             <a href="/financeiro/dre-gerencial/">DRE gerencial</a>
             <a href="/financeiro/dre-cliente/">DRE por cliente</a>
             <a href="/financeiro/dre-filial/">DRE por filial</a>
-            <a href="/financeiro/fluxo-caixa/#origens">Origens legado</a>
-            <a href="/financeiro/fluxo-caixa/#classificacao">Planos e DMR</a>
         </nav>
         <div class="sidebar-note">
             <span>Read-only</span>
             <p>Consulta o legado sem gravar no MySQL.</p>
         </div>
+        <p class="sidebar-credit">Desenvolvido por
+            <a href="https://www.linkedin.com/in/lucas-poltronieri-sampaio/" target="_blank" rel="noopener">Lucas Poltronieri</a>
+        </p>
     </aside>
 
     <main class="content">
         <header class="topbar">
             <div>
                 <p class="eyebrow">Modulo financeiro</p>
-                <h1>Fluxo de caixa operacional</h1>
-                <p class="subtitle">Previsto, realizado, DMR, centro de custo e origem final do lancamento.</p>
+                <h1>Fluxo de caixa estrategico</h1>
+                <p class="subtitle">Previsao do que ha a pagar e a receber, conciliada com o saldo bancario.</p>
                 <p id="dataMode" class="data-mode"></p>
             </div>
             <form id="filters" class="filters">
@@ -47,22 +45,6 @@
                     Fim
                     <input type="date" name="fim">
                 </label>
-                <label>
-                    Status
-                    <select name="status">
-                        <option value="TODOS">Todos</option>
-                        <option value="REALIZADO">Realizado</option>
-                        <option value="PREVISTO">Previsto</option>
-                    </select>
-                </label>
-                <label>
-                    Natureza
-                    <select name="natureza">
-                        <option value="TODAS">Todas</option>
-                        <option value="RECEITA">Receita</option>
-                        <option value="DESPESA">Despesa</option>
-                    </select>
-                </label>
                 <label class="search">
                     Busca
                     <input type="search" name="busca" placeholder="Cliente, fornecedor, plano...">
@@ -73,22 +55,72 @@
 
         <section id="alerts" class="alerts"></section>
         <section id="kpis" class="kpi-grid"></section>
-        <section id="summaryCards" class="summary-grid"></section>
 
-        <section class="workspace">
-            <div class="panel chart-panel">
+        <section class="workspace projection">
+            <div class="panel">
                 <div class="panel-header">
                     <div>
-                        <h2>Previsto x realizado</h2>
-                        <p>Visao diaria do periodo filtrado</p>
+                        <h2>Conciliacao com o saldo bancario</h2>
+                        <p>Saldo atual + a receber &minus; a pagar = saldo projetado</p>
                     </div>
-                    <span id="periodLabel" class="pill"></span>
                 </div>
-                <div id="cashChart" class="cash-chart"></div>
+                <div id="conciliacao" class="conciliacao"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Saldo projetado</h2>
+                        <p>Posicao de caixa dia a dia ate o fim do mes</p>
+                    </div>
+                    <span id="projecaoRange" class="pill"></span>
+                </div>
+                <div id="projecaoChart" class="projecao-chart"></div>
             </div>
         </section>
 
+        <section class="panel block">
+            <div class="panel-header">
+                <div>
+                    <h2>Contas a pagar</h2>
+                    <p>Por vencimento &middot; clique no card para abrir o detalhe por plano de contas</p>
+                </div>
+            </div>
+            <div id="aPagar" class="horizon-grid cinco"></div>
+            <div id="aPagarDetail" class="horizon-detail"></div>
+        </section>
+
+        <section class="panel block">
+            <div class="panel-header">
+                <div>
+                    <h2>Contas a receber</h2>
+                    <p>Por vencimento &middot; clique no card para abrir o detalhe por plano de contas</p>
+                </div>
+            </div>
+            <div id="aReceber" class="horizon-grid cinco"></div>
+            <div id="aReceberDetail" class="horizon-detail"></div>
+        </section>
+
+        <section class="panel block">
+            <div class="panel-header">
+                <div>
+                    <h2>Realizado no periodo</h2>
+                    <p>O que de fato entrou e saiu no intervalo filtrado</p>
+                </div>
+            </div>
+            <div id="retrospectivo" class="horizon-grid"></div>
+            <div id="retrospectivoDetail" class="horizon-detail"></div>
+        </section>
+
         <section class="workspace two">
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Bancos e caixa</h2>
+                        <p>Saldo atual por conta (ultimo extrato)</p>
+                    </div>
+                </div>
+                <div id="bankBalanceList" class="bank-balance-list"></div>
+            </div>
             <div class="panel">
                 <div class="panel-header">
                     <div>
@@ -98,38 +130,13 @@
                 </div>
                 <div id="costCenterList" class="rank-list compact"></div>
             </div>
-            <div class="panel">
-                <div class="panel-header"><h2>Bancos e caixa</h2></div>
-                <div id="bankBalanceList" class="bank-balance-list"></div>
-            </div>
-        </section>
-
-        <section class="workspace two">
-            <div class="panel">
-                <div class="panel-header">
-                    <div>
-                        <h2>Clientes</h2>
-                        <p>Receita &middot; clique para abrir faturas e CT-es</p>
-                    </div>
-                </div>
-                <div id="clientesTree" class="drill-tree"></div>
-            </div>
-            <div class="panel">
-                <div class="panel-header">
-                    <div>
-                        <h2>Fornecedores</h2>
-                        <p>Despesa &middot; clique para abrir notas e produtos</p>
-                    </div>
-                </div>
-                <div id="fornecedoresTree" class="drill-tree"></div>
-            </div>
         </section>
 
         <section class="panel table-panel">
             <div class="panel-header">
                 <div>
                     <h2>Movimentos</h2>
-                    <p>Drill-down ate a origem no legado</p>
+                    <p>Conciliacao com o extrato &middot; clique para ver a origem no legado</p>
                 </div>
                 <span id="movementCount" class="pill"></span>
             </div>
@@ -156,11 +163,12 @@
 
     <aside id="drawer" class="drawer">
         <button id="closeDrawer" class="icon-button" aria-label="Fechar">×</button>
-        <p class="eyebrow">Origem do movimento</p>
+        <p id="drawerEyebrow" class="eyebrow">Origem do movimento</p>
         <h2 id="drawerTitle">Selecione um lancamento</h2>
         <dl id="drawerDetails"></dl>
+        <div id="drawerItens" class="drawer-itens"></div>
     </aside>
 </div>
-<script src="/financeiro/fluxo-caixa/app.js"></script>
+<script src="/financeiro/fluxo-caixa/app.js?v=20260618-1"></script>
 </body>
 </html>

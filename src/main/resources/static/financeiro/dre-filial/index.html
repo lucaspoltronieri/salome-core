@@ -4,32 +4,30 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Salome Core - DRE por filial</title>
-    <link rel="stylesheet" href="/financeiro/dre-gerencial/styles.css?v=20260616-4">
+    <link rel="stylesheet" href="/financeiro/dre-gerencial/styles.css?v=20260616-5">
     <link rel="stylesheet" href="/financeiro/dre-cliente/styles.css?v=20260615-1">
-    <link rel="stylesheet" href="/financeiro/dre-filial/styles.css?v=20260616-4">
+    <link rel="stylesheet" href="/financeiro/dre-filial/styles.css?v=20260616-5">
 </head>
 <body>
 <div class="app-shell">
     <aside class="sidebar">
         <div class="brand">
-            <span class="brand-mark">S</span>
-            <div>
-                <strong>Salome Core</strong>
-                <small>Financeiro</small>
-            </div>
+            <img class="brand-logo" src="/financeiro/salome-logo-vermelho-sem-subtitulo.png" alt="Expresso Salomé">
+            <span class="brand-sub">CORE · Financeiro</span>
         </div>
         <nav>
             <a href="/financeiro/fluxo-caixa/">Fluxo de caixa</a>
             <a href="/financeiro/dre-gerencial/">DRE gerencial</a>
             <a href="/financeiro/dre-cliente/">DRE por cliente</a>
             <a class="active" href="/financeiro/dre-filial/">DRE por filial</a>
-            <a href="/financeiro/fluxo-caixa/#origens">Origens legado</a>
-            <a href="/financeiro/fluxo-caixa/#classificacao">Planos e DMR</a>
         </nav>
         <div class="sidebar-note">
             <span>Read-only</span>
             <p>Consulta o legado sem gravar no MySQL.</p>
         </div>
+        <p class="sidebar-credit">Desenvolvido por
+            <a href="https://www.linkedin.com/in/lucas-poltronieri-sampaio/" target="_blank" rel="noopener">Lucas Poltronieri</a>
+        </p>
     </aside>
 
     <main class="content">
@@ -69,6 +67,8 @@
 
         <section id="alerts" class="alerts"></section>
         <section id="resumos" class="kpi-grid"></section>
+        <p id="ajustesLabel" class="data-mode" hidden>Ajustes da visao por filial (fora do DRE gerencial)</p>
+        <section id="ajustes" class="kpi-grid"></section>
 
         <section class="workspace">
             <div class="panel">
@@ -86,7 +86,7 @@
                                 <th>Filial</th>
                                 <th class="num">Receita</th>
                                 <th class="num">Despesa direta</th>
-                                <th class="num">Overhead rateado</th>
+                                <th class="num">Comuns rateadas</th>
                                 <th class="num">Despesa total</th>
                                 <th class="num">Resultado</th>
                                 <th class="num">Pedagio</th>
@@ -120,6 +120,6 @@
         </div>
     </aside>
 </div>
-<script src="/financeiro/dre-filial/app.js?v=20260616-4"></script>
+<script src="/financeiro/dre-filial/app.js?v=20260617-1"></script>
 </body>
 </html>

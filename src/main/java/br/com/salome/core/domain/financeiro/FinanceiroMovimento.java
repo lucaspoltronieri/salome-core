@@ -59,6 +59,26 @@ public record FinanceiroMovimento(
         return natureza == FinanceiroNatureza.RECEITA && (tomadorExpressoSalome || bancoPerdasDanos);
     }
 
+    /**
+     * Despesa "caixa 2": duplicata de nota de compra cujo No. Duplicata foi cadastrado como "A VISTA".
+     * Essas duplicatas nao representam um pagamento real e devem ser ignoradas no fluxo de caixa.
+     * O documento e montado como {@code NC-<idNotaCompra>/<numeroDuplicata>}, entao o numero e o
+     * trecho apos a primeira barra.
+     */
+    public boolean duplicataAVista() {
+        if (origemTipo != FinanceiroOrigemTipo.NOTA_COMPRA_DUPLICATA || documento == null) {
+            return false;
+        }
+        int barra = documento.indexOf('/');
+        String numero = barra >= 0 ? documento.substring(barra + 1) : documento;
+        String normalizado = java.text.Normalizer.normalize(numero, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .trim()
+                .replaceAll("\\s+", " ")
+                .toUpperCase();
+        return normalizado.equals("A VISTA") || normalizado.equals("AVISTA");
+    }
+
     private static String branco(String valor) {
         return valor == null || valor.isBlank() ? "Nao informado" : valor;
     }
