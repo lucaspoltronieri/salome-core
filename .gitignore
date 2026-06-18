@@ -20,3 +20,9 @@ spring-run.err.log
 
 # Temporarios
 .tmp-folha/
+
+# Ferramentas locais (NAO versionar) - framework Reversa e configs de maquina
+/.agents/
+/.reversa/
+/GEMINI.md
+/.claude/settings.local.json

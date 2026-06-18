@@ -31,8 +31,9 @@ servir como:
    legado via botao/URL/executavel.
 9. Nao mover regra de negocio para o `salome-core` apenas por organizacao.
 10. O batch de manifesto deve continuar somente leitura no MySQL legado.
-11. O arquivo `rodar-exportacao-manifestos.bat` e a configuracao relacionada
-    devem continuar funcionando.
+11. O agendador de manifesto (`ManifestoBaixaExportScheduler`, `@Scheduled` a cada
+    15 min) deve continuar somente leitura no MySQL legado e exportar para o Google
+    Sheets sem alterar o legado.
 12. Escritas no MySQL legado por modulos web exigem mapeamento, aprovacao e
     script SQL versionado quando houver alteracao de schema.
 
@@ -53,8 +54,9 @@ servir como:
   table, tabelas, queries e relatorios envolvidos.
 - Para funcionalidade nova com tela, mapear a origem no legado e implementar a
   experiencia no `salome-core` como rota web local.
-- O ERP legado deve integrar esses modulos abrindo `SalomeCore.exe` ou uma URL
-  local, por exemplo `http://localhost:8787/...`.
+- O ERP legado integra esses modulos abrindo a URL do servidor `salome-core`:
+  `http://localhost:8787/...` em desenvolvimento local e a URL do servidor de
+  homologacao (Hostinger) quando aplicavel.
 - Ao criar uma classe nova no estilo legado, siga o conjunto correspondente:
   View/Form, Controller, Bean, Data e Table quando aplicavel e quando houver
   autorizacao explicita para alterar o legado.
@@ -70,26 +72,3 @@ servir como:
 - Fazer engenharia reversa do executavel nativo para recuperar bytecode Java.
 - Migrar o ERP inteiro para web de uma vez.
 - Alterar estrutura do legado sem autorizacao.
-
-
----
-
-# Reversa
-
-> Framework de Engenharia Reversa instalado neste projeto.
-
-## Como usar
-
-Digite `reversa` para ativar o Reversa e iniciar ou retomar a análise do projeto.
-
-## Comportamento ao ativar
-
-Quando o usuário digitar `reversa` sozinho em uma mensagem:
-
-1. Ative o skill `reversa` disponível em `.agents/skills/reversa/SKILL.md`
-2. Leia o SKILL.md na íntegra e siga exatamente as instruções do Reversa
-
-## Regra não-negociável
-
-Nunca apague, modifique ou sobrescreva arquivos pré-existentes do projeto legado.
-O Reversa escreve **apenas** em `.reversa/` e `_reversa_sdd/`.

@@ -111,29 +111,25 @@ o sistema usa `2026-05-01`.
 
 ## Execucao
 
-Primeira configuracao no Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File configurar-exportacao-manifestos.ps1
-```
-
-Execucao por duplo clique:
-
-```text
-rodar-exportacao-manifestos.bat
-```
+O agendador roda dentro do proprio `salome-core` (`ManifestoBaixaExportScheduler`,
+`@Scheduled` a cada 15 min) sempre que `SALOME_MANIFESTO_EXPORT_ENABLED=true`. Em
+homologacao (Hostinger) o app roda como servico systemd; basta definir as variaveis de
+ambiente acima.
 
 Gerar o jar:
 
-```powershell
-mvn clean package
+```bash
+mvn package -DskipTests
 ```
 
-Rodar manualmente:
+Rodar localmente (com as variaveis de ambiente exportadas):
 
-```powershell
-java -jar target\salome-core-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
+```bash
+java -jar target/salome-core-0.0.1-SNAPSHOT.jar
 ```
+
+Para rodar somente o agendador, sem servidor web, defina
+`SALOME_WEB_APPLICATION_TYPE=none`.
 
 ## Seguranca
 

@@ -15,7 +15,7 @@
     <artifactId>salome-core</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>salome-core</name>
-    <description>Batch support and legacy ERP mapping for Salome</description>
+    <description>Core financeiro da Expresso Salome - APIs de fluxo de caixa, DRE e automacao de manifestos (Spring Boot)</description>
     <packaging>jar</packaging>
 
     <properties>
