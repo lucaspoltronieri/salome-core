@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Salome Core - DRE Gerencial</title>
+    <link rel="stylesheet" href="/financeiro/dre-gerencial/styles.css?v=20260615-2">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">S</span>
+            <div>
+                <strong>Salome Core</strong>
+                <small>Financeiro</small>
+            </div>
+        </div>
+        <nav>
+            <a href="/financeiro/fluxo-caixa/">Fluxo de caixa</a>
+            <a class="active" href="/financeiro/dre-gerencial/">DRE gerencial</a>
+            <a href="/financeiro/dre-cliente/">DRE por cliente</a>
+            <a href="/financeiro/dre-filial/">DRE por filial</a>
+            <a href="/financeiro/fluxo-caixa/#origens">Origens legado</a>
+            <a href="/financeiro/fluxo-caixa/#classificacao">Planos e DMR</a>
+        </nav>
+        <div class="sidebar-note">
+            <span>Read-only</span>
+            <p>Consulta o legado sem gravar no MySQL.</p>
+        </div>
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">DRE caixa / plano de contas</p>
+                <h1>DRE gerencial</h1>
+                <p id="dataMode" class="data-mode"></p>
+            </div>
+            <form id="filters" class="filters">
+                <label>
+                    Inicio
+                    <input type="date" name="inicio">
+                </label>
+                <label>
+                    Fim
+                    <input type="date" name="fim">
+                </label>
+                <label>
+                    Regime
+                    <select name="regime">
+                        <option value="caixa" selected>Caixa</option>
+                        <option value="competencia">Competencia</option>
+                    </select>
+                </label>
+                <label>
+                    Filial
+                    <select name="filial">
+                        <option value="">Consolidado - todas as filiais</option>
+                        <option value="SPO">Osasco (Sao Paulo)</option>
+                        <option value="MAU">Maua</option>
+                        <option value="CAM">Campinas</option>
+                        <option value="RIB">Ribeirao Preto</option>
+                        <option value="SJP">Sao Jose do Rio Preto</option>
+                    </select>
+                </label>
+                <label class="search">
+                    Busca
+                    <input type="search" name="busca" placeholder="Conta, filial, documento...">
+                </label>
+                <button type="submit">Atualizar</button>
+            </form>
+        </header>
+
+        <section id="alerts" class="alerts"></section>
+        <section id="resumos" class="kpi-grid"></section>
+
+        <section class="workspace">
+            <div class="panel dre-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Demonstrativo por plano de contas</h2>
+                        <p id="periodLabel"></p>
+                    </div>
+                    <div class="panel-actions">
+                        <button type="button" id="expandAll" class="ghost">Expandir tudo</button>
+                        <button type="button" id="collapseAll" class="ghost">Recolher</button>
+                        <span id="excludedLabel" class="pill"></span>
+                    </div>
+                </div>
+                <div class="dre">
+                    <div class="dre-head">
+                        <span>Linha</span>
+                        <span>Valor</span>
+                        <span>% rec. liquida</span>
+                        <span>Mov.</span>
+                    </div>
+                    <div id="demonstrativo"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="workspace two">
+            <div class="panel">
+                <div class="panel-header"><h2>Plano de contas</h2></div>
+                <div id="planoList" class="rank-list compact"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h2>Centro de custo</h2></div>
+                <div id="centroList" class="rank-list compact"></div>
+            </div>
+        </section>
+
+        <section class="workspace">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <h2>Custo por peso transportado</h2>
+                        <p>Custo regime caixa &divide; tonelada por emissao do CT-e (exclui banco 34 e CT-es cancelados)</p>
+                    </div>
+                </div>
+                <div id="custoPesoCard" class="custo-peso"></div>
+            </div>
+        </section>
+    </main>
+
+    <aside id="drawer" class="drawer">
+        <button id="closeDrawer" class="icon-button" aria-label="Fechar">x</button>
+        <p class="eyebrow">Origem do movimento</p>
+        <h2 id="drawerTitle">Selecione um documento</h2>
+        <dl id="drawerDetails"></dl>
+    </aside>
+</div>
+<script src="/financeiro/dre-gerencial/app.js?v=20260615-1"></script>
+</body>
+</html>

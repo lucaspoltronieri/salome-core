@@ -1,95 +1,95 @@
-# AGENTS.md - Migração Salomé Legacy para Salomé core
+# AGENTS.md - Salome Core como modulo web integrado ao ERP legado
 
 ## Contexto
 
-Estamos modernizando partes do sistema legado da Expresso Salomé.
+O Salome e o ERP legado da Expresso Salome. O sistema principal continua sendo
+Java 8, Swing, MVC, JDBC direto e MySQL. O legado funciona e deve continuar
+funcionando.
 
-O sistema atual está em Java 8, MVC, Swing, com banco MySQL em VPS.
-O legado funciona e deve continuar funcionando durante toda a migração.
+O `salome-core` nao deve tentar recriar o executavel Swing completo. Ele deve
+servir como:
 
-O novo módulo será salome-core, usando:
+- aplicacao Spring Boot batch para a automacao de baixas de manifesto;
+- area de documentacao e mapeamento do ERP legado;
+- base para novos modulos Spring Boot/web locais, chamados pelo ERP principal
+  por botao, link ou abertura de URL;
+- base para orientar futuras alteracoes no mesmo padrao do legado somente
+  quando isso for explicitamente pedido.
 
-- Java 25
-- Spring Boot 4
-- Vaadin
-- MySQL
-- Maven
-- Flyway
-- Spring Security quando necessário
+## Regras obrigatorias
 
-## Objetivo inicial
+1. Nao alterar codigo dentro de `salome-legacy/` sem autorizacao explicita.
+2. Nao alterar banco de producao.
+3. Nao criar campo ou tabela sem script SQL versionado e aprovacao.
+4. Primeiro mapear, depois planejar, depois implementar.
+5. Toda regra encontrada deve apontar origem: classe, metodo, botao, DAO/query
+   e tabela quando existir.
+6. Toda alteracao deve ser pequena, revisavel e documentada.
+7. Preservar o padrao real do legado: Swing/MVC, Controller, Bean, Data, Table e
+   SQL na camada `model.data`, quando a tarefa for mexer no legado.
+8. Para telas novas, preferir modulo web no `salome-core`, aberto pelo ERP
+   legado via botao/URL/executavel.
+9. Nao mover regra de negocio para o `salome-core` apenas por organizacao.
+10. O batch de manifesto deve continuar somente leitura no MySQL legado.
+11. O arquivo `rodar-exportacao-manifestos.bat` e a configuracao relacionada
+    devem continuar funcionando.
+12. Escritas no MySQL legado por modulos web exigem mapeamento, aprovacao e
+    script SQL versionado quando houver alteracao de schema.
 
-Migrar gradualmente o módulo de Contas a Pagar do legado para uma aplicação web Vaadin.
+## Padrao legado observado
 
-A primeira etapa é replicar a tela de Contas a Pagar em modo web, lendo os mesmos dados do banco legado, respeitando as regras atuais.
+- `view/`: telas Swing, formularios `.form` e handlers como
+  `btnSalvarActionPerformed`.
+- `controller/`: controladores finos que delegam para `model.data`.
+- `model/bean/`: beans mutaveis, muitas vezes com flags de campos a gravar.
+- `model/data/`: JDBC e SQL textual.
+- `model/table/`: enums/constantes com nomes de tabelas e colunas.
+- `deploy/`: executaveis, runtime, relatorios Jasper, templates e configs.
 
-## Regras obrigatórias
+## Como trabalhar
 
-1. Não alterar o código do legado sem autorização explícita.
-2. Não alterar banco de produção.
-3. Não criar campo/tabela sem gerar script SQL versionado.
-4. Não copiar tela Swing como arquitetura nova.
-5. Não colocar regra de negócio dentro da View Vaadin.
-6. Não colocar SQL dentro da View Vaadin.
-7. Toda regra encontrada deve apontar a origem:
-   - classe
-   - método
-   - botão
-   - DAO
-   - query
-   - tabela
-8. Toda alteração deve ser pequena, revisável e documentada.
-9. Primeiro mapear, depois planejar, depois implementar.
-10. Antes de liberar gravação, criar versão somente leitura.
-11. Qualquer regra de baixa, exclusão, edição, rateio, fornecedor, produto, plano de contas, filial ou usuário logado deve ser documentada antes de ser migrada.
-12. Regras críticas de financeiro devem ter teste.
-13. A tela Vaadin deve chamar Services.
-14. Services chamam Repositories/Adapters.
-15. Repositories/Adapters acessam banco.
-16. O usuário logado deve aproveitar a estrutura existente do legado sempre que possível, mas sem acoplar Swing ao novo módulo.
+- Consulte `docs/legacy/` antes de propor mudancas no legado.
+- Ao mapear uma funcionalidade, registre tela, botoes, controller, bean, data,
+  table, tabelas, queries e relatorios envolvidos.
+- Para funcionalidade nova com tela, mapear a origem no legado e implementar a
+  experiencia no `salome-core` como rota web local.
+- O ERP legado deve integrar esses modulos abrindo `SalomeCore.exe` ou uma URL
+  local, por exemplo `http://localhost:8787/...`.
+- Ao criar uma classe nova no estilo legado, siga o conjunto correspondente:
+  View/Form, Controller, Bean, Data e Table quando aplicavel e quando houver
+  autorizacao explicita para alterar o legado.
+- Ao mexer no `salome-core`, preserve a separacao do batch de manifesto:
+  `application.manifesto`, `domain.manifesto`, `infrastructure.manifesto`,
+  `infrastructure.legacy.manifesto` e `infrastructure.google`.
+- Novos modulos web devem ficar separados por dominio, com controllers web,
+  servicos de aplicacao, modelos de dominio e repositorios legados explicitos.
 
-## Classes e termos importantes do legado
+## Fora de escopo atual
 
-Investigar prioritariamente classes, pacotes e métodos contendo:
+- Recriar o ERP Swing completo ou substituir o `Salome.exe`.
+- Fazer engenharia reversa do executavel nativo para recuperar bytecode Java.
+- Migrar o ERP inteiro para web de uma vez.
+- Alterar estrutura do legado sem autorizacao.
 
-- notacompra
-- nota compra
-- rateio
-- produto
-- plano contas
-- plano de contas
-- filial
-- fornecedor
-- contas pagar
-- conta pagar
-- baixa
-- banco
-- extrato
-- usuário
-- login
-- permissão
-- centro de custo
 
-## Arquitetura desejada no novo módulo
+---
 
-salome-core deve seguir a estrutura:
+# Reversa
 
-- ui
-  - Views Vaadin
-- application
-  - Services de caso de uso
-- domain
-  - Entidades e regras de domínio
-- infrastructure
-  - legacy adapters
-  - repositories
-  - integração banco legado
-- security
-  - autenticação e usuário logado
-- docs
-  - documentação da migração
+> Framework de Engenharia Reversa instalado neste projeto.
 
-## Importante
+## Como usar
 
-O objetivo não é reescrever tudo.
-O objetivo é migrar o Contas a Pagar com segurança, preservando comportamento existente e melhorando experiência, governança e manutenção.
+Digite `reversa` para ativar o Reversa e iniciar ou retomar a análise do projeto.
+
+## Comportamento ao ativar
+
+Quando o usuário digitar `reversa` sozinho em uma mensagem:
+
+1. Ative o skill `reversa` disponível em `.agents/skills/reversa/SKILL.md`
+2. Leia o SKILL.md na íntegra e siga exatamente as instruções do Reversa
+
+## Regra não-negociável
+
+Nunca apague, modifique ou sobrescreva arquivos pré-existentes do projeto legado.
+O Reversa escreve **apenas** em `.reversa/` e `_reversa_sdd/`.

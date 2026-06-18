@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: salome-core
+  main:
+    web-application-type: ${SALOME_WEB_APPLICATION_TYPE:servlet}
+  profiles:
+    default: local
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+
+server:
+  port: ${SALOME_SERVER_PORT:8787}
+
+salome:
+  legacy:
+    datasource:
+      enabled: ${SALOME_LEGACY_DB_ENABLED:false}
+      url: ${SALOME_LEGACY_DB_URL:}
+      username: ${SALOME_LEGACY_DB_USERNAME:}
+      password: ${SALOME_LEGACY_DB_PASSWORD:}
+      read-only: true
+  manifesto:
+    export:
+      enabled: ${SALOME_MANIFESTO_EXPORT_ENABLED:false}
+      cron: ${SALOME_MANIFESTO_EXPORT_CRON:0 */15 * * * *}
+      spreadsheet-id: ${SALOME_MANIFESTO_EXPORT_SPREADSHEET_ID:}
+      credentials-path: ${SALOME_MANIFESTO_EXPORT_CREDENTIALS_PATH:}
+      filial-destino-id: ${SALOME_MANIFESTO_EXPORT_FILIAL_DESTINO_ID:}
+      batch-size: ${SALOME_MANIFESTO_EXPORT_BATCH_SIZE:500}
+      data-corte: ${SALOME_MANIFESTO_EXPORT_DATA_CORTE:2026-05-01}

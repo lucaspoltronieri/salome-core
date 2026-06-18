@@ -1,0 +1,15 @@
+/* Especifico do DRE por filial; herda o tema de /financeiro/dre-gerencial/ e a tabela do DRE por cliente. */
+
+.filial-nome {
+    white-space: normal;
+    font-weight: 600;
+    min-width: 200px;
+}
+
+.dre-row.marco.direto {
+    font-weight: 600;
+}
+
+.dre-row.marco.overhead .cell-valor {
+    font-style: italic;
+}

@@ -1,0 +1,142 @@
+{
+  "generated_at": "2026-06-08T15:07:00Z",
+  "modules": [
+    {
+      "name": "viagem",
+      "path": "salome-legacy",
+      "purpose": "Gestão de viagens, manifestos (MDF-e), acerto de contas e integração com parceiros (Pamcard, E-frete).",
+      "primary_files": [
+        "salome-legacy/controller/ViagemController.java",
+        "salome-legacy/model/bean/ViagemBean.java",
+        "salome-legacy/model/data/ViagemData.java",
+        "salome-legacy/model/table/ViagemTable.java"
+      ],
+      "functions": [
+        { "name": "cancelaViagem", "file": "salome-legacy/controller/ViagemController.java", "params": ["idViagem: int"], "returns": "boolean", "confidence": "confirmed" },
+        { "name": "inserirContratoFrete", "file": "salome-legacy/controller/ViagemController.java", "params": ["idViagem: int"], "returns": "void", "confidence": "confirmed" },
+        { "name": "getPesoTotal", "file": "salome-legacy/controller/ViagemController.java", "params": ["idViagem: int"], "returns": "double", "confidence": "confirmed" }
+      ],
+      "entities": [
+        { "name": "Viagem", "fields": [ { "name": "idViagem", "type": "int", "required": true }, { "name": "status", "type": "String", "required": true } ], "confidence": "confirmed" }
+      ],
+      "business_rules": [
+        { "description": "Ao cancelar viagem, CT-es de entrega e transferência voltam para status Armazém", "location": "salome-legacy/controller/ViagemController.java:302", "confidence": "confirmed" }
+      ],
+      "dependencies": ["cliente", "veiculo", "motorista", "pamcard_api"],
+      "algorithms": ["Cálculo de peso total agrupando coletas, entregas e transferências"],
+      "complexity": "high"
+    },
+    {
+      "name": "cliente",
+      "path": "salome-legacy",
+      "purpose": "Cadastro e gerenciamento de clientes, endereços, regras de prazo de entrega e setores de roteirização.",
+      "primary_files": [
+        "salome-legacy/controller/ClienteController.java",
+        "salome-legacy/model/bean/ClienteBean.java"
+      ],
+      "functions": [
+        { "name": "getHorasSetor", "file": "salome-legacy/controller/ClienteController.java", "params": ["idCliente: int"], "returns": "int", "confidence": "confirmed" }
+      ],
+      "entities": [
+        { "name": "Cliente", "fields": [ { "name": "idCliente", "type": "int", "required": true }, { "name": "cnpj_cpf", "type": "String", "required": true } ], "confidence": "confirmed" }
+      ],
+      "business_rules": [
+        { "description": "Prazo de entrega é determinado pelo CEP do endereço de entrega", "location": "salome-legacy/controller/ClienteController.java:211", "confidence": "confirmed" }
+      ],
+      "dependencies": [],
+      "algorithms": [],
+      "complexity": "medium"
+    },
+    {
+      "name": "nota-compra",
+      "path": "salome-legacy",
+      "purpose": "Gestão de notas de compra (o que pagamos), duplicatas a pagar, rateio de custos e produtos comprados.",
+      "primary_files": [
+        "salome-legacy/controller/NotaCompraController.java",
+        "salome-legacy/controller/NotaCompraDuplicatasController.java",
+        "salome-legacy/controller/NotaCompraRateioController.java",
+        "salome-legacy/controller/PagamentoCaixaController.java",
+        "salome-legacy/model/bean/NotaCompraBean.java",
+        "salome-legacy/model/data/NotaCompraData.java"
+      ],
+      "functions": [],
+      "entities": [
+        { "name": "NotaCompra", "fields": [ { "name": "idNotaCompra", "type": "int", "required": true }, { "name": "valorTotal", "type": "double", "required": true }, { "name": "situacao", "type": "String", "required": true } ], "confidence": "infered" },
+        { "name": "NotaCompraDuplicatas", "fields": [ { "name": "idDuplicata", "type": "int", "required": true }, { "name": "dataVencimento", "type": "Date", "required": true }, { "name": "valorDuplicata", "type": "double", "required": true } ], "confidence": "infered" }
+      ],
+      "business_rules": [
+        { "description": "Notas de compra geram duplicatas que devem ser baixadas no PagamentoCaixa, impactando as saídas do caixa", "location": "salome-legacy", "confidence": "infered" }
+      ],
+      "dependencies": ["banco", "fornecedor"],
+      "algorithms": ["Rateio automático do custo da nota de compra entre os centros de custo"],
+      "complexity": "high"
+    },
+    {
+      "name": "faturamento",
+      "path": "salome-legacy",
+      "purpose": "Controle do que a transportadora recebe. Geração de Faturas a partir de CT-es, baixa de faturas pagas e tratamento de arquivos de retorno bancário (CNAB).",
+      "primary_files": [
+        "salome-legacy/controller/FaturaController.java",
+        "salome-legacy/controller/FaturaBaixaController.java",
+        "salome-legacy/controller/FaturaRetornoController.java",
+        "salome-legacy/model/bean/FaturaBean.java",
+        "salome-legacy/model/data/FaturaData.java"
+      ],
+      "functions": [],
+      "entities": [
+        { "name": "Fatura", "fields": [ { "name": "idFatura", "type": "int", "required": true }, { "name": "valorBruto", "type": "double", "required": true }, { "name": "situacao", "type": "String", "required": true } ], "confidence": "infered" }
+      ],
+      "business_rules": [
+        { "description": "CT-es com prazo de pagamento a prazo geram faturas que são enviadas ao banco. A baixa ocorre via arquivo de retorno ou baixa manual", "location": "salome-legacy", "confidence": "infered" }
+      ],
+      "dependencies": ["cte", "banco", "cliente"],
+      "algorithms": ["Processamento de arquivo de retorno CNAB para baixa automática de títulos"],
+      "complexity": "high"
+    },
+    {
+      "name": "cte",
+      "path": "salome-legacy",
+      "purpose": "Emissão, cancelamento, inutilização e carta de correção de Conhecimento de Transporte Eletrônico (CT-e) integrado à SEFAZ.",
+      "primary_files": [
+        "salome-legacy/controller/CteSpedController.java",
+        "salome-legacy/controller/CteCartaCorrecaoController.java",
+        "salome-legacy/controller/CteinutilizacaoController.java",
+        "salome-legacy/view/Conhecimento.java",
+        "salome-legacy/model/bean/ConhecimentoBean.java"
+      ],
+      "functions": [],
+      "entities": [
+        { "name": "Conhecimento", "fields": [ { "name": "idConhecimento", "type": "int", "required": true }, { "name": "chaveAcesso", "type": "String", "required": true }, { "name": "situacao", "type": "String", "required": true } ], "confidence": "confirmed" }
+      ],
+      "business_rules": [
+        { "description": "Emissão de CT-e requer validação estrita de endereços (CEP, IBGE) e papéis (Emitente, Destinatário)", "location": "salome-legacy", "confidence": "confirmed" },
+        { "description": "CT-es rejeitados podem ser inutilizados. CT-es emitidos com erro (desde que não alterem valor/imposto) geram Carta de Correção (CC-e)", "location": "salome-legacy", "confidence": "confirmed" }
+      ],
+      "dependencies": ["cliente", "sefaz"],
+      "algorithms": ["Assinatura digital e validação de schema XML do SPED"],
+      "complexity": "very_high"
+    },
+    {
+      "name": "banco",
+      "path": "salome-legacy",
+      "purpose": "Gestão de contas bancárias da transportadora e controle de extratos.",
+      "primary_files": [
+        "salome-legacy/controller/BancoController.java",
+        "salome-legacy/controller/ExtratoController.java",
+        "salome-legacy/model/bean/BancoBean.java",
+        "salome-legacy/model/bean/ExtratoBean.java"
+      ],
+      "functions": [],
+      "entities": [
+        { "name": "Banco", "fields": [ { "name": "idBanco", "type": "int", "required": true }, { "name": "codigoFebraban", "type": "String", "required": true } ], "confidence": "infered" },
+        { "name": "Extrato", "fields": [ { "name": "idExtrato", "type": "int", "required": true }, { "name": "dataTransacao", "type": "Date", "required": true }, { "name": "tipoOperacao", "type": "String", "required": true } ], "confidence": "infered" }
+      ],
+      "business_rules": [
+        { "description": "Baixas de Faturamento ou Pagamentos de NotaCompra debitam ou creditam os saldos no extrato bancário correspondente da filial", "location": "salome-legacy", "confidence": "infered" }
+      ],
+      "dependencies": ["faturamento", "nota-compra"],
+      "algorithms": [],
+      "complexity": "medium"
+    }
+  ]
+}

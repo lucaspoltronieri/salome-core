@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Salome Core - DRE por filial</title>
+    <link rel="stylesheet" href="/financeiro/dre-gerencial/styles.css?v=20260616-4">
+    <link rel="stylesheet" href="/financeiro/dre-cliente/styles.css?v=20260615-1">
+    <link rel="stylesheet" href="/financeiro/dre-filial/styles.css?v=20260616-4">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">S</span>
+            <div>
+                <strong>Salome Core</strong>
+                <small>Financeiro</small>
+            </div>
+        </div>
+        <nav>
+            <a href="/financeiro/fluxo-caixa/">Fluxo de caixa</a>
+            <a href="/financeiro/dre-gerencial/">DRE gerencial</a>
+            <a href="/financeiro/dre-cliente/">DRE por cliente</a>
+            <a class="active" href="/financeiro/dre-filial/">DRE por filial</a>
+            <a href="/financeiro/fluxo-caixa/#origens">Origens legado</a>
+            <a href="/financeiro/fluxo-caixa/#classificacao">Planos e DMR</a>
+        </nav>
+        <div class="sidebar-note">
+            <span>Read-only</span>
+            <p>Consulta o legado sem gravar no MySQL.</p>
+        </div>
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Resultado por filial</p>
+                <h1>DRE por filial</h1>
+                <p id="dataMode" class="data-mode"></p>
+            </div>
+            <form id="filters" class="filters">
+                <label>
+                    Inicio
+                    <input type="date" name="inicio">
+                </label>
+                <label>
+                    Fim
+                    <input type="date" name="fim">
+                </label>
+                <label>
+                    Regime
+                    <select name="regime">
+                        <option value="COMPETENCIA" selected>Competencia</option>
+                        <option value="CAIXA">Caixa</option>
+                    </select>
+                </label>
+                <label>
+                    Repasse filiais (%)
+                    <input type="number" name="repasse" min="0" max="100" step="1" value="30">
+                </label>
+                <label class="search">
+                    Busca filial
+                    <input type="search" name="busca" placeholder="Nome / sigla da filial...">
+                </label>
+                <button type="submit">Atualizar</button>
+            </form>
+        </header>
+
+        <section id="alerts" class="alerts"></section>
+        <section id="resumos" class="kpi-grid"></section>
+
+        <section class="workspace">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <h2>Ranking de filiais</h2>
+                        <p id="periodLabel"></p>
+                    </div>
+                    <span id="regimeLabel" class="pill"></span>
+                </div>
+                <div class="table-wrap">
+                    <table class="cliente-tabela">
+                        <thead>
+                            <tr>
+                                <th>Filial</th>
+                                <th class="num">Receita</th>
+                                <th class="num">Despesa direta</th>
+                                <th class="num">Overhead rateado</th>
+                                <th class="num">Despesa total</th>
+                                <th class="num">Resultado</th>
+                                <th class="num">Pedagio</th>
+                                <th class="num">Repasse liq.</th>
+                                <th class="num">Transf. peso</th>
+                                <th class="num">Resultado ajustado</th>
+                                <th class="num">Margem %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ranking"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <aside id="drawer" class="drawer drawer-wide">
+        <button id="closeDrawer" class="icon-button" aria-label="Fechar">x</button>
+        <p class="eyebrow">DRE da filial</p>
+        <h2 id="drawerTitle">Selecione uma filial</h2>
+        <p id="drawerSub" class="data-mode"></p>
+        <div id="drawerResumos" class="kpi-grid drawer-kpis"></div>
+        <div class="dre">
+            <div class="dre-head">
+                <span>Linha</span>
+                <span>Valor</span>
+                <span>% rec. liquida</span>
+                <span>Mov.</span>
+            </div>
+            <div id="drawerDre"></div>
+        </div>
+    </aside>
+</div>
+<script src="/financeiro/dre-filial/app.js?v=20260616-4"></script>
+</body>
+</html>

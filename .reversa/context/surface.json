@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-06-08T14:30:00Z",
+  "project_root": "c:/dev/salome-core",
+  "languages": [
+    { "name": "Java", "extensions": [".java"], "file_count": 1392 },
+    { "name": "XML (Swing Forms)", "extensions": [".form"], "file_count": 392 },
+    { "name": "YAML", "extensions": [".yml"], "file_count": 2 },
+    { "name": "Markdown", "extensions": [".md"], "file_count": 3 },
+    { "name": "Batch Script", "extensions": [".bat"], "file_count": 2 },
+    { "name": "PowerShell", "extensions": [".ps1"], "file_count": 1 },
+    { "name": "XML", "extensions": [".xml"], "file_count": 1 }
+  ],
+  "primary_language": "Java",
+  "frameworks": [
+    { "name": "Spring Boot", "version": "4.0.6", "source": "pom.xml" },
+    { "name": "Spring JDBC", "version": "gerenciada pelo parent", "source": "pom.xml" },
+    { "name": "Google Sheets API", "version": "v4-rev20260213-2.0.0", "source": "pom.xml" },
+    { "name": "Google Auth Library", "version": "1.47.0", "source": "pom.xml" },
+    { "name": "Swing (legado)", "version": "Java 8", "source": "salome-legacy/view/" },
+    { "name": "NetBeans Matisse (legado)", "version": "desconhecida", "source": "salome-legacy/view/*.form" }
+  ],
+  "package_manager": "maven",
+  "entry_points": [
+    { "path": "src/main/java/br/com/salome/core/SalomeCoreApplication.java", "type": "app_entry" },
+    { "path": "src/main/java/br/com/salome/core/infrastructure/manifesto/ManifestoBaixaExportScheduler.java", "type": "scheduler_entry" },
+    { "path": "rodar-exportacao-manifestos.bat", "type": "script_entry" },
+    { "path": "criar-distribuicao-salome-core.bat", "type": "build_script" },
+    { "path": "configurar-exportacao-manifestos.ps1", "type": "config_script" }
+  ],
+  "config_files": [
+    "pom.xml",
+    "src/main/resources/application.yml",
+    "src/main/resources/application-local.yml",
+    "google-service-account.json",
+    ".gitignore"
+  ],
+  "ci_cd": [],
+  "docker": {},
+  "database_hints": [
+    { "path": "src/main/resources/db/migration/", "type": "migrations_dir_empty" },
+    { "path": "salome-legacy/model/table/", "type": "table_constants_245_files" },
+    { "path": "salome-legacy/model/data/", "type": "jdbc_dao_239_files" },
+    { "path": "src/main/java/br/com/salome/core/infrastructure/legacy/manifesto/LegacyManifestoBaixaRepository.java", "type": "jdbc_repository" }
+  ],
+  "test_framework": "JUnit 5 (spring-boot-starter-test)",
+  "test_file_count": 2,
+  "modules": [
+    "manifesto",
+    "legacy-infra",
+    "google-sheets",
+    "salome-legacy-controller",
+    "salome-legacy-model-bean",
+    "salome-legacy-model-data",
+    "salome-legacy-model-table",
+    "salome-legacy-view"
+  ],
+  "total_files": 1796,
+  "organization_suggestion": {
+    "granularity": "module",
+    "rationale": "A estrutura de pacotes Java do salome-core separa por domínio (manifesto, legacy, google) e o salome-legacy segue o padrão MVC com pastas top-level de domínio (controller, model/bean, model/data, model/table, view).",
+    "signals": [
+      {
+        "type": "top_level_domain_folders",
+        "evidence": [
+          "src/main/java/br/com/salome/core/application/manifesto/",
+          "src/main/java/br/com/salome/core/domain/manifesto/",
+          "src/main/java/br/com/salome/core/domain/legacy/",
+          "src/main/java/br/com/salome/core/infrastructure/google/",
+          "src/main/java/br/com/salome/core/infrastructure/legacy/",
+          "src/main/java/br/com/salome/core/infrastructure/manifesto/"
+        ]
+      },
+      {
+        "type": "mvc_layer_folders",
+        "evidence": [
+          "salome-legacy/controller/",
+          "salome-legacy/model/bean/",
+          "salome-legacy/model/data/",
+          "salome-legacy/model/table/",
+          "salome-legacy/view/"
+        ]
+      }
+    ],
+    "features": []
+  }
+}

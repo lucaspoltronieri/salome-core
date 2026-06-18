@@ -1,0 +1,16 @@
+# Build
+/target/
+
+# Segredos / credenciais (NUNCA commitar)
+google-service-account.json
+*service-account*.json
+*.pem
+*.key
+
+# Logs
+spring-run.log
+spring-run.err.log
+*.log
+
+# Temporarios
+.tmp-folha/

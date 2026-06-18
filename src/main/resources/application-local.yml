@@ -1,0 +1,17 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+logging:
+  level:
+    br.com.salome.core: INFO
+
+salome:
+  legacy:
+    datasource:
+      enabled: ${SALOME_LEGACY_DB_ENABLED:false}
+      url: ${SALOME_LEGACY_DB_URL:}
+      username: ${SALOME_LEGACY_DB_USERNAME:}
+      password: ${SALOME_LEGACY_DB_PASSWORD:}
+      read-only: true

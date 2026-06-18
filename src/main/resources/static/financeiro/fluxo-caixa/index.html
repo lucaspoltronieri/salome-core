@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Salome Core - Fluxo de Caixa</title>
+    <link rel="stylesheet" href="/financeiro/fluxo-caixa/styles.css?v=20260612-1">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">S</span>
+            <div>
+                <strong>Salome Core</strong>
+                <small>Financeiro</small>
+            </div>
+        </div>
+        <nav>
+            <a class="active" href="/financeiro/fluxo-caixa/">Fluxo de caixa</a>
+            <a href="/financeiro/dre-gerencial/">DRE gerencial</a>
+            <a href="/financeiro/dre-cliente/">DRE por cliente</a>
+            <a href="/financeiro/dre-filial/">DRE por filial</a>
+            <a href="/financeiro/fluxo-caixa/#origens">Origens legado</a>
+            <a href="/financeiro/fluxo-caixa/#classificacao">Planos e DMR</a>
+        </nav>
+        <div class="sidebar-note">
+            <span>Read-only</span>
+            <p>Consulta o legado sem gravar no MySQL.</p>
+        </div>
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Modulo financeiro</p>
+                <h1>Fluxo de caixa operacional</h1>
+                <p class="subtitle">Previsto, realizado, DMR, centro de custo e origem final do lancamento.</p>
+                <p id="dataMode" class="data-mode"></p>
+            </div>
+            <form id="filters" class="filters">
+                <label>
+                    Inicio
+                    <input type="date" name="inicio">
+                </label>
+                <label>
+                    Fim
+                    <input type="date" name="fim">
+                </label>
+                <label>
+                    Status
+                    <select name="status">
+                        <option value="TODOS">Todos</option>
+                        <option value="REALIZADO">Realizado</option>
+                        <option value="PREVISTO">Previsto</option>
+                    </select>
+                </label>
+                <label>
+                    Natureza
+                    <select name="natureza">
+                        <option value="TODAS">Todas</option>
+                        <option value="RECEITA">Receita</option>
+                        <option value="DESPESA">Despesa</option>
+                    </select>
+                </label>
+                <label class="search">
+                    Busca
+                    <input type="search" name="busca" placeholder="Cliente, fornecedor, plano...">
+                </label>
+                <button type="submit">Atualizar</button>
+            </form>
+        </header>
+
+        <section id="alerts" class="alerts"></section>
+        <section id="kpis" class="kpi-grid"></section>
+        <section id="summaryCards" class="summary-grid"></section>
+
+        <section class="workspace">
+            <div class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Previsto x realizado</h2>
+                        <p>Visao diaria do periodo filtrado</p>
+                    </div>
+                    <span id="periodLabel" class="pill"></span>
+                </div>
+                <div id="cashChart" class="cash-chart"></div>
+            </div>
+        </section>
+
+        <section class="workspace two">
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Centro de custo</h2>
+                        <p>Despesas por centro no periodo</p>
+                    </div>
+                </div>
+                <div id="costCenterList" class="rank-list compact"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h2>Bancos e caixa</h2></div>
+                <div id="bankBalanceList" class="bank-balance-list"></div>
+            </div>
+        </section>
+
+        <section class="workspace two">
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Clientes</h2>
+                        <p>Receita &middot; clique para abrir faturas e CT-es</p>
+                    </div>
+                </div>
+                <div id="clientesTree" class="drill-tree"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Fornecedores</h2>
+                        <p>Despesa &middot; clique para abrir notas e produtos</p>
+                    </div>
+                </div>
+                <div id="fornecedoresTree" class="drill-tree"></div>
+            </div>
+        </section>
+
+        <section class="panel table-panel">
+            <div class="panel-header">
+                <div>
+                    <h2>Movimentos</h2>
+                    <p>Drill-down ate a origem no legado</p>
+                </div>
+                <span id="movementCount" class="pill"></span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Status</th>
+                        <th>Documento</th>
+                        <th>Cliente/Fornecedor</th>
+                        <th>Plano de contas</th>
+                        <th>Centro de custo</th>
+                        <th>Filial</th>
+                        <th>Valor</th>
+                    </tr>
+                    </thead>
+                    <tbody id="movements"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <aside id="drawer" class="drawer">
+        <button id="closeDrawer" class="icon-button" aria-label="Fechar">×</button>
+        <p class="eyebrow">Origem do movimento</p>
+        <h2 id="drawerTitle">Selecione um lancamento</h2>
+        <dl id="drawerDetails"></dl>
+    </aside>
+</div>
+<script src="/financeiro/fluxo-caixa/app.js"></script>
+</body>
+</html>

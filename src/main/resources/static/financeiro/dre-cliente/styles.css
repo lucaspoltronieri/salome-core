@@ -1,0 +1,52 @@
+/* Especifico do DRE por cliente; herda o tema de /financeiro/dre-gerencial/styles.css */
+
+.cliente-tabela th.num,
+.cliente-tabela td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cliente-tabela td.cliente-nome {
+    white-space: normal;
+    font-weight: 600;
+    min-width: 220px;
+}
+
+.cliente-tabela tbody tr {
+    cursor: pointer;
+}
+
+.cliente-tabela tbody tr:hover {
+    background: var(--soft-blue);
+}
+
+.cliente-tabela tbody tr:focus {
+    outline: 2px solid var(--accent-2);
+    outline-offset: -2px;
+}
+
+.empty-state {
+    color: var(--muted);
+    padding: 18px 12px;
+    text-align: center;
+}
+
+/* Drawer mais largo para caber o demonstrativo do cliente */
+.drawer-wide {
+    width: min(760px, 100vw);
+}
+
+.drawer-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 14px 0 18px;
+}
+
+.drawer-kpis .kpi strong {
+    font-size: 18px;
+    margin: 4px 0;
+}
+
+#drawerSub {
+    margin-bottom: 6px;
+}
