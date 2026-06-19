@@ -21,6 +21,9 @@ spring-run.err.log
 # Temporarios
 .tmp-folha/
 
+# Gatilhos de deploy locais (contem IP de producao / caminho de credencial)
+*.local.ps1
+
 # Ferramentas locais (NAO versionar) - framework Reversa e configs de maquina
 /.agents/
 /.reversa/
