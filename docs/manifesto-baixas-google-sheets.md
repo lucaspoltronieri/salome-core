@@ -125,7 +125,7 @@ mvn package -DskipTests
 Rodar localmente (com as variaveis de ambiente exportadas):
 
 ```bash
-java -jar target/salome-core-0.0.1-SNAPSHOT.jar
+java -jar target/salome-core-1.0.0.jar
 ```
 
 Para rodar somente o agendador, sem servidor web, defina

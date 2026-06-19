@@ -40,7 +40,7 @@ acrescenta as APIs financeiras (fluxo de caixa, DRE, exportações).
 
 ```bash
 mvn package -DskipTests
-java -jar target/salome-core-0.0.1-SNAPSHOT.jar
+java -jar target/salome-core-1.0.0.jar
 ```
 
 O profile padrão é `local`. Para rodar apenas o agendador, sem servidor web, defina

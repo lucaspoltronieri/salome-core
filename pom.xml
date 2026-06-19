@@ -13,7 +13,7 @@
 
     <groupId>br.com.salome</groupId>
     <artifactId>salome-core</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>salome-core</name>
     <description>Core financeiro da Expresso Salome - APIs de fluxo de caixa, DRE e automacao de manifestos (Spring Boot)</description>
     <packaging>jar</packaging>
@@ -68,6 +68,13 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
