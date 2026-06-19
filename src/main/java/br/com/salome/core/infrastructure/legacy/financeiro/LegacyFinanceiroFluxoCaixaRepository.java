@@ -41,6 +41,7 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
             """;
 
     private final JdbcTemplate jdbcTemplate;
+    private final CteVencimentoPrevisao previsao = new CteVencimentoPrevisao();
 
     public LegacyFinanceiroFluxoCaixaRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -511,6 +512,7 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                     NULL banco,
                     tomador.idCliente pessoaId,
                     tomador.razaoSocial pessoa,
+                    tomador.cnpj_cpf cnpj,
                     NULL centroCustoId,
                     NULL centroCusto,
                     c.idFilial filialId,
@@ -535,14 +537,15 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                     OR (expresso.cnpjLimpo <> ''
                         AND expresso.cnpjLimpo = REPLACE(REPLACE(REPLACE(COALESCE(tomador.cnpj_cpf, ''), '.', ''), '/', ''), '-', ''))
                 LEFT JOIN filial fil ON fil.idFilial = c.idFilial
-                WHERE c.cteEmissao BETWEEN DATE_SUB(?, INTERVAL 45 DAY) AND ?
+                WHERE c.cteEmissao BETWEEN DATE_SUB(?, INTERVAL 90 DAY) AND ?
                   AND COALESCE(c.idFatura, 0) = 0
                   AND COALESCE(c.cte, 0) > 0
                   AND UPPER(COALESCE(c.situacao, '')) NOT LIKE 'CANCEL%%'
                   AND UPPER(COALESCE(c.situacao, '')) NOT LIKE 'INUTIL%%'
                   AND UPPER(COALESCE(c.tipoPagamento, '')) NOT LIKE 'CORTES%%'
                 """.formatted(CLIENTE_EXPRESSO_SALOME_SQL), (rs, rowNum) -> cteAberto(rs),
-                Date.valueOf(filtro.inicio()), Date.valueOf(filtro.fim()));
+                Date.valueOf(filtro.inicio()), Date.valueOf(filtro.fim()))
+                .stream().flatMap(List::stream).toList();
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -974,18 +977,37 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
         return movimento(rs, FinanceiroNatureza.RECEITA, status, tipo, origin, tomadorExpressoSalome, bancoPerdasDanos);
     }
 
-    private FinanceiroMovimento cteAberto(ResultSet rs) throws SQLException {
+    /**
+     * Expande um CT-e emitido nao faturado nas parcelas previstas de recebimento. A regra padrao
+     * 15+15 gera uma unica parcela; clientes com excecao podem gerar uma ou mais
+     * (ver {@link CteVencimentoPrevisao}). Afeta apenas a previsao do Fluxo de Caixa.
+     */
+    private List<FinanceiroMovimento> cteAberto(ResultSet rs) throws SQLException {
         LocalDate emissao = localDate(rs, "dataCompetencia");
-        LocalDate vencimento = vencimentoPadraoCte(emissao);
-        return new FinanceiroMovimento(FinanceiroNatureza.RECEITA, FinanceiroStatus.PREVISTO,
-                FinanceiroOrigemTipo.CTE_ABERTO, integerOrNull(rs, "origemId"), emissao, vencimento, null,
-                decimal(rs, "valor"), integerOrNull(rs, "bancoId"), rs.getString("banco"), integerOrNull(rs, "pessoaId"),
-                rs.getString("pessoa"), integerOrNull(rs, "centroCustoId"), rs.getString("centroCusto"),
-                integerOrNull(rs, "filialId"), rs.getString("filial"),
-                integerOrNull(rs, "planoContasCentroCustoId"), rs.getString("planoContas"),
-                rs.getString("classificacao"), rs.getString("dmr"), rs.getString("documento"),
-                rs.getString("historico"), rs.getInt("tomadorExpressoSalome") == 1, false,
-                FinanceiroRuleOrigins.CTE_ABERTO);
+        BigDecimal valor = decimal(rs, "valor");
+        String razaoSocial = rs.getString("pessoa");
+        String cnpj = rs.getString("cnpj");
+        Integer origemId = integerOrNull(rs, "origemId");
+        Integer pessoaId = integerOrNull(rs, "pessoaId");
+        Integer filialId = integerOrNull(rs, "filialId");
+        String filial = rs.getString("filial");
+        String documentoBase = rs.getString("documento");
+        String historico = rs.getString("historico");
+        boolean expressoSalome = rs.getInt("tomadorExpressoSalome") == 1;
+
+        List<CteVencimentoPrevisao.Parcela> parcelas = previsao.resolver(razaoSocial, cnpj, emissao, valor);
+        List<FinanceiroMovimento> movimentos = new ArrayList<>(parcelas.size());
+        for (CteVencimentoPrevisao.Parcela parcela : parcelas) {
+            String documento = parcela.rotulo() == null
+                    ? documentoBase
+                    : documentoBase + " (" + parcela.rotulo() + ")";
+            movimentos.add(new FinanceiroMovimento(FinanceiroNatureza.RECEITA, FinanceiroStatus.PREVISTO,
+                    FinanceiroOrigemTipo.CTE_ABERTO, origemId, emissao, parcela.vencimento(), null,
+                    parcela.valor(), null, null, pessoaId, razaoSocial, null, null, filialId, filial,
+                    null, null, null, null, documento, historico, expressoSalome, false,
+                    FinanceiroRuleOrigins.CTE_ABERTO));
+        }
+        return movimentos;
     }
 
     private FinanceiroMovimento movimento(ResultSet rs, FinanceiroNatureza natureza, FinanceiroStatus status,
@@ -999,16 +1021,6 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                 integerOrNull(rs, "planoContasCentroCustoId"),
                 rs.getString("planoContas"), rs.getString("classificacao"), rs.getString("dmr"),
                 rs.getString("documento"), rs.getString("historico"), tomadorExpressoSalome, bancoPerdasDanos, origin);
-    }
-
-    private LocalDate vencimentoPadraoCte(LocalDate emissao) {
-        if (emissao == null) {
-            return null;
-        }
-        if (emissao.getDayOfMonth() <= 15) {
-            return emissao.withDayOfMonth(Math.min(30, emissao.lengthOfMonth()));
-        }
-        return emissao.plusMonths(1).withDayOfMonth(15);
     }
 
     private LocalDate localDate(ResultSet rs, String column) throws SQLException {
