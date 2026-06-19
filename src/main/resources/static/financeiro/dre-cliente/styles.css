@@ -1,5 +1,12 @@
 /* Especifico do DRE por cliente; herda o tema de /financeiro/dre-gerencial/styles.css */
 
+/* A tela tem um campo a mais (Criterio de rateio) que o DRE gerencial.
+   Override do grid de filtros para a Filial ter largura fixa e o botao
+   Atualizar caber na mesma linha, igual ao DRE gerencial. */
+.filters {
+    grid-template-columns: 130px 130px 140px 160px 230px minmax(150px, 1fr) 120px;
+}
+
 .cliente-tabela th.num,
 .cliente-tabela td.num {
     text-align: right;
