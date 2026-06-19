@@ -3,6 +3,7 @@ package br.com.salome.core.infrastructure.legacy.financeiro;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import br.com.salome.core.infrastructure.legacy.financeiro.CteVencimentoPrevisao.Parcela;
+import br.com.salome.core.infrastructure.legacy.financeiro.CteVencimentoPrevisao.Previsao;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -88,5 +89,52 @@ class CteVencimentoPrevisaoTest {
     void identificacaoIgnoraAcentoECaixa() {
         List<Parcela> comAcento = previsao.resolver("Eucatex Indústria", null, SEGUNDA, CEM);
         assertEquals(LocalDate.of(2025, 1, 27), comAcento.get(0).vencimento());
+    }
+
+    @Test
+    void parcelaExpoeOFechamento() {
+        // Sherwin fecha na segunda da emissao (06/01); Dovac fecha quinzenal (dia 15).
+        assertEquals(LocalDate.of(2025, 1, 6),
+                previsao.resolver("SHERWIN WILLIAMS", null, SEGUNDA, CEM).get(0).fechamento());
+        assertEquals(LocalDate.of(2025, 1, 15),
+                previsao.resolver("DOVAC DISTRIBUIDORA", null, SEGUNDA, CEM).get(0).fechamento());
+    }
+
+    @Test
+    void preverNoDiaDoFechamentoAindaMostraPrevisaoNormal() {
+        // Sherwin: fechamento 06/01. Em 06/01 (== fechamento) ainda mostra a previsao normal.
+        List<Previsao> previsoes = previsao.prever("SHERWIN WILLIAMS", null, SEGUNDA, CEM, LocalDate.of(2025, 1, 6));
+        assertEquals(1, previsoes.size());
+        assertEquals(LocalDate.of(2025, 1, 31), previsoes.get(0).vencimento());
+        assertEquals(false, previsoes.get(0).aFaturarAtrasado());
+    }
+
+    @Test
+    void preverComFechamentoVencidoViraUmaEntradaAFaturar() {
+        // Sherwin: fechamento 06/01. Em 07/01 (dia seguinte) vira "a faturar" com venc = fechamento.
+        List<Previsao> previsoes = previsao.prever("SHERWIN WILLIAMS", null, SEGUNDA, CEM, LocalDate.of(2025, 1, 7));
+        assertEquals(1, previsoes.size());
+        assertEquals(LocalDate.of(2025, 1, 6), previsoes.get(0).vencimento());
+        assertEquals(CEM, previsoes.get(0).valor());
+        assertEquals(true, previsoes.get(0).aFaturarAtrasado());
+    }
+
+    @Test
+    void preverDovacVencidoColapsaAsParcelasNumaSoAFaturar() {
+        // Dovac: fechamento 15/01. Em 16/01 as 3 parcelas viram UMA entrada "a faturar" com valor cheio.
+        List<Previsao> previsoes = previsao.prever("DOVAC DISTRIBUIDORA", null, SEGUNDA, CEM, LocalDate.of(2025, 1, 16));
+        assertEquals(1, previsoes.size());
+        assertEquals(LocalDate.of(2025, 1, 15), previsoes.get(0).vencimento());
+        assertEquals(CEM, previsoes.get(0).valor());
+        assertEquals(true, previsoes.get(0).aFaturarAtrasado());
+    }
+
+    @Test
+    void preverDovacNoDiaDoFechamentoMantemAsTresParcelas() {
+        List<Previsao> previsoes = previsao.prever("DOVAC DISTRIBUIDORA", null, SEGUNDA, CEM, LocalDate.of(2025, 1, 15));
+        assertEquals(3, previsoes.size());
+        assertEquals(false, previsoes.get(0).aFaturarAtrasado());
+        BigDecimal soma = previsoes.stream().map(Previsao::valor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(CEM, soma);
     }
 }

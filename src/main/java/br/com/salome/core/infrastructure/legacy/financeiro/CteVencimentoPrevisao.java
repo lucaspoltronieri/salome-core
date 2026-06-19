@@ -34,8 +34,19 @@ import java.util.Set;
  */
 public final class CteVencimentoPrevisao {
 
-    /** Uma parcela prevista de recebimento de um CT-e. */
-    public record Parcela(LocalDate vencimento, BigDecimal valor, String rotulo) {
+    /**
+     * Uma parcela prevista de recebimento de um CT-e. {@code fechamento} e a data em que a fatura
+     * seria emitida (usada para decidir se a previsao ainda e valida em {@link #prever}).
+     */
+    public record Parcela(LocalDate vencimento, BigDecimal valor, String rotulo, LocalDate fechamento) {
+    }
+
+    /**
+     * Previsao final de um CT-e ja decidida em relacao a "hoje": ou e uma parcela normal a vencer,
+     * ou (quando o fechamento ja passou e o CT-e segue sem fatura) e uma unica entrada
+     * {@code aFaturarAtrasado} para o card "Em atraso".
+     */
+    public record Previsao(LocalDate vencimento, BigDecimal valor, String rotulo, boolean aFaturarAtrasado) {
     }
 
     /** Calculo das parcelas de um CT-e a partir da emissao e do valor total. */
@@ -68,7 +79,28 @@ public final class CteVencimentoPrevisao {
                 return entrada.regra().parcelas(emissao, valorTotal);
             }
         }
-        return List.of(new Parcela(vencimentoPadrao(emissao), valorTotal, null));
+        return List.of(new Parcela(vencimentoPadrao(emissao), valorTotal, null, fechamentoQuinzenal(emissao)));
+    }
+
+    /**
+     * Decide a previsao de um CT-e em relacao a {@code hoje}. Se o fechamento (emissao da fatura)
+     * ainda nao passou ({@code fechamento >= hoje}), devolve as parcelas normais a vencer. Se o
+     * fechamento ja passou e o CT-e segue sem fatura, devolve UMA entrada "a faturar" (valor cheio,
+     * data = fechamento) para o card "Em atraso" — fora da previsao normal e da projecao de caixa.
+     */
+    public List<Previsao> prever(String razaoSocial, String cnpj, LocalDate emissao, BigDecimal valorTotal,
+            LocalDate hoje) {
+        List<Parcela> parcelas = resolver(razaoSocial, cnpj, emissao, valorTotal);
+        if (parcelas.isEmpty()) {
+            return List.of();
+        }
+        LocalDate fechamento = parcelas.get(0).fechamento();
+        if (fechamento != null && fechamento.isBefore(hoje)) {
+            return List.of(new Previsao(fechamento, valorTotal, "a faturar", true));
+        }
+        return parcelas.stream()
+                .map(p -> new Previsao(p.vencimento(), p.valor(), p.rotulo(), false))
+                .toList();
     }
 
     /** Regra padrao 15+15. Publica/estatica para reuso e teste. */
@@ -162,20 +194,26 @@ public final class CteVencimentoPrevisao {
 
     /** Fechamento no proximo {@code fech} >= emissao; vencimento = fechamento + {@code dias}. */
     private static Regra semanal(DayOfWeek fech, int dias) {
-        return (emissao, valor) ->
-                umaParcela(proximoOuMesmo(emissao, fech).plusDays(dias), valor);
+        return (emissao, valor) -> {
+            LocalDate fechamento = proximoOuMesmo(emissao, fech);
+            return umaParcela(fechamento, fechamento.plusDays(dias), valor);
+        };
     }
 
     /** Igual a {@link #semanal}, mas empurrando o vencimento para o proximo dia da semana {@code snap}. */
     private static Regra semanalSnapSemana(DayOfWeek fech, int dias, DayOfWeek snap) {
-        return (emissao, valor) ->
-                umaParcela(ajustarParaDiaSemana(proximoOuMesmo(emissao, fech).plusDays(dias), snap), valor);
+        return (emissao, valor) -> {
+            LocalDate fechamento = proximoOuMesmo(emissao, fech);
+            return umaParcela(fechamento, ajustarParaDiaSemana(fechamento.plusDays(dias), snap), valor);
+        };
     }
 
     /** Igual a {@link #semanal}, mas empurrando o vencimento para o proximo dia-do-mes {@code diaMes}. */
     private static Regra semanalSnapDiaMes(DayOfWeek fech, int dias, int diaMes) {
-        return (emissao, valor) ->
-                umaParcela(ajustarParaDiaDoMes(proximoOuMesmo(emissao, fech).plusDays(dias), diaMes), valor);
+        return (emissao, valor) -> {
+            LocalDate fechamento = proximoOuMesmo(emissao, fech);
+            return umaParcela(fechamento, ajustarParaDiaDoMes(fechamento.plusDays(dias), diaMes), valor);
+        };
     }
 
     /** Fechamento quinzenal (dia 15 ou ultimo dia do mes) e uma parcela por prazo em {@code dias}. */
@@ -186,7 +224,7 @@ public final class CteVencimentoPrevisao {
             List<Parcela> parcelas = new ArrayList<>();
             for (int i = 0; i < dias.length; i++) {
                 parcelas.add(new Parcela(base.plusDays(dias[i]), partes.get(i),
-                        "parc. " + (i + 1) + "/" + dias.length));
+                        "parc. " + (i + 1) + "/" + dias.length, base));
             }
             return parcelas;
         };
@@ -199,6 +237,7 @@ public final class CteVencimentoPrevisao {
      * VALIDAR: base da semana (emissao x segunda do fechamento).
      */
     private static List<Parcela> regraAnjo(LocalDate emissao, BigDecimal valor) {
+        LocalDate fechamento = proximoOuMesmo(emissao, DayOfWeek.MONDAY);
         int semana = (emissao.getDayOfMonth() - 1) / 7 + 1;
         LocalDate vencimento;
         if (semana == 1) {
@@ -208,7 +247,7 @@ public final class CteVencimentoPrevisao {
         } else {
             vencimento = comDia(emissao.plusMonths(1), 15);
         }
-        return umaParcela(vencimento, valor);
+        return umaParcela(fechamento, vencimento, valor);
     }
 
     /**
@@ -219,15 +258,15 @@ public final class CteVencimentoPrevisao {
     private static List<Parcela> regraBraile(LocalDate emissao, BigDecimal valor) {
         LocalDate proximoMes = emissao.plusMonths(1);
         int dia = emissao.getDayOfMonth() <= 15 ? 15 : 30;
-        return umaParcela(comDia(proximoMes, dia), valor);
+        return umaParcela(fechamentoQuinzenal(emissao), comDia(proximoMes, dia), valor);
     }
 
     // ------------------------------------------------------------------------------------------
     // Helpers de data e valor
     // ------------------------------------------------------------------------------------------
 
-    private static List<Parcela> umaParcela(LocalDate vencimento, BigDecimal valor) {
-        return List.of(new Parcela(vencimento, valor, null));
+    private static List<Parcela> umaParcela(LocalDate fechamento, LocalDate vencimento, BigDecimal valor) {
+        return List.of(new Parcela(vencimento, valor, null, fechamento));
     }
 
     /** Primeiro {@code alvo} (dia da semana) >= base. */

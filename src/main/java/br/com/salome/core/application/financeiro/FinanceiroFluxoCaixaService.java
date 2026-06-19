@@ -192,6 +192,9 @@ public class FinanceiroFluxoCaixaService {
             };
             BigDecimal entradas = previstos.stream()
                     .filter(movimento -> movimento.natureza() == FinanceiroNatureza.RECEITA)
+                    // CT-es "a faturar" (fechamento vencido) aparecem no card "Em atraso", mas nao sao
+                    // caixa iminente (nem foram faturados): ficam fora da projecao de saldo.
+                    .filter(movimento -> !aFaturarAtrasado(movimento, hoje))
                     .filter(noDia)
                     .map(FinanceiroMovimento::valor)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -299,6 +302,18 @@ public class FinanceiroFluxoCaixaService {
 
     private boolean visivelNaTabela(FinanceiroMovimento movimento) {
         return temBancoInformado(movimento) || movimento.origemTipo().name().equals("CTE_ABERTO");
+    }
+
+    /**
+     * CT-e em aberto cujo fechamento ja passou (vencimento no passado): "a faturar atrasado".
+     * Aparece no card "Em atraso", mas nao entra na projecao de caixa (nao foi faturado). Apos a
+     * correcao da previsao, todo CTE_ABERTO normal vence hoje ou no futuro; logo um CTE_ABERTO com
+     * vencimento anterior a hoje e necessariamente um "a faturar".
+     */
+    private static boolean aFaturarAtrasado(FinanceiroMovimento movimento, LocalDate hoje) {
+        return movimento.origemTipo().name().equals("CTE_ABERTO")
+                && movimento.dataVencimento() != null
+                && movimento.dataVencimento().isBefore(hoje);
     }
 
     private boolean temBancoInformado(FinanceiroMovimento movimento) {

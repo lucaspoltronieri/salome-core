@@ -152,6 +152,28 @@ class FinanceiroFluxoCaixaServiceTest {
     }
 
     @Test
+    void cteAFaturarAtrasadoVaiParaAtrasoMasForaDaProjecao() {
+        // hoje = 2026-06-08. Um CT-e em aberto com vencimento no passado e um "a faturar atrasado".
+        FinanceiroFluxoCaixaService service = new FinanceiroFluxoCaixaService(filtro -> List.of(
+                previstoReceita(FinanceiroOrigemTipo.CTE_ABERTO, LocalDate.of(2026, 6, 2), "777.00", null),
+                previstoReceita(FinanceiroOrigemTipo.CTE_ABERTO, LocalDate.of(2026, 6, 20), "300.00", "1.01.001")
+        ), CLOCK);
+
+        var snapshot = service.dashboard(FILTRO);
+
+        // O "a faturar" (venc 02/06 < hoje) aparece no card Em atraso; o CT-e normal (futuro) no Este mes.
+        assertEquals(new BigDecimal("777.00"), horizonte(snapshot.aReceber(), "ATRASO").valor());
+        assertEquals(new BigDecimal("300.00"), horizonte(snapshot.aReceber(), "MES").valor());
+        // Projecao: o primeiro ponto (hoje) NAO recebe os 777 do "a faturar"...
+        assertEquals(BigDecimal.ZERO, snapshot.projecao().getFirst().entradas());
+        // ...mas o CT-e normal entra na projecao na sua data (20/06).
+        BigDecimal entradasNoDia20 = snapshot.projecao().stream()
+                .filter(ponto -> ponto.data().equals(LocalDate.of(2026, 6, 20)))
+                .findFirst().orElseThrow().entradas();
+        assertEquals(new BigDecimal("300.00"), entradasNoDia20);
+    }
+
+    @Test
     void shouldMontarArvorePlanoContasComDocumentosNoDrill() {
         FinanceiroFluxoCaixaService service = new FinanceiroFluxoCaixaService(filtro -> List.of(
                 previstoDespesa(LocalDate.of(2026, 6, 9), "100.00", "2.08.001"),

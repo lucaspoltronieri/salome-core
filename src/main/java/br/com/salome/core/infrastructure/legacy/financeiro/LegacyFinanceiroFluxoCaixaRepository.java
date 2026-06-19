@@ -18,9 +18,11 @@ import java.math.RoundingMode;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -41,10 +43,17 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
             """;
 
     private final JdbcTemplate jdbcTemplate;
+    private final Clock clock;
     private final CteVencimentoPrevisao previsao = new CteVencimentoPrevisao();
 
+    @Autowired
     public LegacyFinanceiroFluxoCaixaRepository(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate, Clock.systemDefaultZone());
+    }
+
+    LegacyFinanceiroFluxoCaixaRepository(JdbcTemplate jdbcTemplate, Clock clock) {
         this.jdbcTemplate = jdbcTemplate;
+        this.clock = clock;
     }
 
     @Override
@@ -543,7 +552,7 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                   AND UPPER(COALESCE(c.situacao, '')) NOT LIKE 'CANCEL%%'
                   AND UPPER(COALESCE(c.situacao, '')) NOT LIKE 'INUTIL%%'
                   AND UPPER(COALESCE(c.tipoPagamento, '')) NOT LIKE 'CORTES%%'
-                """.formatted(CLIENTE_EXPRESSO_SALOME_SQL), (rs, rowNum) -> cteAberto(rs),
+                """.formatted(CLIENTE_EXPRESSO_SALOME_SQL), (rs, rowNum) -> cteAberto(rs, LocalDate.now(clock)),
                 Date.valueOf(filtro.inicio()), Date.valueOf(filtro.fim()))
                 .stream().flatMap(List::stream).toList();
     }
@@ -978,11 +987,13 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
     }
 
     /**
-     * Expande um CT-e emitido nao faturado nas parcelas previstas de recebimento. A regra padrao
-     * 15+15 gera uma unica parcela; clientes com excecao podem gerar uma ou mais
-     * (ver {@link CteVencimentoPrevisao}). Afeta apenas a previsao do Fluxo de Caixa.
+     * Expande um CT-e emitido nao faturado nas previsoes de recebimento, ja decididas em relacao a
+     * {@code hoje} ({@link CteVencimentoPrevisao#prever}): se o fechamento ainda nao passou, gera
+     * uma ou mais parcelas a vencer; se o fechamento ja passou e o CT-e segue sem fatura, gera UMA
+     * entrada "a faturar" com vencimento = fechamento (data no passado), que cai sozinha no card
+     * "Em atraso" e e excluida da projecao de caixa. Afeta apenas a previsao do Fluxo de Caixa.
      */
-    private List<FinanceiroMovimento> cteAberto(ResultSet rs) throws SQLException {
+    private List<FinanceiroMovimento> cteAberto(ResultSet rs, LocalDate hoje) throws SQLException {
         LocalDate emissao = localDate(rs, "dataCompetencia");
         BigDecimal valor = decimal(rs, "valor");
         String razaoSocial = rs.getString("pessoa");
@@ -995,15 +1006,13 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
         String historico = rs.getString("historico");
         boolean expressoSalome = rs.getInt("tomadorExpressoSalome") == 1;
 
-        List<CteVencimentoPrevisao.Parcela> parcelas = previsao.resolver(razaoSocial, cnpj, emissao, valor);
-        List<FinanceiroMovimento> movimentos = new ArrayList<>(parcelas.size());
-        for (CteVencimentoPrevisao.Parcela parcela : parcelas) {
-            String documento = parcela.rotulo() == null
-                    ? documentoBase
-                    : documentoBase + " (" + parcela.rotulo() + ")";
+        List<CteVencimentoPrevisao.Previsao> previsoes = previsao.prever(razaoSocial, cnpj, emissao, valor, hoje);
+        List<FinanceiroMovimento> movimentos = new ArrayList<>(previsoes.size());
+        for (CteVencimentoPrevisao.Previsao p : previsoes) {
+            String documento = p.rotulo() == null ? documentoBase : documentoBase + " (" + p.rotulo() + ")";
             movimentos.add(new FinanceiroMovimento(FinanceiroNatureza.RECEITA, FinanceiroStatus.PREVISTO,
-                    FinanceiroOrigemTipo.CTE_ABERTO, origemId, emissao, parcela.vencimento(), null,
-                    parcela.valor(), null, null, pessoaId, razaoSocial, null, null, filialId, filial,
+                    FinanceiroOrigemTipo.CTE_ABERTO, origemId, emissao, p.vencimento(), null,
+                    p.valor(), null, null, pessoaId, razaoSocial, null, null, filialId, filial,
                     null, null, null, null, documento, historico, expressoSalome, false,
                     FinanceiroRuleOrigins.CTE_ABERTO));
         }
