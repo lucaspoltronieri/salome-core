@@ -472,7 +472,7 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                         WHERE c.idFatura = f.idFatura
                     ) valor,
                     IF(f.idBanco IN (%s), f.idBanco, NULL) bancoId,
-                    IF(f.idBanco IN (%s), b.conta, NULL) banco,
+                    COALESCE(NULLIF(b.conta, ''), NULLIF(b.nome, '')) banco,
                     f.idCliente pessoaId,
                     cliente.razaoSocial pessoa,
                     pccc.idCentroCusto centroCustoId,
@@ -483,7 +483,8 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                     plano.descricao planoContas,
                     plano.classificacao classificacao,
                     plano.dmr dmr,
-                    CONCAT('FAT-', f.idFatura) documento,
+                    IF(f.idBanco = 31, CONCAT('FAT-', f.idFatura, ' (Cartorio)'), CONCAT('FAT-', f.idFatura)) documento,
+                    IF(f.idBanco = 31, 1, 0) cartorio,
                     f.obs historico,
                     IF(f.idBanco = ?
                         OR UPPER(COALESCE(b.conta, '')) LIKE '%%PERDAS%%DANOS%%'
@@ -503,10 +504,22 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                 LEFT JOIN filial fil ON fil.idFilial = f.idFilial
                 WHERE f.vencimento BETWEEN ? AND ?
                   AND NOT EXISTS (SELECT 1 FROM faturabaixa fb WHERE fb.idFatura = f.idFatura)
-                """.formatted(BANCOS_FLUXO_IDS, BANCOS_FLUXO_IDS, CLIENTE_EXPRESSO_SALOME_SQL), (rs, rowNum) -> movimentoReceita(rs,
-                FinanceiroOrigemTipo.FATURA_ABERTA, FinanceiroStatus.PREVISTO, FinanceiroRuleOrigins.FATURA,
+                """.formatted(BANCOS_FLUXO_IDS, CLIENTE_EXPRESSO_SALOME_SQL), (rs, rowNum) -> movimentoReceita(rs,
+                rs.getInt("cartorio") == 1 ? FinanceiroOrigemTipo.FATURA_CARTORIO : FinanceiroOrigemTipo.FATURA_ABERTA,
+                FinanceiroStatus.PREVISTO, FinanceiroRuleOrigins.FATURA,
                 rs.getInt("tomadorExpressoSalome") == 1, rs.getInt("bancoPerdasDanos") == 1),
-                BANCO_PERDAS_DANOS_ID, Date.valueOf(filtro.inicio()), Date.valueOf(filtro.fim()));
+                BANCO_PERDAS_DANOS_ID, Date.valueOf(inicioFaturas(filtro)), Date.valueOf(filtro.fim()));
+    }
+
+    /**
+     * Piso de vencimento para as faturas em aberto. O card "Faturas atrasadas (todas)" deve mostrar
+     * TODA fatura em aberto vencida, de qualquer idade (inclusive as em cartorio, banco 31, que podem
+     * estar vencidas ha anos), entao usamos um piso bem antigo. So a previsao de faturas usa esta
+     * janela ampla; as demais consultas seguem a janela padrao.
+     */
+    private LocalDate inicioFaturas(FinanceiroFiltro filtro) {
+        LocalDate piso = LocalDate.of(2000, 1, 1);
+        return filtro.inicio().isBefore(piso) ? filtro.inicio() : piso;
     }
 
     private List<FinanceiroMovimento> listarCtesAbertos(FinanceiroFiltro filtro) {

@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("#filters");
     const today = new Date();
     const first = new Date(today.getFullYear(), today.getMonth(), 1);
-    const last = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    const last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     form.inicio.value = iso(first);
     form.fim.value = iso(last);
     form.addEventListener("submit", event => {
@@ -43,6 +43,7 @@ function render(snapshot) {
     renderProjecao(snapshot.projecao || []);
     renderHorizonteCards("#aPagar", "#aPagarDetail", snapshot.aPagar || []);
     renderHorizonteCards("#aReceber", "#aReceberDetail", snapshot.aReceber || []);
+    renderHorizonteCards("#faturamentoPendente", "#faturamentoPendenteDetail", snapshot.faturamentoPendente || []);
     renderRetrospectivo(snapshot.retrospectivo || []);
     renderBankBalances(snapshot.saldosBancarios || []);
     renderRanks("#costCenterList", snapshot.porCentroCusto);
@@ -74,14 +75,14 @@ function renderConciliacao(snapshot) {
     const rows = [
         ["Saldo bancario hoje", snapshot.saldoBancarioAtual, "base"],
         ["+ A receber (mes)", aReceberMes, "entrada"],
-        ["+ A receber em atraso", atrasoReceber, "entrada muted"],
+        ["+ A receber em atraso", atrasoReceber, "entrada muted", "Apenas vencido 30 dias"],
         ["- A pagar (mes)", -Math.abs(aPagarMes), "saida"],
         ["- A pagar em atraso", -Math.abs(atrasoPagar), "saida muted"],
         ["= Saldo projetado (fim do mes)", projetado, projetado >= 0 ? "total positivo" : "total negativo"]
     ];
-    document.querySelector("#conciliacao").innerHTML = rows.map(([label, value, cls]) => `
+    document.querySelector("#conciliacao").innerHTML = rows.map(([label, value, cls, nota]) => `
         <div class="concil-row ${cls}">
-            <span>${escapeHtml(label)}</span>
+            <span>${escapeHtml(label)}${nota ? ` <span class="nota-vermelha">${escapeHtml(nota)}</span>` : ""}</span>
             <strong>${fmtMoney.format(value || 0)}</strong>
         </div>
     `).join("");
@@ -174,7 +175,9 @@ function buildDrillCard(card, grid, detail, metaFn) {
             <span class="horizon-twisty">${hasDetail ? "▾" : ""}</span>
         </div>
         <strong class="horizon-value">${fmtMoney.format(card.valor || 0)}</strong>
-        <span class="horizon-meta">${metaFn(card)}</span>`;
+        <span class="horizon-meta">${metaFn(card)}</span>
+        ${card.codigo === "ATRASO" && card.natureza === "RECEITA"
+            ? `<span class="nota-vermelha">Apenas vencido 30 dias</span>` : ""}`;
     wrap.appendChild(head);
 
     if (!hasDetail) {
@@ -255,6 +258,7 @@ function renderContaDoc(doc, nivelPai) {
     item.innerHTML = `
         <span class="doc-name">${escapeHtml(doc.documento)}</span>
         <span class="doc-person">${escapeHtml(doc.clienteFornecedor)}</span>
+        <span class="doc-banco">${escapeHtml(doc.banco || "-")}</span>
         <span class="doc-filial">${escapeHtml(doc.filial || "-")}</span>
         <span class="doc-venc">${date(doc.dataVencimento)}</span>
         <span class="doc-value">${fmtMoney.format(doc.valor || 0)}</span>`;
@@ -371,6 +375,7 @@ function openDocDrawer(doc) {
     const pairs = [
         ["Pessoa", doc.clienteFornecedor],
         ["Filial", doc.filial],
+        ["Banco", doc.banco],
         ["Vencimento", date(doc.dataVencimento)],
         ["Valor", fmtMoney.format(doc.valor || 0)],
         ["Origem", doc.origemTipo]

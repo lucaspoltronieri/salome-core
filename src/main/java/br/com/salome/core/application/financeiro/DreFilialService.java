@@ -814,6 +814,7 @@ public class DreFilialService {
             case EXTRATO_AVULSO -> "Extrato bancario";
             case FATURA_BAIXA -> "Fatura baixada";
             case FATURA_ABERTA -> "Fatura aberta";
+            case FATURA_CARTORIO -> "Fatura em cartorio";
             case CTE_ABERTO -> "CT-e aberto";
             case CTE_EMITIDO -> "CT-e emitido";
             case NOTA_COMPRA_COMPETENCIA -> "Nota de compra (competencia)";

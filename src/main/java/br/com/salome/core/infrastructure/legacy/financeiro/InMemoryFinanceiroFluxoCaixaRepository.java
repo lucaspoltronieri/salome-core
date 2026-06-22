@@ -248,7 +248,7 @@ public class InMemoryFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCa
 
     private br.com.salome.core.domain.legacy.LegacyOrigin origin(FinanceiroOrigemTipo tipo) {
         return switch (tipo) {
-            case FATURA_BAIXA, FATURA_ABERTA -> FinanceiroRuleOrigins.FATURA;
+            case FATURA_BAIXA, FATURA_ABERTA, FATURA_CARTORIO -> FinanceiroRuleOrigins.FATURA;
             case CTE_ABERTO -> FinanceiroRuleOrigins.CTE_ABERTO;
             case CTE_EMITIDO -> FinanceiroRuleOrigins.CTE_EMITIDO;
             case PAGAMENTO_CAIXA, CAIXA_DINHEIRO -> FinanceiroRuleOrigins.PAGAMENTO_CAIXA;

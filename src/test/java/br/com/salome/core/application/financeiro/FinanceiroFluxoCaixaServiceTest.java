@@ -152,7 +152,7 @@ class FinanceiroFluxoCaixaServiceTest {
     }
 
     @Test
-    void cteAFaturarAtrasadoVaiParaAtrasoMasForaDaProjecao() {
+    void cteAFaturarAtrasadoVaiParaFaturamentoPendenteForaDaProjecao() {
         // hoje = 2026-06-08. Um CT-e em aberto com vencimento no passado e um "a faturar atrasado".
         FinanceiroFluxoCaixaService service = new FinanceiroFluxoCaixaService(filtro -> List.of(
                 previstoReceita(FinanceiroOrigemTipo.CTE_ABERTO, LocalDate.of(2026, 6, 2), "777.00", null),
@@ -161,8 +161,12 @@ class FinanceiroFluxoCaixaServiceTest {
 
         var snapshot = service.dashboard(FILTRO);
 
-        // O "a faturar" (venc 02/06 < hoje) aparece no card Em atraso; o CT-e normal (futuro) no Este mes.
-        assertEquals(new BigDecimal("777.00"), horizonte(snapshot.aReceber(), "ATRASO").valor());
+        // O card "Em atraso" de Contas a receber agora traz so faturas (nao CT-es): nada aqui.
+        assertEquals(BigDecimal.ZERO, horizonte(snapshot.aReceber(), "ATRASO").valor());
+        // O "a faturar" (venc 02/06 < hoje) vai para o painel "Faturamento pendente".
+        assertEquals(new BigDecimal("777.00"), horizonte(snapshot.faturamentoPendente(), "CTE_A_FATURAR").valor());
+        // O CT-e normal (futuro) fica como "aguardando prazo" e tambem no card Este mes.
+        assertEquals(new BigDecimal("300.00"), horizonte(snapshot.faturamentoPendente(), "CTE_AGUARDANDO").valor());
         assertEquals(new BigDecimal("300.00"), horizonte(snapshot.aReceber(), "MES").valor());
         // Projecao: o primeiro ponto (hoje) NAO recebe os 777 do "a faturar"...
         assertEquals(BigDecimal.ZERO, snapshot.projecao().getFirst().entradas());
@@ -171,6 +175,29 @@ class FinanceiroFluxoCaixaServiceTest {
                 .filter(ponto -> ponto.data().equals(LocalDate.of(2026, 6, 20)))
                 .findFirst().orElseThrow().entradas();
         assertEquals(new BigDecimal("300.00"), entradasNoDia20);
+    }
+
+    @Test
+    void aReceberEmAtrasoConsideraSoFaturasVencidasNosUltimos30DiasEForaCartorio() {
+        // hoje = 2026-06-08; janela de atraso recente = [09/05, 07/06].
+        FinanceiroFluxoCaixaService service = new FinanceiroFluxoCaixaService(filtro -> List.of(
+                // fatura vencida ontem (07/06): atraso recente -> conta.
+                previstoReceita(FinanceiroOrigemTipo.FATURA_ABERTA, LocalDate.of(2026, 6, 7), "100.00", "1.01.001"),
+                // fatura vencida ha 40 dias (29/04): fora da janela de 30 dias.
+                previstoReceita(FinanceiroOrigemTipo.FATURA_ABERTA, LocalDate.of(2026, 4, 29), "200.00", "1.01.001"),
+                // fatura em cartorio (banco 31) vencida: fora do "A receber em atraso" e da projecao.
+                previstoReceita(FinanceiroOrigemTipo.FATURA_CARTORIO, LocalDate.of(2026, 5, 20), "300.00", "1.01.001")
+        ), CLOCK);
+
+        var snapshot = service.dashboard(FILTRO);
+
+        // Card "Em atraso" (Contas a receber): so a fatura recente de 100.
+        assertEquals(new BigDecimal("100.00"), horizonte(snapshot.aReceber(), "ATRASO").valor());
+        // Card "Faturas atrasadas (todas)": as tres (100 + 200 + 300), inclusive cartorio.
+        assertEquals(new BigDecimal("600.00"), horizonte(snapshot.faturamentoPendente(), "FATURAS_ATRASADAS").valor());
+        assertEquals(3, horizonte(snapshot.faturamentoPendente(), "FATURAS_ATRASADAS").quantidade());
+        // Projecao no primeiro dia (hoje): so a fatura recente de 100 (cartorio e >30d ficam fora).
+        assertEquals(new BigDecimal("100.00"), snapshot.projecao().getFirst().entradas());
     }
 
     @Test

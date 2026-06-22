@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Salome Core - Fluxo de Caixa</title>
-    <link rel="stylesheet" href="/financeiro/fluxo-caixa/styles.css?v=20260619-2">
+    <link rel="stylesheet" href="/financeiro/fluxo-caixa/styles.css?v=20260622-3">
 </head>
 <body>
 <div class="app-shell">
@@ -104,6 +104,17 @@
         <section class="panel block">
             <div class="panel-header">
                 <div>
+                    <h2>Faturamento pendente</h2>
+                    <p>CT-es a faturar, faturas atrasadas (inclusive cartorio) e CT-es aguardando prazo &middot; clique no card para o detalhe</p>
+                </div>
+            </div>
+            <div id="faturamentoPendente" class="horizon-grid"></div>
+            <div id="faturamentoPendenteDetail" class="horizon-detail"></div>
+        </section>
+
+        <section class="panel block">
+            <div class="panel-header">
+                <div>
                     <h2>Realizado no periodo</h2>
                     <p>O que de fato entrou e saiu no intervalo filtrado</p>
                 </div>
@@ -170,7 +181,7 @@
         <div id="drawerItens" class="drawer-itens"></div>
     </aside>
 </div>
-<script src="/financeiro/fluxo-caixa/app.js?v=20260618-1"></script>
+<script src="/financeiro/fluxo-caixa/app.js?v=20260622-3"></script>
 <script>
     fetch('/api/versao')
         .then(function (r) { return r.ok ? r.json() : null; })

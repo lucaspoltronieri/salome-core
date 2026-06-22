@@ -912,6 +912,14 @@ text.axis {
     color: var(--muted);
 }
 
+.nota-vermelha {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--red);
+}
+
 /* Painel largo de detalhe (abaixo da linha de cards) */
 .horizon-detail {
     margin-top: 14px;
@@ -1062,6 +1070,17 @@ text.axis {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.conta-doc .doc-banco {
+    flex: 0 0 150px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    color: var(--muted);
+    font-size: 12px;
 }
 
 .conta-doc .doc-filial {

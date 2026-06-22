@@ -435,6 +435,7 @@ public class DreGerencialService {
             case EXTRATO_AVULSO -> "Extrato bancario";
             case FATURA_BAIXA -> "Fatura baixada";
             case FATURA_ABERTA -> "Fatura aberta";
+            case FATURA_CARTORIO -> "Fatura em cartorio";
             case CTE_ABERTO -> "CT-e aberto";
             // Origens exclusivas do regime de competencia: nao ocorrem no caixa, mantidas so para exaustividade.
             case CTE_EMITIDO -> "CT-e emitido";

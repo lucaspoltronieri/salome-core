@@ -9,6 +9,7 @@ import br.com.salome.core.domain.financeiro.FinanceiroHorizonteCard;
 import br.com.salome.core.domain.financeiro.FinanceiroKpi;
 import br.com.salome.core.domain.financeiro.FinanceiroMovimento;
 import br.com.salome.core.domain.financeiro.FinanceiroNatureza;
+import br.com.salome.core.domain.financeiro.FinanceiroOrigemTipo;
 import br.com.salome.core.domain.financeiro.FinanceiroProjecaoPonto;
 import br.com.salome.core.domain.financeiro.FinanceiroRetrospectivoCard;
 import br.com.salome.core.domain.financeiro.FinanceiroSaldoBanco;
@@ -100,6 +101,7 @@ public class FinanceiroFluxoCaixaService {
 
         List<FinanceiroHorizonteCard> aPagar = horizontes(previstos, FinanceiroNatureza.DESPESA, hoje, fimMes, descricaoPlano);
         List<FinanceiroHorizonteCard> aReceber = horizontes(previstos, FinanceiroNatureza.RECEITA, hoje, fimMes, descricaoPlano);
+        List<FinanceiroHorizonteCard> faturamentoPendente = faturamentoPendente(previstos, hoje, descricaoPlano);
         List<FinanceiroProjecaoPonto> projecao = projecao(previstos, hoje, fimMes, saldoBancarioAtual);
         List<FinanceiroRetrospectivoCard> retrospectivo = retrospectivo(movimentosResumo, tela, descricaoPlano);
 
@@ -127,12 +129,14 @@ public class FinanceiroFluxoCaixaService {
                 saldoBancarioAtual,
                 aPagar,
                 aReceber,
+                faturamentoPendente,
                 projecao,
                 retrospectivo,
                 grupos(movimentosResumo.stream()
                         .filter(movimento -> movimento.natureza() == FinanceiroNatureza.DESPESA)
                         .toList(), FinanceiroMovimento::centroCusto, 10),
-                grupos(movimentosResumo.stream().filter(this::temBancoInformado).toList(), FinanceiroMovimento::banco, 8),
+                grupos(movimentosResumo.stream().filter(this::temBancoInformado)
+                        .filter(movimento -> !ehFaturaReceita(movimento)).toList(), FinanceiroMovimento::banco, 8),
                 saldosBancarios,
                 grupos(movimentosResumo, FinanceiroMovimento::clienteFornecedor, 12),
                 movimentosTabela,
@@ -157,21 +161,71 @@ public class FinanceiroFluxoCaixaService {
                         venc -> !venc.isBefore(hoje) && !venc.isAfter(fimSemana), descricaoPlano),
                 card("MES", "Este mes", natureza, hoje, fimMes, previstos,
                         venc -> !venc.isBefore(hoje) && !venc.isAfter(fimMes), descricaoPlano),
-                card("ATRASO", "Em atraso", natureza, null, hoje.minusDays(1), previstos,
-                        venc -> venc.isBefore(hoje), descricaoPlano));
+                cardMov("ATRASO", "Em atraso", natureza, null, hoje.minusDays(1), previstos,
+                        movimento -> atrasoDoHorizonte(movimento, natureza, hoje), descricaoPlano));
+    }
+
+    /**
+     * Card "Em atraso". Contas a pagar mantem o comportamento original (todos os vencidos). Contas a
+     * receber passa a considerar somente faturas vencidas nos ultimos 30 dias ({@link #faturaAtrasadaRecente}):
+     * faturas em cartorio (banco 31) e CT-es "a faturar" saem para o painel "Faturamento pendente".
+     */
+    private boolean atrasoDoHorizonte(FinanceiroMovimento movimento, FinanceiroNatureza natureza, LocalDate hoje) {
+        LocalDate venc = movimento.dataVencimento();
+        if (venc == null || !venc.isBefore(hoje)) {
+            return false;
+        }
+        if (natureza == FinanceiroNatureza.RECEITA) {
+            return faturaAtrasadaRecente(movimento, hoje);
+        }
+        return true;
     }
 
     private FinanceiroHorizonteCard card(String codigo, String titulo, FinanceiroNatureza natureza, LocalDate de,
             LocalDate ate, List<FinanceiroMovimento> previstos, Predicate<LocalDate> dentroDoVencimento,
             Map<String, String> descricaoPlano) {
+        return cardMov(codigo, titulo, natureza, de, ate, previstos,
+                movimento -> dentroDoVencimento.test(movimento.dataVencimento()), descricaoPlano);
+    }
+
+    private FinanceiroHorizonteCard cardMov(String codigo, String titulo, FinanceiroNatureza natureza, LocalDate de,
+            LocalDate ate, List<FinanceiroMovimento> previstos, Predicate<FinanceiroMovimento> filtroMovimento,
+            Map<String, String> descricaoPlano) {
         List<FinanceiroMovimento> doBucket = previstos.stream()
                 .filter(movimento -> movimento.natureza() == natureza)
-                .filter(movimento -> dentroDoVencimento.test(movimento.dataVencimento()))
+                .filter(filtroMovimento)
                 .toList();
         BigDecimal valor = doBucket.stream().map(FinanceiroMovimento::valor).reduce(BigDecimal.ZERO, BigDecimal::add);
         List<FinanceiroContaNo> contas = FinanceiroPlanoContasArvore.construir(doBucket, descricaoPlano);
         return new FinanceiroHorizonteCard(codigo, titulo, natureza, de, ate, valor, doBucket.size(),
                 tomHorizonte(codigo, natureza, valor), contas);
+    }
+
+    /**
+     * Painel "Faturamento pendente": separa o que falta faturar/cobrar e que hoje inflava o card "Em
+     * atraso". Tres cards (todos RECEITA, com drill por plano de contas):
+     * <ul>
+     *   <li>CT-es a faturar (atrasados): CTE_ABERTO com fechamento vencido — deveriam ter sido faturados;</li>
+     *   <li>Faturas atrasadas (todas): toda fatura em aberto vencida, inclusive as em cartorio (banco 31);</li>
+     *   <li>CT-es aguardando prazo: CTE_ABERTO ainda dentro do prazo de faturamento.</li>
+     * </ul>
+     */
+    private List<FinanceiroHorizonteCard> faturamentoPendente(List<FinanceiroMovimento> previstos, LocalDate hoje,
+            Map<String, String> descricaoPlano) {
+        return List.of(
+                cardMov("CTE_A_FATURAR", "CT-es a faturar (atrasados)", FinanceiroNatureza.RECEITA, null,
+                        hoje.minusDays(1), previstos,
+                        movimento -> movimento.origemTipo() == FinanceiroOrigemTipo.CTE_ABERTO
+                                && venceuAntesDeHoje(movimento, hoje), descricaoPlano),
+                cardMov("FATURAS_ATRASADAS", "Faturas atrasadas (todas)", FinanceiroNatureza.RECEITA, null,
+                        hoje.minusDays(1), previstos,
+                        movimento -> (movimento.origemTipo() == FinanceiroOrigemTipo.FATURA_ABERTA
+                                || movimento.origemTipo() == FinanceiroOrigemTipo.FATURA_CARTORIO)
+                                && venceuAntesDeHoje(movimento, hoje), descricaoPlano),
+                cardMov("CTE_AGUARDANDO", "CT-es aguardando prazo", FinanceiroNatureza.RECEITA, hoje, null,
+                        previstos,
+                        movimento -> movimento.origemTipo() == FinanceiroOrigemTipo.CTE_ABERTO
+                                && !venceuAntesDeHoje(movimento, hoje), descricaoPlano));
     }
 
     /**
@@ -192,9 +246,10 @@ public class FinanceiroFluxoCaixaService {
             };
             BigDecimal entradas = previstos.stream()
                     .filter(movimento -> movimento.natureza() == FinanceiroNatureza.RECEITA)
-                    // CT-es "a faturar" (fechamento vencido) aparecem no card "Em atraso", mas nao sao
-                    // caixa iminente (nem foram faturados): ficam fora da projecao de saldo.
-                    .filter(movimento -> !aFaturarAtrasado(movimento, hoje))
+                    // So recebimentos cobraveis entram no caixa projetado: faturas a vencer ou vencidas
+                    // ha ate 30 dias. CT-es "a faturar", faturas em cartorio e faturas vencidas ha mais
+                    // de 30 dias ficam de fora (ver painel "Faturamento pendente").
+                    .filter(movimento -> entraNaProjecaoReceber(movimento, hoje))
                     .filter(noDia)
                     .map(FinanceiroMovimento::valor)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -301,7 +356,15 @@ public class FinanceiroFluxoCaixaService {
     }
 
     private boolean visivelNaTabela(FinanceiroMovimento movimento) {
-        return temBancoInformado(movimento) || movimento.origemTipo().name().equals("CTE_ABERTO");
+        // Faturas em aberto agora trazem o banco de cobranca (para o drill), mas nao sao movimentos de
+        // extrato: continuam fora da tabela de conciliacao, como antes.
+        return (temBancoInformado(movimento) && !ehFaturaReceita(movimento))
+                || movimento.origemTipo() == FinanceiroOrigemTipo.CTE_ABERTO;
+    }
+
+    private static boolean ehFaturaReceita(FinanceiroMovimento movimento) {
+        return movimento.origemTipo() == FinanceiroOrigemTipo.FATURA_ABERTA
+                || movimento.origemTipo() == FinanceiroOrigemTipo.FATURA_CARTORIO;
     }
 
     /**
@@ -311,9 +374,44 @@ public class FinanceiroFluxoCaixaService {
      * vencimento anterior a hoje e necessariamente um "a faturar".
      */
     private static boolean aFaturarAtrasado(FinanceiroMovimento movimento, LocalDate hoje) {
-        return movimento.origemTipo().name().equals("CTE_ABERTO")
+        return movimento.origemTipo() == FinanceiroOrigemTipo.CTE_ABERTO
                 && movimento.dataVencimento() != null
                 && movimento.dataVencimento().isBefore(hoje);
+    }
+
+    private static boolean venceuAntesDeHoje(FinanceiroMovimento movimento, LocalDate hoje) {
+        return movimento.dataVencimento() != null && movimento.dataVencimento().isBefore(hoje);
+    }
+
+    /**
+     * Fatura em aberto vencida nos ultimos 30 dias ({@code [hoje-30, hoje-1]}): o atraso recente e
+     * cobravel que ainda conta na conciliacao e na projecao. Exclui cartorio (outro origemTipo) e
+     * faturas vencidas ha mais de 30 dias.
+     */
+    private static boolean faturaAtrasadaRecente(FinanceiroMovimento movimento, LocalDate hoje) {
+        LocalDate venc = movimento.dataVencimento();
+        return movimento.origemTipo() == FinanceiroOrigemTipo.FATURA_ABERTA
+                && venc != null
+                && venc.isBefore(hoje)
+                && !venc.isBefore(hoje.minusDays(30));
+    }
+
+    /**
+     * Recebimentos previstos que entram na projecao de caixa: faturas a vencer ou vencidas ha ate 30
+     * dias. Ficam de fora os CT-es "a faturar" (nao faturados), as faturas em cartorio (banco 31) e as
+     * faturas vencidas ha mais de 30 dias.
+     */
+    private static boolean entraNaProjecaoReceber(FinanceiroMovimento movimento, LocalDate hoje) {
+        if (aFaturarAtrasado(movimento, hoje)) {
+            return false;
+        }
+        if (movimento.origemTipo() == FinanceiroOrigemTipo.FATURA_CARTORIO) {
+            return false;
+        }
+        LocalDate venc = movimento.dataVencimento();
+        return !(movimento.origemTipo() == FinanceiroOrigemTipo.FATURA_ABERTA
+                && venc != null
+                && venc.isBefore(hoje.minusDays(30)));
     }
 
     private boolean temBancoInformado(FinanceiroMovimento movimento) {
@@ -371,7 +469,7 @@ public class FinanceiroFluxoCaixaService {
         if (valor.signum() == 0) {
             return "neutro";
         }
-        if ("ATRASO".equals(codigo)) {
+        if ("ATRASO".equals(codigo) || "CTE_A_FATURAR".equals(codigo) || "FATURAS_ATRASADAS".equals(codigo)) {
             return "alerta";
         }
         return natureza == FinanceiroNatureza.RECEITA ? "positivo" : "negativo";

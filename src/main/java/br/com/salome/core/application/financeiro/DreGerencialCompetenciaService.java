@@ -444,6 +444,7 @@ public class DreGerencialCompetenciaService {
             case EXTRATO_AVULSO -> "Extrato bancario";
             case FATURA_BAIXA -> "Fatura baixada";
             case FATURA_ABERTA -> "Fatura aberta";
+            case FATURA_CARTORIO -> "Fatura em cartorio";
             case CTE_ABERTO -> "CT-e aberto";
             case CTE_EMITIDO -> "CT-e emitido";
         };

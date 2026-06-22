@@ -19,6 +19,7 @@ public record FinanceiroDashboardSnapshot(
         BigDecimal saldoBancarioAtual,
         List<FinanceiroHorizonteCard> aPagar,
         List<FinanceiroHorizonteCard> aReceber,
+        List<FinanceiroHorizonteCard> faturamentoPendente,
         List<FinanceiroProjecaoPonto> projecao,
         List<FinanceiroRetrospectivoCard> retrospectivo,
         List<FinanceiroGrupo> porCentroCusto,

@@ -11,6 +11,7 @@ public record FinanceiroContaDocumento(
         String documento,
         String clienteFornecedor,
         String filial,
+        String banco,
         LocalDate dataVencimento,
         BigDecimal valor,
         String origemTipo

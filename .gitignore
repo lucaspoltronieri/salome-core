@@ -20,6 +20,7 @@ spring-run.err.log
 
 # Temporarios
 .tmp-folha/
+tmp/
 
 # Gatilhos de deploy locais (contem IP de producao / caminho de credencial)
 *.local.ps1

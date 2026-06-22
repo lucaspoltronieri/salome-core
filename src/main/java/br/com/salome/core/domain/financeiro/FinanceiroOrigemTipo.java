@@ -7,6 +7,7 @@ public enum FinanceiroOrigemTipo {
     EXTRATO_AVULSO,
     FATURA_BAIXA,
     FATURA_ABERTA,
+    FATURA_CARTORIO,
     CTE_ABERTO,
     CTE_EMITIDO,
     NOTA_COMPRA_COMPETENCIA
