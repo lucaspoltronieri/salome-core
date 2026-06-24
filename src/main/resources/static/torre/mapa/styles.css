@@ -1,0 +1,154 @@
+/* hidden sempre esconde, mesmo quando a classe define display (ver painel). */
+[hidden] { display: none !important; }
+
+:root {
+  /* Paleta alinhada ao core financeiro. */
+  --bg: #eef2f4;
+  --surface: #ffffff;
+  --surface-2: #eef3f6;
+  --linha: #dde5e8;
+  --texto: #17252b;
+  --suave: #667982;
+  --azul: #0e5964;
+  --azul-claro: #226da8;
+  --verde: #0f7a4f;
+  --amarelo: #9a620f;
+  --vermelho: #b0322a;
+  --sombra: 0 1px 3px rgba(20, 50, 60, .08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Segoe UI", system-ui, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--texto);
+  min-height: 100vh;
+}
+
+/* Topo */
+.topo {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 22px; background: var(--surface);
+  border-bottom: 3px solid var(--azul); box-shadow: var(--sombra);
+  position: sticky; top: 0; z-index: 20;
+}
+.marca { display: flex; align-items: center; gap: 12px; }
+.marca h1 { font-size: 22px; font-weight: 700; color: var(--azul); }
+.marca h1 small { font-size: 15px; color: var(--suave); font-weight: 600; }
+.ponto {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--verde); box-shadow: 0 0 10px rgba(15, 122, 79, .6);
+  animation: pulsa 2s infinite;
+}
+@keyframes pulsa { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.topo-dir { display: flex; align-items: center; gap: 12px; }
+.atualizado { font-size: 12px; color: var(--suave); }
+.usuario-info { font-size: 12px; color: var(--suave); }
+
+/* Botões */
+.btn {
+  border: 1px solid var(--azul); background: var(--azul); color: #fff;
+  border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 13px; font-weight: 600;
+}
+.btn:hover { background: var(--azul-claro); border-color: var(--azul-claro); }
+.btn-ghost { background: none; color: var(--suave); border-color: var(--linha); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--texto); }
+.btn-export { background: var(--verde); border-color: var(--verde); }
+.btn-export:hover { background: #0c6a44; border-color: #0c6a44; }
+
+/* Barra de filtros */
+.barra-filtros {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 22px; background: var(--surface-2);
+  border-bottom: 1px solid var(--linha);
+  position: sticky; top: 56px; z-index: 15;
+}
+.filtro {
+  padding: 8px 12px; border: 1px solid var(--linha); border-radius: 8px;
+  font-size: 14px; color: var(--texto); background: #fff; min-width: 200px;
+}
+.filtro:focus { outline: 2px solid var(--azul-claro); border-color: var(--azul-claro); }
+.filtro:first-child { flex: 1; min-width: 280px; }
+
+/* Mapa / blocos */
+.mapa { padding: 18px 22px; display: flex; flex-direction: column; gap: 18px; }
+.bloco {
+  background: var(--surface); border: 1px solid var(--linha);
+  border-radius: 12px; box-shadow: var(--sombra); overflow: hidden;
+}
+.bloco-cab {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px; background: var(--surface-2); border-bottom: 1px solid var(--linha);
+}
+.bloco-cab.clicavel { cursor: pointer; }
+.bloco-cab h2 { font-size: 17px; font-weight: 700; color: var(--azul); }
+.bloco-cab h2 small { font-size: 12px; color: var(--suave); font-weight: 500; }
+.contador {
+  background: var(--azul); color: #fff; font-weight: 800; font-size: 15px;
+  min-width: 34px; text-align: center; padding: 2px 11px; border-radius: 20px;
+}
+
+.tabela-wrap { overflow-x: auto; max-height: 60vh; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  position: sticky; top: 0; background: var(--surface-2); color: var(--suave);
+  font-size: 12px; text-transform: uppercase; letter-spacing: .4px;
+  text-align: left; padding: 9px 14px; border-bottom: 2px solid var(--linha); white-space: nowrap;
+}
+tbody td { padding: 9px 14px; border-bottom: 1px solid var(--linha); font-size: 14px; white-space: nowrap; }
+tbody tr:nth-child(even) { background: #f6f9fb; }
+tbody tr:hover { background: #edf5fb; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.placa { font-weight: 700; letter-spacing: 1px; color: var(--azul); }
+.badge-grupo {
+  display: inline-block; margin-left: 7px; background: var(--azul-claro); color: #fff;
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; vertical-align: middle;
+}
+
+/* Linha-mãe expansível (caminhão) + detalhe de CT-es */
+.expansor { cursor: pointer; width: 26px; color: var(--suave); font-weight: 700; user-select: none; }
+tr.mae { cursor: pointer; }
+tr.mae.aberta { background: #eaf2f6 !important; }
+tr.detalhe > td { padding: 0; background: #fbfdfe; }
+tr.detalhe table { width: 100%; }
+tr.detalhe thead th { background: #eef3f6; }
+.det-vazio { padding: 12px 18px; color: var(--suave); font-size: 13px; }
+
+.vazio { padding: 24px; text-align: center; color: var(--suave); font-size: 15px; }
+
+/* Rodapé */
+.rodape {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 22px; background: var(--surface); border-top: 1px solid var(--linha);
+  font-size: 12px; color: var(--suave);
+}
+.erro { color: var(--vermelho); font-weight: 600; font-size: 13px; }
+
+/* Login (mesmo padrão do painel) */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: linear-gradient(135deg, #0e5964 0%, #17343b 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  background: var(--surface); border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.3);
+  padding: 36px 40px; width: 360px; max-width: 90vw; display: flex; flex-direction: column; gap: 14px;
+}
+.login-card h2 { color: var(--azul); font-size: 26px; }
+.login-sub { color: var(--suave); font-size: 14px; margin-top: -8px; }
+.login-card label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--suave); font-weight: 600; }
+.login-card input[type="text"], .login-card input[type="password"] {
+  padding: 11px 13px; border: 1px solid var(--linha); border-radius: 8px;
+  font-size: 16px; color: var(--texto); background: var(--surface-2);
+}
+.login-card input:focus { outline: 2px solid var(--azul-claro); border-color: var(--azul-claro); }
+.login-check { flex-direction: row !important; align-items: center; gap: 8px; font-weight: 500; }
+.login-check input { width: 16px; height: 16px; }
+.login-card button {
+  margin-top: 6px; padding: 12px; border: none; border-radius: 8px;
+  background: var(--azul); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.login-card button:hover { background: var(--azul-claro); }
+.login-card button:disabled { opacity: .6; cursor: default; }
+.login-erro { color: var(--vermelho); font-weight: 600; font-size: 14px; text-align: center; }

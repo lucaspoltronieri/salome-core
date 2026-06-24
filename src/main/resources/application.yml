@@ -44,6 +44,11 @@ salome:
       expiration-minutes: ${SALOME_TORRE_JWT_EXP_MIN:720}
     fotos:
       dir: ${SALOME_TORRE_FOTOS_DIR:./dados/torre/fotos}
+    mapa:
+      # Mapa do armazém: janela (baixas de N dias atrás p/ frente) e cache curto
+      # por filial, p/ não multiplicar as consultas pesadas no legado.
+      dias-corte: ${SALOME_TORRE_MAPA_DIAS_CORTE:30}
+      cache-segundos: ${SALOME_TORRE_MAPA_CACHE_SEGUNDOS:25}
     datasource:
       url: ${SALOME_TORRE_DB_URL:}
       username: ${SALOME_TORRE_DB_USERNAME:}

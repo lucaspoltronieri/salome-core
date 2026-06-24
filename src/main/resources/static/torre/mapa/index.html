@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Torre de Controle — Mapa do Armazém</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="login" class="login-overlay">
+    <form id="loginForm" class="login-card" autocomplete="off">
+      <h2>Mapa do Armazém</h2>
+      <p class="login-sub">Torre operacional — entre com seu usuário</p>
+      <label>Usuário<input id="loginUsuario" type="text" required autocomplete="off"></label>
+      <label>Senha<input id="loginSenha" type="password" required autocomplete="new-password"></label>
+      <label class="login-check"><input id="loginManter" type="checkbox"> Manter conectado neste computador</label>
+      <button type="submit" id="loginBtn">Entrar</button>
+      <span id="loginErro" class="login-erro" hidden></span>
+    </form>
+  </div>
+
+  <header class="topo">
+    <div class="marca">
+      <span class="ponto"></span>
+      <h1>Mapa do Armazém <small id="filialNome"></small></h1>
+    </div>
+    <div class="topo-dir">
+      <span id="atualizado" class="atualizado">aguardando dados…</span>
+      <span id="usuarioInfo" class="usuario-info"></span>
+      <button id="atualizarBtn" class="btn">Atualizar</button>
+      <button id="sairBtn" class="btn btn-ghost" hidden>sair</button>
+    </div>
+  </header>
+
+  <div class="barra-filtros">
+    <input id="fTexto" class="filtro" type="search" placeholder="Buscar (CT-e, NF, placa, remetente, destinatário…)">
+    <input id="fCidade" class="filtro" type="search" placeholder="Cidade destino">
+    <input id="fSituacao" class="filtro" type="search" placeholder="Situação">
+    <button id="limparBtn" class="btn btn-ghost">Limpar</button>
+    <button id="exportBtn" class="btn btn-export">Exportar Excel</button>
+    <span id="erro" class="erro" hidden></span>
+  </div>
+
+  <main class="mapa">
+    <section class="bloco" data-sec="vindo">
+      <div class="bloco-cab"><h2>Vindo de outras bases</h2><span class="contador" id="cVindo">0</span></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr>
+            <th></th><th>Placa</th><th>Origem</th><th>Motorista</th>
+            <th>Prev. saída</th><th>Prev. chegada</th>
+            <th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th>
+          </tr></thead>
+          <tbody id="tbVindo"></tbody>
+        </table>
+        <p class="vazio" id="vVindo" hidden>Nenhum caminhão a caminho.</p>
+      </div>
+    </section>
+
+    <section class="bloco" data-sec="aguardando">
+      <div class="bloco-cab"><h2>No armazém — aguardando descarga</h2><span class="contador" id="cAguardando">0</span></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr>
+            <th>Placa</th><th>Origem</th><th>Baixa</th>
+            <th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th>
+          </tr></thead>
+          <tbody id="tbAguardando"></tbody>
+        </table>
+        <p class="vazio" id="vAguardando" hidden>Nenhuma viagem aguardando.</p>
+      </div>
+    </section>
+
+    <section class="bloco" data-sec="descarregando">
+      <div class="bloco-cab"><h2>No armazém — descarregando agora</h2><span class="contador" id="cDescarregando">0</span></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr>
+            <th>Viagem</th><th>Placa</th><th class="num">Pessoas</th><th class="num">Tempo</th>
+          </tr></thead>
+          <tbody id="tbDescarregando"></tbody>
+        </table>
+        <p class="vazio" id="vDescarregando" hidden>Nenhuma descarga em andamento.</p>
+      </div>
+    </section>
+
+    <section class="bloco" data-sec="armazenado">
+      <div class="bloco-cab"><h2>No armazém — armazenado</h2><span class="contador" id="cArmazenado">0</span></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr>
+            <th>CT-e</th><th>Entrada</th><th>Destinatário</th><th>Cidade</th><th>Setor/Região</th>
+            <th class="num">Volumes</th><th class="num">Peso (kg)</th><th>Situação</th><th>Prev. entrega</th>
+          </tr></thead>
+          <tbody id="tbArmazenado"></tbody>
+        </table>
+        <p class="vazio" id="vArmazenado" hidden>Nada armazenado nesta janela.</p>
+      </div>
+    </section>
+
+    <section class="bloco" data-sec="entrega">
+      <div class="bloco-cab"><h2>Saíram para entrega</h2><span class="contador" id="cEntrega">0</span></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr>
+            <th></th><th>Placa</th><th>Motorista</th><th>Prev. saída</th>
+            <th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th>
+          </tr></thead>
+          <tbody id="tbEntrega"></tbody>
+        </table>
+        <p class="vazio" id="vEntrega" hidden>Nenhuma viagem em rota de entrega.</p>
+      </div>
+    </section>
+
+    <section class="bloco recolhido" data-sec="outros">
+      <div class="bloco-cab clicavel" id="cabOutros">
+        <h2>Em outros armazéns <small>(clique para expandir)</small></h2><span class="contador" id="cOutros">0</span>
+      </div>
+      <div class="tabela-wrap" id="wrapOutros" hidden>
+        <table>
+          <thead><tr>
+            <th>CT-e</th><th>Armazém atual</th><th>Destinatário</th><th>Cidade</th>
+            <th class="num">Volumes</th><th class="num">Peso (kg)</th><th>Situação</th>
+          </tr></thead>
+          <tbody id="tbOutros"></tbody>
+        </table>
+        <p class="vazio" id="vOutros" hidden>Nada em outros armazéns.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <span class="rodape-esq">janela: <strong id="janela">—</strong></span>
+    <span class="versao" id="versao"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

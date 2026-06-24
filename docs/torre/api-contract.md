@@ -80,6 +80,27 @@ O **shell estático** do painel (`/torre/painel/`) é público, mas o snapshot *
 Bloco `indicadores` (recorte do dia corrente, fuso do servidor):
 `{atividadesFinalizadasHoje, horasHomemHojeSeg, pessoasAtivasAgora, documentosNoArmazem, ocorrenciasHoje, tempoMedioDescargaSeg}` — durações em segundos.
 
+## Mapa do Armazém (Torre operacional)
+| Método | Rota | Params | Resposta |
+|---|---|---|---|
+| GET | `/api/torre/mapa/snapshot` | `filial?` (ADMIN) | snapshot do ciclo da carga (seções abaixo) |
+| GET | `/api/torre/mapa/export` | `filial?`, `texto?`, `cidade?`, `situacao?` | XLSX (uma aba por seção, colunas enxutas) |
+
+Página interativa para operadores (`/torre/mapa/`, shell público; dados/export exigem JWT).
+Filial sai do token; ADMIN pode trocar via `?filial`. Consulta o legado **ao vivo** (cache
+curto por filial; janela = `salome.torre.mapa.dias-corte`, default 30 dias). Reaproveita as 4
+consultas do export de manifesto + estados próprios da Torre.
+
+Seções do snapshot:
+- `vindoDeOutrasBases` / `emRotaEntrega`: `[{idViagem, placa, origem, motorista, dataPrevisaoSaida, horaPrevisaoSaida, dataPrevisaoChegada, horaPrevisaoChegada, qtdCtes, volumes, peso, ctes:[…]}]` (agrupado por viagem/caminhão).
+- `aguardandoDescarga`: viagens aguardando descarga (mesmo bloco do painel).
+- `descarregando`: atividades de descarga abertas (placa, viagem, participantes, início).
+- `armazenado` / `outrosArmazens`: `[{cte, notasFiscais, remetente, destinatario, cidadeDestinatario, setorRegiao, volumes, peso, situacaoCte, dataEntradaArmazem, horaEntradaArmazem, dataPrevistaEntrega, armazemAtual}]`.
+
+Filtros (`texto`/`cidade`/`situacao`) são aplicados na tela e replicados no servidor para o
+XLSX refletir o que o operador vê. O download usa `fetch` + `Authorization` (Bearer), não link
+direto. Colunas financeiras/internas (valor NF, valor CT-e, ICMS, frete, MDF-e) são **omitidas**.
+
 ## Catálogos (enums)
 - **TipoAtividade**: DESCARGA_TRANSFERENCIA, DESCARGA_COLETA, SEPARACAO, CARREGAMENTO, OUTRAS
 - **StatusAtividade**: ABERTA, FINALIZADA, CANCELADA
