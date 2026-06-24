@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Torre de Controle — Painel</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <span class="ponto"></span>
+      <h1>Torre de Controle <small id="filialNome"></small></h1>
+    </div>
+    <div class="relogio">
+      <strong id="hora">--:--</strong>
+      <span id="atualizado" class="atualizado">aguardando dados…</span>
+    </div>
+  </header>
+
+  <section class="indicadores" id="indicadores">
+    <div class="kpi"><span class="kpi-num" id="kpiFinalizadas">0</span><span class="kpi-rot">Atividades finalizadas</span></div>
+    <div class="kpi"><span class="kpi-num" id="kpiPessoas">0</span><span class="kpi-rot">Pessoas ativas agora</span></div>
+    <div class="kpi"><span class="kpi-num" id="kpiHorasHomem">0h</span><span class="kpi-rot">Horas-homem hoje</span></div>
+    <div class="kpi"><span class="kpi-num" id="kpiTempoDescarga">—</span><span class="kpi-rot">Tempo médio descarga</span></div>
+    <div class="kpi"><span class="kpi-num" id="kpiArmazem">0</span><span class="kpi-rot">No armazém</span></div>
+    <div class="kpi"><span class="kpi-num" id="kpiOcorrencias">0</span><span class="kpi-rot">Ocorrências hoje</span></div>
+  </section>
+
+  <main class="grade">
+    <section class="bloco">
+      <div class="bloco-cab">
+        <h2>Viagens aguardando descarga</h2>
+        <span class="contador" id="contViagens">0</span>
+      </div>
+      <div class="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Placa</th><th>Origem</th><th>Motorista</th>
+              <th>Baixa</th><th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th>
+            </tr>
+          </thead>
+          <tbody id="tbViagens"></tbody>
+        </table>
+        <p class="vazio" id="vazioViagens" hidden>Nenhuma viagem aguardando.</p>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <div class="bloco-cab">
+        <h2>Descargas em andamento</h2>
+        <span class="contador" id="contDescargas">0</span>
+      </div>
+      <div class="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Viagem</th><th>Placa</th><th class="num">Pessoas</th><th class="num">Tempo</th>
+            </tr>
+          </thead>
+          <tbody id="tbDescargas"></tbody>
+        </table>
+        <p class="vazio" id="vazioDescargas" hidden>Nenhuma descarga em andamento.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <span id="erro" class="erro" hidden></span>
+    <span class="versao" id="versao"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
