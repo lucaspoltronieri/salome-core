@@ -44,10 +44,15 @@ public class ViagemAguardandoService {
         LocalDate dataCorte = LocalDate.now(clock);
         List<ViagemAguardando> viagens =
                 viagemLegadoRepository.listarAguardandoDescarga(idFilial, dataCorte, LIMITE);
+        // Descarga é por viagem (caminhão): abrir uma cobre todos os manifestos.
+        // Exclui pelo idViagem; sem idViagem, cai no id do manifesto.
         Set<Long> jaAbertas = atividadeRepository.idsViagensComDescarga(idFilial);
 
         return viagens.stream()
-                .filter(v -> !jaAbertas.contains(v.idViagemTransferencia()))
+                .filter(v -> {
+                    Long chave = v.idViagem() != null ? v.idViagem() : v.idViagemTransferencia();
+                    return !jaAbertas.contains(chave);
+                })
                 .toList();
     }
 }

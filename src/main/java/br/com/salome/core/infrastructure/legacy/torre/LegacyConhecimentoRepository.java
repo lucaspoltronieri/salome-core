@@ -14,8 +14,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * Lê os CT-es de uma viagem de transferência (somente leitura). Joins/subselects
- * de NFs reaproveitados de {@code LegacyManifestoBaixaRepository}.
+ * Lê os CT-es de uma viagem (todos os manifestos do caminhão; somente leitura).
+ * Joins/subselects de NFs reaproveitados de {@code LegacyManifestoBaixaRepository}.
  */
 @Repository
 @ConditionalOnProperty(prefix = "salome.torre", name = "enabled", havingValue = "true")
@@ -46,13 +46,16 @@ public class LegacyConhecimentoRepository implements ConhecimentoLegadoRepositor
     }
 
     @Override
-    public List<CteDescarga> listarCtesDaViagem(long idViagemTransferencia) {
+    public List<CteDescarga> listarCtesDaViagem(long idViagem) {
+        // Cobre TODOS os manifestos (idViagemTransferencia) do mesmo caminhão
+        // (idViagem): a descarga é por viagem, não por manifesto.
         String sql = SELECT + """
                  INNER JOIN viagemtransferenciaconhecimento vtc ON vtc.idConhecimento = c.idConhecimento
-                 WHERE vtc.idViagemTransferencia = ?
+                 INNER JOIN viagemtransferencia vt ON vt.idViagemTransferencia = vtc.idViagemTransferencia
+                 WHERE vt.idViagem = ?
                  ORDER BY c.cte
                 """;
-        return jdbcTemplate.query(sql, this::map, idViagemTransferencia);
+        return jdbcTemplate.query(sql, this::map, idViagem);
     }
 
     @Override

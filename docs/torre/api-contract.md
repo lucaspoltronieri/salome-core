@@ -16,7 +16,12 @@ Autenticação: Bearer JWT no header `Authorization`. O token carrega `idUsuario
 ## Sincronização / legado (leitura)
 | Método | Rota | Resposta |
 |---|---|---|
-| GET | `/api/torre/viagens/aguardando-descarga` | `[{idViagem, tipo, placa, motorista, origem, volumes, peso, chegadaPrevista}]` (respeita `data_corte_viagem` da filial) |
+| GET | `/api/torre/viagens/aguardando-descarga` | `[{idViagem, idViagemTransferencia, placa, motorista, origem, dataBaixa, horaBaixa, qtdCtes, volumes, peso}]` (só baixas **de hoje em diante**; o painel agrupa por `idViagem`) |
+
+> **Descarga é por viagem (caminhão), não por manifesto.** Vários `idViagemTransferencia`
+> (manifestos) do mesmo `idViagem` chegam no mesmo caminhão e são descarregados juntos.
+> Ao abrir a atividade, envie `idViagem`: a descarga passa a cobrir os CT-es de **todos**
+> os manifestos daquele caminhão, e o caminhão inteiro sai da lista de aguardando.
 
 ## Atividade
 | Método | Rota | Corpo | Resposta |

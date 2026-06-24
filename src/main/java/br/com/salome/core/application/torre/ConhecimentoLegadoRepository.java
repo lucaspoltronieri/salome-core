@@ -5,11 +5,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Leitura dos CT-es de uma viagem de transferência no legado (somente leitura).
+ * Leitura dos CT-es de uma viagem no legado (somente leitura).
  */
 public interface ConhecimentoLegadoRepository {
 
-    List<CteDescarga> listarCtesDaViagem(long idViagemTransferencia);
+    /** CT-es de todos os manifestos do caminhão (idViagem) — a descarga é por viagem. */
+    List<CteDescarga> listarCtesDaViagem(long idViagem);
 
     Optional<CteDescarga> buscarCte(long idConhecimento);
 
