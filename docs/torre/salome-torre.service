@@ -1,0 +1,31 @@
+# =====================================================================
+# Torre de Controle - unit systemd (3º serviço no servidor atual).
+# Roda o MESMO JAR do salome-core com SALOME_TORRE_ENABLED=true.
+# Provisório: quando a Torre migrar para o Hostinger dedicado, este unit
+# é copiado para lá sem alteração (só muda o EnvironmentFile).
+#
+# Instalar:
+#   sudo cp docs/torre/salome-torre.service /etc/systemd/system/
+#   sudo cp docs/torre/salome-torre.env.example /etc/salome/torre.env   # e editar
+#   sudo mkdir -p /var/lib/salome/torre/fotos && sudo chown salome: /var/lib/salome/torre/fotos
+#   sudo systemctl daemon-reload && sudo systemctl enable --now salome-torre
+# =====================================================================
+[Unit]
+Description=Salome Torre de Controle (API + painel TV)
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=salome
+Group=salome
+WorkingDirectory=/opt/salome
+EnvironmentFile=/etc/salome/torre.env
+# Ajustar o caminho/versão do JAR conforme o deploy (mesmo artefato do serviço web).
+ExecStart=/usr/bin/java -jar /opt/salome/salome-core-1.1.0.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
