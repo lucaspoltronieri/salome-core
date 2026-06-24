@@ -33,7 +33,8 @@ public class TorreSecurityConfig {
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/torre/auth/login").permitAll()
-                        .requestMatchers("/api/torre/painel/**").permitAll()
+                        // Shell estático do painel (HTML/CSS/JS) é público; os DADOS
+                        // (/api/torre/painel/snapshot) exigem login, como o resto da Torre.
                         .requestMatchers("/torre/**", "/api/versao").permitAll()
                         .requestMatchers("/api/torre/**").authenticated()
                         .anyRequest().permitAll())

@@ -139,3 +139,39 @@ tbody tr:hover { background: #eef6f9; }
   font-size: 13px; color: var(--suave);
 }
 .erro { color: var(--vermelho); font-weight: 600; }
+.rodape-dir { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.usuario-info { color: var(--suave); }
+.sair-btn {
+  background: none; border: 1px solid var(--linha); color: var(--suave);
+  border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px;
+}
+.sair-btn:hover { background: var(--surface-2); color: var(--texto); }
+
+/* Login do painel */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: linear-gradient(135deg, #0f6e8c 0%, #17252f 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  background: var(--surface); border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.3);
+  padding: 36px 40px; width: 360px; max-width: 90vw;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.login-card h2 { color: var(--azul); font-size: 26px; }
+.login-sub { color: var(--suave); font-size: 14px; margin-top: -8px; }
+.login-card label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--suave); font-weight: 600; }
+.login-card input[type="text"], .login-card input[type="password"] {
+  padding: 11px 13px; border: 1px solid var(--linha); border-radius: 8px;
+  font-size: 16px; color: var(--texto); background: var(--surface-2);
+}
+.login-card input:focus { outline: 2px solid var(--azul-claro); border-color: var(--azul-claro); }
+.login-check { flex-direction: row !important; align-items: center; gap: 8px; font-weight: 500; }
+.login-check input { width: 16px; height: 16px; }
+.login-card button {
+  margin-top: 6px; padding: 12px; border: none; border-radius: 8px;
+  background: var(--azul); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.login-card button:hover { background: var(--azul-claro); }
+.login-card button:disabled { opacity: .6; cursor: default; }
+.login-erro { color: var(--vermelho); font-weight: 600; font-size: 14px; text-align: center; }

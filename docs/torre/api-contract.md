@@ -70,6 +70,8 @@ Foto: JPG/PNG/WEBP até 10MB. O servidor gera o caminho (`<ano>/<mês>/<filial>/
 |---|---|---|
 | GET | `/api/torre/painel/snapshot` | snapshot com todos os blocos + `indicadores` (polling) |
 
+O **shell estático** do painel (`/torre/painel/`) é público, mas o snapshot **exige login** (JWT), mesmo critério do app: a filial sai do token; ADMIN pode forçar via `?filial`. O painel autentica em `/auth/login` e, em modo TV ("manter conectado"), re-loga sozinho quando o token expira.
+
 Bloco `indicadores` (recorte do dia corrente, fuso do servidor):
 `{atividadesFinalizadasHoje, horasHomemHojeSeg, pessoasAtivasAgora, documentosNoArmazem, ocorrenciasHoje, tempoMedioDescargaSeg}` — durações em segundos.
 

@@ -7,6 +7,18 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="login" class="login-overlay">
+    <form id="loginForm" class="login-card" autocomplete="off">
+      <h2>Torre de Controle</h2>
+      <p class="login-sub">Painel — entre com seu usuário</p>
+      <label>Usuário<input id="loginUsuario" type="text" required autocomplete="username"></label>
+      <label>Senha<input id="loginSenha" type="password" required autocomplete="current-password"></label>
+      <label class="login-check"><input id="loginManter" type="checkbox" checked> Manter conectado nesta TV</label>
+      <button type="submit" id="loginBtn">Entrar</button>
+      <span id="loginErro" class="login-erro" hidden></span>
+    </form>
+  </div>
+
   <header class="topo">
     <div class="marca">
       <span class="ponto"></span>
@@ -68,7 +80,11 @@
 
   <footer class="rodape">
     <span id="erro" class="erro" hidden></span>
-    <span class="versao" id="versao"></span>
+    <span class="rodape-dir">
+      <span id="usuarioInfo" class="usuario-info"></span>
+      <button id="sairBtn" class="sair-btn" hidden>sair</button>
+      <span class="versao" id="versao"></span>
+    </span>
   </footer>
 
   <script src="app.js"></script>

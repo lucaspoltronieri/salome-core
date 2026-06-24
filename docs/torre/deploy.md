@@ -60,11 +60,12 @@ location /torre/     { auth_basic off; proxy_pass http://127.0.0.1:8789; }
 > O Basic Auth do nginx (`/etc/nginx/.htpasswd-salome`) continua protegendo os
 > painéis financeiros. Ver memória `basic-auth-nginx-vps`.
 
-> **Pendência (auth do painel):** hoje `TorreSecurityConfig` deixa
-> `/api/torre/painel/**` e `/torre/**` como `permitAll` — a TV abre sem login.
-> A decisão é fazer o painel seguir o login do Spring Security (JWT). Isso é uma
-> mudança de comportamento (a TV passaria a autenticar, ex.: token de painel por
-> filial) e fica como follow-up antes de expor o painel fora da rede interna.
+> **Auth do painel:** o shell estático (`/torre/**`) é público, mas o snapshot
+> (`/api/torre/painel/snapshot`) exige login (JWT), mesmo critério do app. A TV
+> autentica como um usuário da Torre; no modo "manter conectado" a credencial
+> fica no `localStorage` do navegador da TV (kiosk) e o painel re-loga sozinho
+> quando o token expira. Recomendado: criar um **usuário de painel por filial**
+> (perfil OPERADOR) só para a TV.
 
 ## Versão e tag
 
