@@ -33,6 +33,11 @@ public class TorreFilialRepository implements FilialTorreRepository {
     }
 
     @Override
+    public List<FilialTorre> listarTodas() {
+        return jdbc.query("SELECT * FROM filial_torre ORDER BY ativa DESC, nome", MAPPER);
+    }
+
+    @Override
     public Optional<FilialTorre> buscar(int idFilial) {
         try {
             return Optional.ofNullable(jdbc.queryForObject(
@@ -40,5 +45,16 @@ public class TorreFilialRepository implements FilialTorreRepository {
         } catch (EmptyResultDataAccessException e) {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public void salvar(FilialTorre f) {
+        jdbc.update("""
+                INSERT INTO filial_torre (id_filial, nome, data_corte_viagem, ativa)
+                VALUES (?,?,?,?)
+                ON DUPLICATE KEY UPDATE nome = VALUES(nome),
+                                        data_corte_viagem = VALUES(data_corte_viagem),
+                                        ativa = VALUES(ativa)
+                """, f.idFilial(), f.nome(), java.sql.Date.valueOf(f.dataCorteViagem()), f.ativa());
     }
 }

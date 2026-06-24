@@ -34,6 +34,12 @@ public class TorreExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("erro", e.getMessage()));
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> integridade(org.springframework.dao.DataIntegrityViolationException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("erro", "Registro duplicado ou viola uma restrição (ex.: login/código já existe)."));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> validacao(MethodArgumentNotValidException e) {
         String msg = e.getBindingResult().getFieldErrors().stream()

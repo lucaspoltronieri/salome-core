@@ -28,12 +28,26 @@ Autenticação: Bearer JWT no header `Authorization`. O token carrega `idUsuario
 | POST | `/api/torre/atividades/{id}/cancelar` | `{motivo}` (obrigatório) | atividade cancelada (encerra participantes; grava motivo + auditoria) |
 | GET | `/api/torre/atividades/abertas` | — | lista de atividades abertas da filial |
 
+## Admin / Cadastros (somente ADMIN)
+| Método | Rota | Corpo / Params | Resposta |
+|---|---|---|---|
+| POST | `/api/torre/admin/usuarios` | `{login, nome, senha, idFilial, perfil}` | usuário criado (sem hash) |
+| GET | `/api/torre/admin/usuarios` | `?filial` | usuários da filial |
+| POST | `/api/torre/admin/usuarios/{id}/ativo` | `?ativo=true\|false` | — |
+| POST | `/api/torre/admin/locais` | `{codigo, nome, tipo}` (+`?filial`) | local criado |
+| GET | `/api/torre/admin/locais` | `?filial` | locais da filial (inclui inativos) |
+| POST | `/api/torre/admin/locais/{id}/ativo` | `?ativo=true\|false` (+`?filial`) | — |
+| POST | `/api/torre/admin/filiais` | `{idFilial, nome, dataCorteViagem, ativa}` (upsert) | filial salva |
+| GET | `/api/torre/admin/filiais` | — | todas as filiais |
+
+`tipo` de local: DOCA \| BOX \| AREA \| PENDENCIA \| AVARIA \| QUIMICA \| BOX_DEFINITIVO. Operador recebe **403**. Login/código duplicado → **409**. `GET /api/torre/locais` (operador) segue listando só os ativos.
+
 ## Auditoria (somente ADMIN)
 | Método | Rota | Resposta |
 |---|---|---|
 | GET | `/api/torre/auditoria` | `[{id, idFilial, idUsuario, acao, entidade, idEntidade, detalhe, ocorridoEm}]` (200 mais recentes) |
 
-Ações registradas hoje: `FINALIZAR_ATIVIDADE`, `CANCELAR_ATIVIDADE`. Operador recebe **403** ao tentar acessar.
+Ações registradas: `FINALIZAR_ATIVIDADE`, `CANCELAR_ATIVIDADE`, `CRIAR_USUARIO`, `ATIVAR_USUARIO`/`DESATIVAR_USUARIO`, `CRIAR_LOCAL`, `ATIVAR_LOCAL`/`DESATIVAR_LOCAL`, `SALVAR_FILIAL`. Operador recebe **403** ao tentar acessar.
 
 ## Documento
 | Método | Rota | Resposta |
