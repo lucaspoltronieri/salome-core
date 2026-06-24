@@ -3,10 +3,14 @@ package br.com.salome.core;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication(exclude = DataSourceAutoConfiguration.class)
+@SpringBootApplication(exclude = {
+        DataSourceAutoConfiguration.class,
+        UserDetailsServiceAutoConfiguration.class
+})
 @ConfigurationPropertiesScan
 @EnableScheduling
 public class SalomeCoreApplication {

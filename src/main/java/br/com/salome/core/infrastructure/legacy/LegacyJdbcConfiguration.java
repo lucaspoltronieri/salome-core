@@ -6,12 +6,14 @@ import javax.sql.DataSource;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
 public class LegacyJdbcConfiguration {
 
     @Bean(name = "legacyDataSource", destroyMethod = "close")
+    @Primary
     @ConditionalOnProperty(prefix = "salome.legacy.datasource", name = "enabled", havingValue = "true")
     HikariDataSource legacyDataSource(LegacyDatabaseProperties properties) {
         HikariConfig config = new HikariConfig();
@@ -26,6 +28,7 @@ public class LegacyJdbcConfiguration {
     }
 
     @Bean
+    @Primary
     @ConditionalOnProperty(prefix = "salome.legacy.datasource", name = "enabled", havingValue = "true")
     JdbcTemplate legacyJdbcTemplate(DataSource legacyDataSource) {
         return new JdbcTemplate(legacyDataSource);
