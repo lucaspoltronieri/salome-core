@@ -7,6 +7,9 @@
 # Exports gerados
 ctes-sem-fatura-*.xlsx
 
+# Dados de runtime da Torre (fotos de ocorrência, etc.) - NAO versionar
+/dados/
+
 # Segredos / credenciais (NUNCA commitar)
 google-service-account.json
 *service-account*.json
