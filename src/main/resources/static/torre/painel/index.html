@@ -11,8 +11,8 @@
     <form id="loginForm" class="login-card" autocomplete="off">
       <h2>Torre de Controle</h2>
       <p class="login-sub">Painel — entre com seu usuário</p>
-      <label>Usuário<input id="loginUsuario" type="text" required autocomplete="username"></label>
-      <label>Senha<input id="loginSenha" type="password" required autocomplete="current-password"></label>
+      <label>Usuário<input id="loginUsuario" type="text" required autocomplete="off"></label>
+      <label>Senha<input id="loginSenha" type="password" required autocomplete="new-password"></label>
       <label class="login-check"><input id="loginManter" type="checkbox" checked> Manter conectado nesta TV</label>
       <button type="submit" id="loginBtn">Entrar</button>
       <span id="loginErro" class="login-erro" hidden></span>
@@ -49,7 +49,7 @@
         <table>
           <thead>
             <tr>
-              <th>Placa</th><th>Origem</th><th>Motorista</th>
+              <th>Placa</th><th>Origem</th>
               <th>Baixa</th><th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th>
             </tr>
           </thead>

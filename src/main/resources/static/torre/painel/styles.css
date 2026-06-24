@@ -1,15 +1,20 @@
+/* O atributo hidden deve sempre esconder, mesmo quando a classe define display
+   (ex.: .login-overlay usa display:flex e venceria o [hidden] do navegador). */
+[hidden] { display: none !important; }
+
 :root {
-  --bg: #eef2f5;
+  /* Paleta alinhada ao core financeiro (financeiro/*/styles.css). */
+  --bg: #eef2f4;
   --surface: #ffffff;
-  --surface-2: #f3f7fa;
-  --linha: #d9e1e7;
-  --texto: #17252f;
-  --suave: #5e7380;
-  --azul: #0f6e8c;
-  --azul-claro: #1d9fc0;
-  --verde: #1f8a70;
-  --amarelo: #c8881a;
-  --vermelho: #c75146;
+  --surface-2: #eef3f6;
+  --linha: #dde5e8;
+  --texto: #17252b;
+  --suave: #667982;
+  --azul: #0e5964;        /* accent */
+  --azul-claro: #226da8;  /* accent-2 */
+  --verde: #0f7a4f;       /* good */
+  --amarelo: #9a620f;     /* warn */
+  --vermelho: #b0322a;    /* bad */
   --sombra: 0 1px 3px rgba(20, 50, 60, .08);
 }
 
@@ -40,7 +45,7 @@ body {
 .marca h1 small { font-size: 18px; color: var(--suave); font-weight: 600; }
 .ponto {
   width: 14px; height: 14px; border-radius: 50%;
-  background: var(--verde); box-shadow: 0 0 10px rgba(31, 138, 112, .6);
+  background: var(--verde); box-shadow: 0 0 10px rgba(15, 122, 79, .6);
   animation: pulsa 2s infinite;
 }
 @keyframes pulsa { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
@@ -124,12 +129,18 @@ tbody td {
   border-bottom: 1px solid var(--linha);
   font-size: 17px;
 }
-tbody tr:nth-child(even) { background: #fafcfd; }
-tbody tr:hover { background: #eef6f9; }
+tbody tr:nth-child(even) { background: #f6f9fb; }
+tbody tr:hover { background: #edf5fb; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .placa { font-weight: 700; letter-spacing: 1px; color: var(--azul); }
+.badge-grupo {
+  display: inline-block; margin-left: 7px;
+  background: var(--azul-claro); color: #fff;
+  font-size: 12px; font-weight: 700; letter-spacing: 0;
+  padding: 1px 7px; border-radius: 10px; vertical-align: middle;
+}
 .fresca td { animation: entra 1s ease; }
-@keyframes entra { from { background: rgba(31, 138, 112, .18); } to { background: transparent; } }
+@keyframes entra { from { background: rgba(15, 122, 79, .16); } to { background: transparent; } }
 
 .vazio { padding: 30px; text-align: center; color: var(--suave); font-size: 18px; }
 
@@ -150,7 +161,7 @@ tbody tr:hover { background: #eef6f9; }
 /* Login do painel */
 .login-overlay {
   position: fixed; inset: 0; z-index: 50;
-  background: linear-gradient(135deg, #0f6e8c 0%, #17252f 100%);
+  background: linear-gradient(135deg, #0e5964 0%, #17343b 100%);
   display: flex; align-items: center; justify-content: center;
 }
 .login-card {

@@ -46,23 +46,57 @@ function renderIndicadores(ind) {
   document.getElementById("kpiOcorrencias").textContent = fmtInt.format(ind.ocorrenciasHoje || 0);
 }
 
+// Origem vem como "EXPRESSO SALOME - OSASCO"; mostra só a cidade (último trecho).
+function limparOrigem(origem) {
+  const o = (origem ?? "").trim();
+  const partes = o.split(" - ");
+  const cidade = partes.length > 1 ? partes[partes.length - 1].trim() : o;
+  return cidade || o.replace(/^expresso\s+salome\b[\s-]*/i, "").trim() || o;
+}
+
+// Vários idViagemTransferencia (manifestos) do mesmo idViagem chegam no mesmo
+// caminhão e são descarregados juntos: agrupa numa linha só e soma os totais.
+function agruparViagens(viagens) {
+  const grupos = new Map();
+  for (const v of viagens) {
+    const chave = v.idViagem != null ? "g" + v.idViagem : "t" + v.idViagemTransferencia;
+    let g = grupos.get(chave);
+    if (!g) {
+      g = { chave, placa: v.placa, origem: v.origem, dataBaixa: v.dataBaixa, horaBaixa: v.horaBaixa,
+            qtdCtes: 0, volumes: 0, peso: 0, manifestos: 0 };
+      grupos.set(chave, g);
+    }
+    g.qtdCtes += v.qtdCtes || 0;
+    g.volumes += Number(v.volumes ?? 0);
+    g.peso += Number(v.peso ?? 0);
+    g.manifestos += 1;
+    // mantém a baixa mais recente do grupo
+    if (`${v.dataBaixa} ${v.horaBaixa ?? ""}` > `${g.dataBaixa} ${g.horaBaixa ?? ""}`) {
+      g.dataBaixa = v.dataBaixa; g.horaBaixa = v.horaBaixa;
+    }
+  }
+  return [...grupos.values()];
+}
+
 function renderViagens(viagens) {
-  document.getElementById("contViagens").textContent = viagens.length;
-  document.getElementById("vazioViagens").hidden = viagens.length > 0;
-  document.getElementById("tbViagens").innerHTML = viagens.map(v => {
-    const chave = "v" + v.idViagemTransferencia;
-    const fresca = vistas.size && !vistas.has(chave) ? "fresca" : "";
+  const grupos = agruparViagens(viagens);
+  document.getElementById("contViagens").textContent = grupos.length;
+  document.getElementById("vazioViagens").hidden = grupos.length > 0;
+  document.getElementById("tbViagens").innerHTML = grupos.map(g => {
+    const fresca = vistas.size && !vistas.has(g.chave) ? "fresca" : "";
+    const badge = g.manifestos > 1
+      ? ` <span class="badge-grupo" title="${g.manifestos} manifestos na mesma viagem">×${g.manifestos}</span>`
+      : "";
     return `<tr class="${fresca}">
-      <td class="placa">${escapar(v.placa) || "—"}</td>
-      <td>${escapar(v.origem)}</td>
-      <td>${escapar(v.motorista) || "—"}</td>
-      <td>${escapar(v.dataBaixa)} ${escapar(v.horaBaixa) || ""}</td>
-      <td class="num">${fmtInt.format(v.qtdCtes)}</td>
-      <td class="num">${fmtInt.format(v.volumes ?? 0)}</td>
-      <td class="num">${fmtPeso.format(v.peso ?? 0)}</td>
+      <td class="placa">${escapar(g.placa) || "—"}${badge}</td>
+      <td>${escapar(limparOrigem(g.origem))}</td>
+      <td>${escapar(g.dataBaixa)} ${escapar(g.horaBaixa) || ""}</td>
+      <td class="num">${fmtInt.format(g.qtdCtes)}</td>
+      <td class="num">${fmtInt.format(g.volumes)}</td>
+      <td class="num">${fmtPeso.format(g.peso)}</td>
     </tr>`;
   }).join("");
-  vistas = new Set(viagens.map(v => "v" + v.idViagemTransferencia));
+  vistas = new Set(grupos.map(g => g.chave));
 }
 
 function renderDescargas(descargas) {
