@@ -56,14 +56,16 @@ public class TorreDocumentoRepository implements DocumentoRepository {
                     rs -> rs.next() ? rs.getLong(1) : null, d.idFilial(), d.numeroCte());
         }
         if (existente != null) {
+            // Não sobrescreve status nem id_local_atual: o destino é definido no 1º
+            // registro (re-bipar é idempotente; corrigir destino é ação explícita).
             jdbc.update("""
                     UPDATE documento_operacional
                        SET id_conhecimento_legado = ?, id_viagem_legado = ?, pre_cte = ?, volumes = ?, peso = ?,
-                           remetente = ?, destinatario = ?, cidade_destino = ?, chave_nf = ?, status = ?
+                           remetente = ?, destinatario = ?, cidade_destino = ?, chave_nf = ?
                      WHERE id = ?
                     """,
                     d.idConhecimentoLegado(), d.idViagemLegado(), d.preCte(), d.volumes(), d.peso(),
-                    d.remetente(), d.destinatario(), d.cidadeDestino(), d.chaveNf(), d.status().name(), existente);
+                    d.remetente(), d.destinatario(), d.cidadeDestino(), d.chaveNf(), existente);
             return existente;
         }
         String sql = """

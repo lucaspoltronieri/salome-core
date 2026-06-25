@@ -50,6 +50,29 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
              LIMIT ?
             """;
 
+    // Coletas da própria filial: a coleta é lançada na viagem (ViagemColetas) e fica
+    // 'Em Viagem' enquanto o caminhão vem pra filial. Agrupado por viagem (caminhão).
+    private static final String SQL_COLETAS = """
+            SELECT v.idViagem                                       AS idViagem,
+                   veiculo.placa                                    AS placa,
+                   fornecedorMotorista.razaoSocial                  AS motorista,
+                   COUNT(DISTINCT col.idColeta)                     AS qtdColetas,
+                   COALESCE(SUM(IFNULL(col.quantidadeVolumes, 0)), 0) AS volumes,
+                   COALESCE(SUM(IFNULL(col.pesoNf, 0)), 0)          AS peso,
+                   MAX(col.statusData)                              AS data
+              FROM ViagemColetas vc
+              INNER JOIN Coleta col ON col.idColeta = vc.idColeta
+              INNER JOIN viagem v ON v.idViagem = vc.idViagem
+              LEFT JOIN veiculo ON veiculo.idVeiculo = v.idVeiculo
+              LEFT JOIN motorista ON motorista.idMotorista = v.idMotorista
+              LEFT JOIN fornecedor fornecedorMotorista ON fornecedorMotorista.idFornecedor = motorista.idFornecedor
+             WHERE col.idFilial = ?
+               AND col.status = 'Em Viagem'
+             GROUP BY v.idViagem, veiculo.placa, fornecedorMotorista.razaoSocial
+             ORDER BY data DESC
+             LIMIT ?
+            """;
+
     private final JdbcTemplate jdbcTemplate;
 
     public LegacyViagemRepository(JdbcTemplate jdbcTemplate) {
@@ -70,6 +93,24 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
                 zero(rs.getBigDecimal("volumes")),
                 zero(rs.getBigDecimal("peso"))
         ), idFilialDestino, dataCorte, limite);
+    }
+
+    @Override
+    public List<ViagemAguardando> listarColetasAguardando(int idFilial, int limite) {
+        return jdbcTemplate.query(SQL_COLETAS, (rs, n) -> {
+            long idViagem = rs.getLong("idViagem");
+            return new ViagemAguardando(
+                    idViagem, // sem manifesto; a descarga de coleta abre pela viagem
+                    idViagem,
+                    rs.getDate("data") == null ? null : rs.getDate("data").toLocalDate(),
+                    null,
+                    rs.getString("placa"),
+                    rs.getString("motorista"),
+                    "Coleta",
+                    rs.getInt("qtdColetas"),
+                    zero(rs.getBigDecimal("volumes")),
+                    zero(rs.getBigDecimal("peso")));
+        }, idFilial, limite);
     }
 
     private static BigDecimal zero(BigDecimal v) {

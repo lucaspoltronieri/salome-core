@@ -4,6 +4,7 @@ import br.com.salome.core.application.torre.DocumentoService;
 import br.com.salome.core.domain.torre.CteDescarga;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -33,12 +34,12 @@ public class DocumentoWebController {
         return documentoService.listarCtesDaDescarga(id, usuario);
     }
 
-    /** Bipa/registra um CT-e como descarregado. */
+    /** Bipa/registra um CT-e como descarregado, roteando para o box destino. */
     @PostMapping("/documentos")
     public DocumentoOperacional registrar(@PathVariable long id,
-                                          @RequestBody RegistrarDocumento corpo,
+                                          @Valid @RequestBody RegistrarDocumento corpo,
                                           @AuthenticationPrincipal UsuarioAutenticado usuario) {
-        return documentoService.registrarDescarga(id, corpo.idConhecimento(), usuario);
+        return documentoService.registrarDescarga(id, corpo.idConhecimento(), corpo.idLocalDestino(), usuario);
     }
 
     /** Documentos já registrados nesta atividade. */
@@ -48,6 +49,6 @@ public class DocumentoWebController {
         return documentoService.listarDocumentos(id, usuario);
     }
 
-    public record RegistrarDocumento(@NotNull Long idConhecimento) {
+    public record RegistrarDocumento(@NotNull Long idConhecimento, @NotNull Long idLocalDestino) {
     }
 }

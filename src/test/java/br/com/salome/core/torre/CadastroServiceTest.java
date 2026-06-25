@@ -12,6 +12,7 @@ import br.com.salome.core.application.torre.auth.UsuarioRepository;
 import br.com.salome.core.domain.torre.FilialTorre;
 import br.com.salome.core.domain.torre.LocalArmazem;
 import br.com.salome.core.domain.torre.PerfilCodigo;
+import br.com.salome.core.domain.torre.SalvarFilialRequest;
 import br.com.salome.core.domain.torre.auth.CriarUsuarioRequest;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
 import br.com.salome.core.domain.torre.auth.UsuarioCredencial;
@@ -19,6 +20,7 @@ import br.com.salome.core.domain.torre.auth.UsuarioResumo;
 import br.com.salome.core.domain.torre.erro.RegraViolada;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,6 +84,34 @@ class CadastroServiceTest {
         assertThat(acaoAuditada.get()).isNull();
     }
 
+    @Test
+    void salvarFilial_criaOsTresBoxesPadrao() {
+        List<LocalArmazem> criados = new ArrayList<>();
+        LocalArmazemRepository locais = localCapturando(criados);
+        CadastroService service = new CadastroService(
+                usuarioRepoCriando(new AtomicReference<>(), 1L), locais, filialSalvavel(), encoder, auditoria());
+
+        service.salvarFilial(new SalvarFilialRequest(2, "Rio Preto", LocalDate.of(2026, 6, 1), true), admin);
+
+        assertThat(criados).extracting(LocalArmazem::codigo)
+                .containsExactlyInAnyOrder("SEP", "DIST", "TRANSF");
+        assertThat(criados).allMatch(l -> "BOX".equals(l.tipo()));
+    }
+
+    @Test
+    void salvarFilial_naoDuplicaBoxesJaExistentes() {
+        List<LocalArmazem> criados = new ArrayList<>();
+        LocalArmazemRepository locais = localCapturando(criados,
+                new LocalArmazem(1L, 2, "SEP", "Box Separação", "BOX", true));
+        CadastroService service = new CadastroService(
+                usuarioRepoCriando(new AtomicReference<>(), 1L), locais, filialSalvavel(), encoder, auditoria());
+
+        service.salvarFilial(new SalvarFilialRequest(2, "Rio Preto", LocalDate.of(2026, 6, 1), true), admin);
+
+        assertThat(criados).extracting(LocalArmazem::codigo)
+                .containsExactlyInAnyOrder("DIST", "TRANSF");
+    }
+
     // ---- stubs ----------------------------------------------------------
 
     private UsuarioRepository usuarioRepoCriando(AtomicReference<String> hashGravado, long idGerado) {
@@ -128,6 +158,64 @@ class CadastroServiceTest {
 
             @Override
             public void salvar(FilialTorre filial) {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    private FilialTorreRepository filialSalvavel() {
+        return new FilialTorreRepository() {
+            @Override
+            public Optional<FilialTorre> buscar(int idFilial) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<FilialTorre> listarAtivas() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<FilialTorre> listarTodas() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void salvar(FilialTorre filial) {
+                // no-op
+            }
+        };
+    }
+
+    /** Fake stateful: já tem {@code existentes} e acumula os boxes criados em {@code criados}. */
+    private LocalArmazemRepository localCapturando(List<LocalArmazem> criados, LocalArmazem... existentes) {
+        List<LocalArmazem> base = new ArrayList<>(List.of(existentes));
+        return new LocalArmazemRepository() {
+            @Override
+            public List<LocalArmazem> listarAtivos(int idFilial) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<LocalArmazem> listarTodos(int idFilial) {
+                List<LocalArmazem> todos = new ArrayList<>(base);
+                todos.addAll(criados);
+                return todos;
+            }
+
+            @Override
+            public Optional<LocalArmazem> buscar(long id, int idFilial) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public long criar(LocalArmazem local) {
+                criados.add(local);
+                return criados.size();
+            }
+
+            @Override
+            public boolean definirAtivo(long id, int idFilial, boolean ativo) {
                 throw new UnsupportedOperationException();
             }
         };

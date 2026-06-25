@@ -1,6 +1,7 @@
 package br.com.salome.core.application.torre;
 
 import br.com.salome.core.application.torre.auth.UsuarioRepository;
+import br.com.salome.core.domain.torre.BoxPadrao;
 import br.com.salome.core.domain.torre.CriarLocalRequest;
 import br.com.salome.core.domain.torre.FilialTorre;
 import br.com.salome.core.domain.torre.LocalArmazem;
@@ -98,7 +99,28 @@ public class CadastroService {
         filialRepository.salvar(filial);
         auditoriaService.registrar(admin, "SALVAR_FILIAL", "filial_torre", (long) req.idFilial(),
                 req.nome() + " (corte " + req.dataCorteViagem() + ", ativa=" + req.ativa() + ")");
+        garantirBoxesPadrao(req.idFilial(), admin);
         return filial;
+    }
+
+    /**
+     * Garante que a filial tenha os 3 boxes-destino padrão (Separação, Distribuição,
+     * Transferência). Idempotente: cria só os que faltam — chamado a cada upsert de filial,
+     * eliminando o seed manual via SQL.
+     */
+    private void garantirBoxesPadrao(int idFilial, UsuarioAutenticado admin) {
+        List<String> existentes = localRepository.listarTodos(idFilial).stream()
+                .map(l -> l.codigo() == null ? "" : l.codigo().trim().toUpperCase())
+                .toList();
+        for (BoxPadrao box : BoxPadrao.values()) {
+            if (existentes.contains(box.codigo())) {
+                continue;
+            }
+            long id = localRepository.criar(new LocalArmazem(
+                    null, idFilial, box.codigo(), box.nome(), BoxPadrao.TIPO, true));
+            auditoriaService.registrar(admin, "CRIAR_LOCAL", "local_armazem", id,
+                    box.codigo() + " (box padrão, filial " + idFilial + ")");
+        }
     }
 
     @Transactional(value = "torreTransactionManager", readOnly = true)

@@ -2,11 +2,12 @@ package br.com.salome.core.application.torre;
 
 import br.com.salome.core.domain.torre.Atividade;
 import br.com.salome.core.domain.torre.BiparNfRequest;
+import br.com.salome.core.domain.torre.BoxPadrao;
 import br.com.salome.core.domain.torre.CasamentoResultado;
 import br.com.salome.core.domain.torre.CteDescarga;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
+import br.com.salome.core.domain.torre.LocalArmazem;
 import br.com.salome.core.domain.torre.StatusAtividade;
-import br.com.salome.core.domain.torre.StatusDocumento;
 import br.com.salome.core.domain.torre.TipoAtividade;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
 import br.com.salome.core.domain.torre.erro.RecursoNaoEncontrado;
@@ -31,15 +32,18 @@ public class ColetaService {
     private final AtividadeRepository atividadeRepository;
     private final DocumentoRepository documentoRepository;
     private final ConhecimentoLegadoRepository conhecimentoLegadoRepository;
+    private final LocalArmazemRepository localRepository;
     private final Clock clock;
 
     public ColetaService(AtividadeRepository atividadeRepository,
                          DocumentoRepository documentoRepository,
                          ConhecimentoLegadoRepository conhecimentoLegadoRepository,
+                         LocalArmazemRepository localRepository,
                          Clock clock) {
         this.atividadeRepository = atividadeRepository;
         this.documentoRepository = documentoRepository;
         this.conhecimentoLegadoRepository = conhecimentoLegadoRepository;
+        this.localRepository = localRepository;
         this.clock = clock;
     }
 
@@ -52,15 +56,22 @@ public class ColetaService {
         if (a.tipo() != TipoAtividade.DESCARGA_COLETA) {
             throw new RegraViolada("Bipagem de NF só vale para descarga de coleta.");
         }
+        LocalArmazem box = localRepository.buscar(req.idLocalDestino(), usuario.idFilial())
+                .orElseThrow(() -> new RecursoNaoEncontrado("Box destino não encontrado."));
+        BoxPadrao destino = BoxPadrao.porCodigo(box.codigo())
+                .filter(BoxPadrao.DESTINOS_COLETA::contains)
+                .orElseThrow(() -> new RegraViolada(
+                        "Destino inválido para descarga de coleta: use Transferência ou Separação."));
         Instant now = clock.instant();
         DocumentoOperacional doc = new DocumentoOperacional(
                 null, usuario.idFilial(), null, null, a.idViagemLegado(), true,
                 req.volumes(), req.peso(), null, null, null, req.chaveNf(),
-                StatusDocumento.NO_ARMAZEM, null, now);
+                destino.statusAposDescarga(), box.id(), now);
         long docId = documentoRepository.salvar(doc);
         documentoRepository.inserirNf(docId, req.chaveNf(), req.numeroNf(), req.serie(), req.cnpjEmitente());
+        documentoRepository.atualizarStatusELocal(docId, destino.statusAposDescarga(), box.id(), now);
         documentoRepository.vincularAtividade(idAtividade, docId, "DESCARREGADO", req.volumes(), req.peso(), usuario.id(), now);
-        documentoRepository.inserirMovimento(docId, "DESCARGA", idAtividade, idAtividade, null, null, usuario.id(), now);
+        documentoRepository.inserirMovimento(docId, "DESCARGA", idAtividade, idAtividade, null, box.id(), usuario.id(), now);
         return documentoRepository.buscar(docId, usuario.idFilial()).orElseThrow();
     }
 

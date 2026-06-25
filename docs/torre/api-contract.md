@@ -17,6 +17,7 @@ Autenticação: Bearer JWT no header `Authorization`. O token carrega `idUsuario
 | Método | Rota | Resposta |
 |---|---|---|
 | GET | `/api/torre/viagens/aguardando-descarga` | `[{idViagem, idViagemTransferencia, placa, motorista, origem, dataBaixa, horaBaixa, qtdCtes, volumes, peso}]` (só baixas **de hoje em diante**; o painel agrupa por `idViagem`) |
+| GET | `/api/torre/viagens/coletas-aguardando` | mesmo shape `ViagemAguardando` (`origem="Coleta"`, `qtdCtes`=nº de coletas) — viagens trazendo **coletas da própria filial** (`Coleta.idFilial` = filial, `status='Em Viagem'` no legado), agrupado por `idViagem`, exceto as já em descarga |
 
 > **Descarga é por viagem (caminhão), não por manifesto.** Vários `idViagemTransferencia`
 > (manifestos) do mesmo `idViagem` chegam no mesmo caminhão e são descarregados juntos.
@@ -55,11 +56,25 @@ Autenticação: Bearer JWT no header `Authorization`. O token carrega `idUsuario
 Ações registradas: `FINALIZAR_ATIVIDADE`, `CANCELAR_ATIVIDADE`, `CRIAR_USUARIO`, `ATIVAR_USUARIO`/`DESATIVAR_USUARIO`, `CRIAR_LOCAL`, `ATIVAR_LOCAL`/`DESATIVAR_LOCAL`, `SALVAR_FILIAL`. Operador recebe **403** ao tentar acessar.
 
 ## Documento
-| Método | Rota | Resposta |
+| Método | Rota | Corpo | Resposta |
+|---|---|---|---|
+| GET | `/api/torre/documentos/disponiveis` | `?para=separar\|carregar` | docs disponíveis na filial (armazém / box / descarga ativa) |
+| POST | `/api/torre/atividades/{id}/documentos` | `{idConhecimento, idLocalDestino}` | bipa o CT-e e **roteia pro box destino** (transferência) |
+| POST | `/api/torre/documentos/{id}/movimentar` | `{tipo, idLocalDestino?, idAtividadeDestino?}` | move/cross-dock |
+
+### Boxes-destino e roteamento na descarga
+A descarga marca, por CT-e/NF, o **box destino** (escolhido na hora). São 3 boxes padrão
+(`local_armazem`, `tipo=BOX`), **auto-criados a cada `SALVAR_FILIAL`** (idempotente) e identificados pelo `codigo`:
+
+| codigo | box | status do doc após descarga |
 |---|---|---|
-| GET | `/api/torre/documentos/disponiveis` | docs disponíveis na filial (armazém / box / descarga ativa) |
-| POST | `/api/torre/atividades/{id}/documentos` | bipa/seleciona CT-e dentro da atividade |
-| POST | `/api/torre/documentos/{id}/movimentar` | `{tipo, idLocalDestino?, idAtividadeDestino?}` (inclui cross-dock) |
+| `SEP` | Separação | `NO_ARMAZEM` (entra na fila de separar) |
+| `DIST` | Distribuição | `SEPARADO_BOX` (pula separação; pronto p/ carregar) |
+| `TRANSF` | Transferência | `SEPARADO_BOX` (cross-dock p/ re-transferência) |
+
+Destinos válidos por origem: **transferência → {DIST, SEP}**; **coleta → {TRANSF, SEP}** (box fora do
+conjunto → **400**). O destino é definido na 1ª bipagem; re-bipar é idempotente (não altera). `GET /api/torre/locais`
+lista os boxes ativos (o app filtra por `codigo`).
 
 ## Ocorrência
 | Método | Rota | Corpo / Params | Resposta |

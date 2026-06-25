@@ -55,4 +55,21 @@ public class ViagemAguardandoService {
                 })
                 .toList();
     }
+
+    /** Viagens trazendo coletas da própria filial ('Em Viagem'), exceto as já em descarga. */
+    public List<ViagemAguardando> listarColetas(int idFilial) {
+        filialTorreRepository.buscar(idFilial)
+                .filter(FilialTorre::ativa)
+                .orElseThrow(() -> new RecursoNaoEncontrado("Filial não está ativa na Torre."));
+
+        List<ViagemAguardando> viagens = viagemLegadoRepository.listarColetasAguardando(idFilial, LIMITE);
+        Set<Long> jaAbertas = atividadeRepository.idsViagensComDescarga(idFilial);
+
+        return viagens.stream()
+                .filter(v -> {
+                    Long chave = v.idViagem() != null ? v.idViagem() : v.idViagemTransferencia();
+                    return !jaAbertas.contains(chave);
+                })
+                .toList();
+    }
 }

@@ -25,4 +25,10 @@ public class ViagemWebController {
     public List<ViagemAguardando> aguardandoDescarga(@RequestParam(required = false) Integer filial) {
         return viagemAguardandoService.listar(AutenticacaoContexto.filialAtiva(filial));
     }
+
+    /** Viagens trazendo coletas da própria filial (facilita abrir a descarga de coleta). */
+    @GetMapping("/coletas-aguardando")
+    public List<ViagemAguardando> coletasAguardando(@RequestParam(required = false) Integer filial) {
+        return viagemAguardandoService.listarColetas(AutenticacaoContexto.filialAtiva(filial));
+    }
 }
