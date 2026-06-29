@@ -19,6 +19,10 @@ import org.springframework.stereotype.Service;
 public class ViagemAguardandoService {
 
     private static final int LIMITE = 500;
+    // Caminhão baixado no fim de semana só é descarregado na segunda: o corte olha
+    // alguns dias pra trás pra não sumir do painel. A exclusão por descarga na Torre
+    // (idsViagensComDescarga) é quem tira da lista, não a data.
+    private static final int DIAS_RETROATIVOS = 3;
 
     private final ViagemLegadoRepository viagemLegadoRepository;
     private final FilialTorreRepository filialTorreRepository;
@@ -40,8 +44,8 @@ public class ViagemAguardandoService {
                 .filter(FilialTorre::ativa)
                 .orElseThrow(() -> new RecursoNaoEncontrado("Filial não está ativa na Torre."));
 
-        // Painel carrega só o que foi baixado de hoje em diante.
-        LocalDate dataCorte = LocalDate.now(clock);
+        // Janela retroativa: cobre baixas do fim de semana ainda não descarregadas.
+        LocalDate dataCorte = LocalDate.now(clock).minusDays(DIAS_RETROATIVOS);
         List<ViagemAguardando> viagens =
                 viagemLegadoRepository.listarAguardandoDescarga(idFilial, dataCorte, LIMITE);
         // Descarga é por viagem (caminhão): abrir uma cobre todos os manifestos.
@@ -62,7 +66,10 @@ public class ViagemAguardandoService {
                 .filter(FilialTorre::ativa)
                 .orElseThrow(() -> new RecursoNaoEncontrado("Filial não está ativa na Torre."));
 
-        List<ViagemAguardando> viagens = viagemLegadoRepository.listarColetasAguardando(idFilial, LIMITE);
+        // Mesma janela retroativa da transferência: evita arrastar coletas antigas
+        // presas em 'Em Viagem', mas mantém as do fim de semana visíveis.
+        LocalDate dataCorte = LocalDate.now(clock).minusDays(DIAS_RETROATIVOS);
+        List<ViagemAguardando> viagens = viagemLegadoRepository.listarColetasAguardando(idFilial, dataCorte, LIMITE);
         Set<Long> jaAbertas = atividadeRepository.idsViagensComDescarga(idFilial);
 
         return viagens.stream()
