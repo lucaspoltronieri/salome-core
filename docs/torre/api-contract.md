@@ -85,10 +85,36 @@ lista os boxes ativos (o app filtra por `codigo`).
 
 Foto: JPG/PNG/WEBP até 10MB. O servidor gera o caminho (`<ano>/<mês>/<filial>/<uuid>.<ext>`); o cliente nunca informa path.
 
+## App web unificado (supervisão)
+Shell SPA (vanilla, roteamento por hash) servido em `/torre/` e `/torre/app/` (forward p/
+`/torre/app/index.html`, público). Menu lateral: Dashboard, Atividades & operadores, Armazém
+(atual / aguardando descarga / outros armazéns), Administração (ADMIN). Reúne endpoints já
+existentes (mapa, viagens, atividades, admin) + os dois snapshots novos abaixo. A web é
+**só supervisão/cadastro**: não grava status operacional (isso é do app no celular).
+
+| Método | Rota | Params | Resposta |
+|---|---|---|---|
+| GET | `/api/torre/dashboard/snapshot` | `filial?` (ADMIN) | indicadores do dia + ocupação do armazém por estágio/box + pátio (caminhões em trânsito/aguardando, coletas, descargas) |
+| GET | `/api/torre/armazem/por-box` | `filial?` (ADMIN) | `{boxes:[{idLocal,codigo,nome,tipo,total,aguardandoSeparacao,emSeparacao,prontos,emCarregamento,avarias,volumes,peso}], documentos:[DocumentoArmazenado]}` — estados próprios da Torre (galpão), não o status grosso do legado |
+
+`DashboardSnapshot`: `{indicadores, totalNoArmazem, aguardandoSeparacao, emSeparacao, prontos, emCarregamento, avarias, boxes, caminhoesEmTransito, caminhoesAguardando, coletasEmTransito, descargasEmAndamento, proximaChegadaData, proximaChegadaHora}` (percentuais por estágio o front deriva das contagens).
+
+`DocumentoArmazenado`: `{id, numeroCte, preCte, volumes, peso, remetente, destinatario, cidadeDestino, dataEmissao, status, idLocal, codigoLocal, nomeLocal, tipoLocal, idConhecimentoLegado, atualizadoEm}`. `dataEmissao` vem do legado (`conhecimento.cteEmissao`), enriquecida por filial; nula em pré-CTes sem CT-e casado.
+
+**Atividades & operadores** (correção pela web): reaproveita `GET /api/torre/atividades/abertas`
+(participantes ativos = quem está logado/trabalhando no celular) + `POST .../{id}/cancelar`
+(abertura errada, antes de bipar) e `POST .../{id}/finalizar`. Ambos aceitam `?filial` e
+resolvem por `filialAtiva`: **ADMIN corrige qualquer filial** (via `?filial`); **OPERADOR fica
+travado na própria** (o `?filial` é ignorado pra ele).
+
 ## Painel TV
 | Método | Rota | Resposta |
 |---|---|---|
 | GET | `/api/torre/painel/snapshot` | snapshot com todos os blocos + `indicadores` (polling) |
+
+O snapshot expõe o **ciclo completo** (esteira do painel): `viagensAguardando`,
+`descargasEmAndamento`, `noArmazem` (NO_ARMAZEM = aguardando separação), `separacoesEmAndamento`,
+`prontosBox` (SEPARADO_BOX = pronto/box distribuição), `carregamentosEmAndamento`, `ocorrenciasRecentes`.
 
 O **shell estático** do painel (`/torre/painel/`) é público, mas o snapshot **exige login** (JWT), mesmo critério do app: a filial sai do token; ADMIN pode forçar via `?filial`. O painel autentica em `/auth/login` e, em modo TV ("manter conectado"), re-loga sozinho quando o token expira.
 
@@ -110,7 +136,7 @@ Seções do snapshot:
 - `vindoDeOutrasBases` / `emRotaEntrega`: `[{idViagem, placa, origem, motorista, dataPrevisaoSaida, horaPrevisaoSaida, dataPrevisaoChegada, horaPrevisaoChegada, qtdCtes, volumes, peso, ctes:[…]}]` (agrupado por viagem/caminhão).
 - `aguardandoDescarga`: viagens aguardando descarga (mesmo bloco do painel).
 - `descarregando`: atividades de descarga abertas (placa, viagem, participantes, início).
-- `armazenado` / `outrosArmazens`: `[{cte, notasFiscais, remetente, destinatario, cidadeDestinatario, setorRegiao, volumes, peso, situacaoCte, dataEntradaArmazem, horaEntradaArmazem, dataPrevistaEntrega, armazemAtual}]`.
+- `armazenado` / `outrosArmazens`: `[{cte, dataEmissao, notasFiscais, remetente, destinatario, cidadeDestinatario, setorRegiao, volumes, peso, situacaoCte, dataEntradaArmazem, horaEntradaArmazem, dataPrevistaEntrega, armazemAtual}]`.
 
 Filtros (`texto`/`cidade`/`situacao`) são aplicados na tela e replicados no servidor para o
 XLSX refletir o que o operador vê. O download usa `fetch` + `Authorization` (Bearer), não link

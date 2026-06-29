@@ -1,8 +1,14 @@
 # Torre de Controle — Deploy
 
-> **Política:** produção é a Hostinger; não mexer no VPS sem pedido; deploy só
-> com versão nova (bump SemVer + tag). Esta página descreve **como** subir — a
-> execução é manual e sob demanda.
+> **Ambiente:** nada roda local — build e testes acontecem **no servidor**
+> (homologação = servidor dedicado da Torre). Ver
+> **[ambiente-execucao.md](ambiente-execucao.md)** e, para o passo a passo real
+> de deploy, **[deploy-runbook.md](deploy-runbook.md)**.
+>
+> **Política:** não mexer no servidor sem pedido; deploy só com versão nova
+> (bump SemVer + tag). Esta página descreve **como** subir — a execução é manual
+> e sob demanda. Os comandos `mvn`/`scp` abaixo são **referência conceitual**;
+> na prática o build roda no servidor (ver runbook).
 
 ## Topologia
 

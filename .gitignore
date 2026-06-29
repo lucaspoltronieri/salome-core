@@ -11,6 +11,7 @@ ctes-sem-fatura-*.xlsx
 /dados/
 
 # Segredos / credenciais (NUNCA commitar)
+/secrets/
 google-service-account.json
 *service-account*.json
 *.pem
