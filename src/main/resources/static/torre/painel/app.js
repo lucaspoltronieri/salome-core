@@ -111,6 +111,49 @@ function renderDescargas(descargas) {
     </tr>`).join("");
 }
 
+function setNum(id, n) { document.getElementById(id).textContent = fmtInt.format(n || 0); }
+
+// Esteira: contagem por estágio do ciclo (chegada → expedição).
+function renderEsteira(snap) {
+  setNum("etAguardando", agruparViagens(snap.viagensAguardando || []).length);
+  setNum("etDescarregando", (snap.descargasEmAndamento || []).length);
+  setNum("etSeparar", (snap.noArmazem || []).length);
+  setNum("etSeparando", (snap.separacoesEmAndamento || []).length);
+  setNum("etPronto", (snap.prontosBox || []).length);
+  setNum("etCarregando", (snap.carregamentosEmAndamento || []).length);
+}
+
+// Aguardando separação: documentos NO_ARMAZEM (descarregados, esperando separar).
+function renderSeparar(docs) {
+  docs = docs || [];
+  document.getElementById("contSeparar").textContent = docs.length;
+  document.getElementById("vazioSeparar").hidden = docs.length > 0;
+  document.getElementById("tbSeparar").innerHTML = docs.map(d => `<tr>
+    <td>${escapar(d.numeroCte) || '<span class="pre">NF</span>'}</td>
+    <td>${escapar(d.destinatario)}</td>
+    <td>${escapar(d.cidadeDestino)}</td>
+    <td class="num">${fmtInt.format(d.volumes || 0)}</td>
+  </tr>`).join("");
+}
+
+// Carregando agora (atividades) + o que já está pronto no box de distribuição.
+function renderCarregar(atividades, prontos) {
+  atividades = atividades || [];
+  prontos = prontos || [];
+  const rows = atividades.map(a => `<tr>
+    <td class="placa">${escapar(a.placaVeiculo) || (a.idViagemLegado ? "viagem " + a.idViagemLegado : "—")}</td>
+    <td>Carregando</td>
+    <td class="num">${a.participantes.filter(p => !p.saidaEm).length}</td>
+    <td class="num">${tempoDecorrido(a.iniciadaEm)}</td>
+  </tr>`).concat(prontos.map(d => `<tr>
+    <td>${escapar(d.numeroCte) || escapar(d.destinatario) || "—"}</td>
+    <td>Pronto no box</td><td class="num">—</td><td class="num">—</td>
+  </tr>`));
+  document.getElementById("contCarregar").textContent = atividades.length + prontos.length;
+  document.getElementById("vazioCarregar").hidden = rows.length > 0;
+  document.getElementById("tbCarregar").innerHTML = rows.join("");
+}
+
 // ---- Autenticação (mesmo login da Torre; modo TV pode manter a sessão) ----
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
@@ -190,8 +233,11 @@ async function carregar() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     const snap = await r.json();
     renderIndicadores(snap.indicadores);
+    renderEsteira(snap);
     renderViagens(snap.viagensAguardando || []);
     renderDescargas(snap.descargasEmAndamento || []);
+    renderSeparar(snap.noArmazem || []);
+    renderCarregar(snap.carregamentosEmAndamento || [], snap.prontosBox || []);
     document.getElementById("atualizado").textContent =
       "atualizado " + new Date(snap.atualizadoEm).toLocaleTimeString("pt-BR");
     erro.hidden = true;

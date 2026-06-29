@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Torre de Controle — Painel</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260625-1">
 </head>
 <body>
   <div id="login" class="login-overlay">
@@ -39,20 +39,27 @@
     <div class="kpi"><span class="kpi-num" id="kpiOcorrencias">0</span><span class="kpi-rot">Ocorrências hoje</span></div>
   </section>
 
+  <!-- Esteira do ciclo: contagem por estágio, da chegada à expedição -->
+  <section class="esteira" id="esteira">
+    <div class="etapa"><span class="etapa-num" id="etAguardando">0</span><span class="etapa-rot">Aguardando descarga</span></div>
+    <div class="seta">›</div>
+    <div class="etapa"><span class="etapa-num" id="etDescarregando">0</span><span class="etapa-rot">Descarregando</span></div>
+    <div class="seta">›</div>
+    <div class="etapa"><span class="etapa-num" id="etSeparar">0</span><span class="etapa-rot">Aguardando separação</span></div>
+    <div class="seta">›</div>
+    <div class="etapa"><span class="etapa-num" id="etSeparando">0</span><span class="etapa-rot">Em separação</span></div>
+    <div class="seta">›</div>
+    <div class="etapa"><span class="etapa-num" id="etPronto">0</span><span class="etapa-rot">Box distribuição</span></div>
+    <div class="seta">›</div>
+    <div class="etapa"><span class="etapa-num" id="etCarregando">0</span><span class="etapa-rot">Carregando</span></div>
+  </section>
+
   <main class="grade">
     <section class="bloco">
-      <div class="bloco-cab">
-        <h2>Viagens aguardando descarga</h2>
-        <span class="contador" id="contViagens">0</span>
-      </div>
+      <div class="bloco-cab"><h2>Aguardando descarga</h2><span class="contador" id="contViagens">0</span></div>
       <div class="tabela-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Placa</th><th>Origem</th>
-              <th>Baixa</th><th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Placa</th><th>Origem</th><th>Baixa</th><th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th></tr></thead>
           <tbody id="tbViagens"></tbody>
         </table>
         <p class="vazio" id="vazioViagens" hidden>Nenhuma viagem aguardando.</p>
@@ -60,20 +67,35 @@
     </section>
 
     <section class="bloco">
-      <div class="bloco-cab">
-        <h2>Descargas em andamento</h2>
-        <span class="contador" id="contDescargas">0</span>
-      </div>
+      <div class="bloco-cab"><h2>Descarregando agora</h2><span class="contador" id="contDescargas">0</span></div>
       <div class="tabela-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Viagem</th><th>Placa</th><th class="num">Pessoas</th><th class="num">Tempo</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Viagem</th><th>Placa</th><th class="num">Pessoas</th><th class="num">Tempo</th></tr></thead>
           <tbody id="tbDescargas"></tbody>
         </table>
         <p class="vazio" id="vazioDescargas" hidden>Nenhuma descarga em andamento.</p>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <div class="bloco-cab"><h2>Aguardando separação</h2><span class="contador" id="contSeparar">0</span></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th>CT-e</th><th>Destinatário</th><th>Cidade</th><th class="num">Volumes</th></tr></thead>
+          <tbody id="tbSeparar"></tbody>
+        </table>
+        <p class="vazio" id="vazioSeparar" hidden>Nada aguardando separação.</p>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <div class="bloco-cab"><h2>Carregando / pronto no box</h2><span class="contador" id="contCarregar">0</span></div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th>Placa / viagem</th><th>Situação</th><th class="num">Pessoas</th><th class="num">Tempo</th></tr></thead>
+          <tbody id="tbCarregar"></tbody>
+        </table>
+        <p class="vazio" id="vazioCarregar" hidden>Nada carregando agora.</p>
       </div>
     </section>
   </main>
@@ -87,6 +109,6 @@
     </span>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20260625-1"></script>
 </body>
 </html>
