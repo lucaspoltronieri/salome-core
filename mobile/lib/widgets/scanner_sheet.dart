@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -22,6 +24,14 @@ class _ScannerSheet extends StatefulWidget {
 class _ScannerSheetState extends State<_ScannerSheet> {
   final MobileScannerController _controller = MobileScannerController();
   bool _capturado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // mobile_scanner 5.x NÃO inicia a câmera sozinho: é preciso start() manual.
+    // Sem isto a câmera fica preta (era a causa de "a câmera não funciona").
+    unawaited(_controller.start());
+  }
 
   @override
   void dispose() {
@@ -61,7 +71,27 @@ class _ScannerSheetState extends State<_ScannerSheet> {
               ),
             ],
           ),
-          Expanded(child: MobileScanner(controller: _controller, onDetect: _onDetect)),
+          Expanded(
+            child: MobileScanner(
+              controller: _controller,
+              onDetect: _onDetect,
+              errorBuilder: (context, error, child) => Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.no_photography, size: 48, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Não foi possível abrir a câmera.\n'
+                      '${error.errorCode == MobileScannerErrorCode.permissionDenied ? 'Permissão de câmera negada — libere nas configurações do app.' : 'Use a digitação manual para continuar.'}',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           const Padding(
             padding: EdgeInsets.all(12),
             child: Text('Aponte para o código de barras do documento'),

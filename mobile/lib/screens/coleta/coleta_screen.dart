@@ -4,6 +4,8 @@ import '../../api/api_client.dart';
 import '../../chave/chave_parser.dart';
 import '../../main.dart';
 import '../../models/models.dart';
+import '../../widgets/atividade_app_bar.dart';
+import '../../widgets/barra_atividade.dart';
 import '../../widgets/destino_picker.dart';
 import '../../widgets/dialogos.dart';
 import '../../widgets/scanner_sheet.dart';
@@ -20,16 +22,26 @@ class ColetaScreen extends StatefulWidget {
 }
 
 class _ColetaScreenState extends State<ColetaScreen> {
+  late AtividadeResumo _atv;
   List<DocumentoOperacional> _docs = [];
   List<LocalArmazem> _locais = [];
   bool _carregando = true;
 
-  int get _idAtividade => widget.atividade.id;
+  int get _idAtividade => _atv.id;
 
   @override
   void initState() {
     super.initState();
+    _atv = widget.atividade;
     _carregar();
+  }
+
+  Future<void> _participar() async {
+    final ok = await entrarAtividade(context, _idAtividade);
+    if (ok) {
+      final a = await session.api.buscarAtividade(_idAtividade);
+      if (mounted) setState(() => _atv = a);
+    }
   }
 
   Future<void> _carregar() async {
@@ -53,7 +65,13 @@ class _ColetaScreenState extends State<ColetaScreen> {
   Future<void> _registrarChave(String? bruto) async {
     final chave = ChaveParser.normalizar(bruto);
     if (chave == null) {
-      mostrarMensagem(context, 'Chave inválida (esperado 44 dígitos da NF).', erro: true);
+      mostrarMensagem(context, 'Chave inválida (esperado 44 dígitos da NF).',
+          erro: true);
+      return;
+    }
+    if (!ChaveParser.isNfe(chave)) {
+      mostrarMensagem(context, 'Bipe a chave da NF-e na coleta (modelo 55).',
+          erro: true);
       return;
     }
     final box = await escolherDestino(context, _locais, OrigemDescarga.coleta,
@@ -93,9 +111,12 @@ class _ColetaScreenState extends State<ColetaScreen> {
           decoration: const InputDecoration(labelText: 'Chave (44 dígitos)'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Voltar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Voltar')),
           FilledButton(
-              onPressed: () => Navigator.pop(context, ctrl.text), child: const Text('OK')),
+              onPressed: () => Navigator.pop(context, ctrl.text),
+              child: const Text('OK')),
         ],
       ),
     );
@@ -104,22 +125,46 @@ class _ColetaScreenState extends State<ColetaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Coleta · ${widget.atividade.placaVeiculo ?? '#$_idAtividade'}'),
-        actions: [
-          IconButton(icon: const Icon(Icons.keyboard), onPressed: _digitar, tooltip: 'Digitar chave'),
-          acoesAtividadeMenu(context, _idAtividade, aoMudar: () {
+    final souParticipante = _atv.souParticipanteAtivo(session.usuario?.id);
+    return PopScope(
+      canPop: !souParticipante,
+      onPopInvoked: (didPop) {
+        if (!didPop && mounted) {
+          mostrarMensagem(context, 'Use "Sair" ou "Concluir" para fechar a atividade.');
+        }
+      },
+      child: Scaffold(
+        appBar: appBarAtividade(
+          context,
+          titulo: 'Coleta · ${_atv.placaVeiculo ?? '#$_idAtividade'}',
+          iniciadaEm: _atv.iniciadaEm,
+          idAtividade: _idAtividade,
+          aoMudar: () {
+            if (mounted) Navigator.pop(context);
+          },
+          acoesExtras: [
+            IconButton(
+                icon: const Icon(Icons.keyboard),
+                onPressed: _digitar,
+                tooltip: 'Digitar chave'),
+          ],
+        ),
+        bottomNavigationBar: barraAtividadeCompartilhada(
+          context,
+          idAtividade: _idAtividade,
+          ativos: _atv.participantesAtivos,
+          souParticipante: souParticipante,
+          onParticipar: _participar,
+          onSair: () => sairAtividade(context, _idAtividade, aoMudar: () {
             if (mounted) Navigator.pop(context);
           }),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _biparCamera,
-        icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('Bipar NF'),
-      ),
-      body: _carregando
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _biparCamera,
+          icon: const Icon(Icons.qr_code_scanner),
+          label: const Text('Bipar NF'),
+        ),
+        body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
@@ -135,14 +180,16 @@ class _ColetaScreenState extends State<ColetaScreen> {
                         ? ListView(children: const [
                             Padding(
                                 padding: EdgeInsets.all(24),
-                                child: Center(child: Text('Bipe a primeira NF.')))
+                                child:
+                                    Center(child: Text('Bipe a primeira NF.')))
                           ])
                         : ListView.builder(
                             itemCount: _docs.length,
                             itemBuilder: (_, i) {
                               final d = _docs[i];
                               return ListTile(
-                                leading: const Icon(Icons.description, color: Colors.teal),
+                                leading: const Icon(Icons.description,
+                                    color: Colors.teal),
                                 title: Text(d.chaveNf ?? 'NF ${d.id}',
                                     style: const TextStyle(fontSize: 13)),
                                 subtitle: Text('${d.status}'
@@ -154,6 +201,7 @@ class _ColetaScreenState extends State<ColetaScreen> {
                 ),
               ],
             ),
+      ),
     );
   }
 }

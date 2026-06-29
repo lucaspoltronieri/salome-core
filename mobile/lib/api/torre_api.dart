@@ -48,6 +48,11 @@ class TorreApi {
     return (j as List).map((e) => AtividadeResumo.fromJson(e)).toList();
   }
 
+  Future<AtividadeResumo> buscarAtividade(int idAtividade) async {
+    final j = await _c.get('/api/torre/atividades/$idAtividade');
+    return AtividadeResumo.fromJson(j as Map<String, dynamic>);
+  }
+
   Future<AtividadeResumo> entrar(int idAtividade, {String? funcao}) async {
     final j = await _c.post('/api/torre/atividades/$idAtividade/entrar',
         body: funcao == null ? {} : {'funcao': funcao});
@@ -61,6 +66,12 @@ class TorreApi {
 
   Future<AtividadeFinalizada> finalizar(int idAtividade) async {
     final j = await _c.post('/api/torre/atividades/$idAtividade/finalizar');
+    return AtividadeFinalizada.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Conclui a atividade: efetiva o status final dos documentos e finaliza.
+  Future<AtividadeFinalizada> concluir(int idAtividade) async {
+    final j = await _c.post('/api/torre/atividades/$idAtividade/concluir');
     return AtividadeFinalizada.fromJson(j as Map<String, dynamic>);
   }
 
@@ -84,6 +95,14 @@ class TorreApi {
     final j = await _c.post('/api/torre/atividades/$idAtividade/documentos',
         body: {'idConhecimento': idConhecimento, 'idLocalDestino': idLocalDestino});
     return DocumentoOperacional.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Modo rápido: marca vários CT-es de uma vez para o mesmo box destino.
+  Future<List<DocumentoOperacional>> registrarDescargaLote(
+      int idAtividade, List<int> idsConhecimento, int idLocalDestino) async {
+    final j = await _c.post('/api/torre/atividades/$idAtividade/documentos/lote',
+        body: {'idsConhecimento': idsConhecimento, 'idLocalDestino': idLocalDestino});
+    return (j as List).map((e) => DocumentoOperacional.fromJson(e)).toList();
   }
 
   // ---- Descarga coleta ------------------------------------------------
@@ -121,10 +140,43 @@ class TorreApi {
     return DocumentoOperacional.fromJson(j as Map<String, dynamic>);
   }
 
+  /// Modo rápido: separa vários documentos de uma vez para o mesmo box (ex.: Distribuição).
+  Future<List<DocumentoOperacional>> separarLote(
+      int idAtividade, List<int> idsDocumento, int idLocal) async {
+    final j = await _c.post('/api/torre/atividades/$idAtividade/separar/lote',
+        body: {'idsDocumento': idsDocumento, 'idLocal': idLocal});
+    return (j as List).map((e) => DocumentoOperacional.fromJson(e)).toList();
+  }
+
   Future<DocumentoOperacional> carregar(int idAtividade, int idDocumento) async {
     final j = await _c.post('/api/torre/atividades/$idAtividade/carregar',
         body: {'idDocumento': idDocumento});
     return DocumentoOperacional.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Modo rápido: marca vários documentos para carregamento de uma vez.
+  Future<List<DocumentoOperacional>> carregarLote(int idAtividade, List<int> idsDocumento) async {
+    final j = await _c.post('/api/torre/atividades/$idAtividade/carregar/lote',
+        body: {'idsDocumento': idsDocumento});
+    return (j as List).map((e) => DocumentoOperacional.fromJson(e)).toList();
+  }
+
+  // ---- Pessoas na atividade ------------------------------------------
+  /// Usuários da filial (para escolher quem adicionar à atividade).
+  Future<List<Usuario>> listarUsuarios() async {
+    final j = await _c.get('/api/torre/usuarios');
+    return (j as List).map((e) => Usuario.fromJson(e)).toList();
+  }
+
+  Future<AtividadeResumo> adicionarParticipante(int idAtividade, int idUsuario, {String? funcao}) async {
+    final j = await _c.post('/api/torre/atividades/$idAtividade/participantes',
+        body: {'idUsuario': idUsuario, if (funcao != null) 'funcao': funcao});
+    return AtividadeResumo.fromJson(j as Map<String, dynamic>);
+  }
+
+  Future<AtividadeResumo> removerParticipante(int idAtividade, int idUsuario) async {
+    final j = await _c.delete('/api/torre/atividades/$idAtividade/participantes/$idUsuario');
+    return AtividadeResumo.fromJson(j as Map<String, dynamic>);
   }
 
   // ---- Locais ---------------------------------------------------------

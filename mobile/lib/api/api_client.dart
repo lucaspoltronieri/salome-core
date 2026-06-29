@@ -40,6 +40,10 @@ class ApiClient {
     return _handle(r);
   }
 
+  Future<dynamic> delete(String path, {Map<String, dynamic>? query}) async {
+    return _handle(await _http.delete(_uri(path, query), headers: _headers));
+  }
+
   /// POST multipart: parte JSON `dados` + arquivo `foto` opcional (ocorrências).
   Future<dynamic> postMultipart(String path,
       {required Map<String, dynamic> dados, String? fotoPath}) async {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../main.dart';
 import '../models/models.dart';
+import '../widgets/cronometro.dart';
 import '../widgets/dialogos.dart';
 import 'carregamento_screen.dart';
 import 'coleta/coleta_screen.dart';
@@ -38,6 +39,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _recarregar();
   }
 
+  /// Intervalo/Almoço: abre uma atividade que pausa automaticamente a atividade
+  /// atual da pessoa (regra de 1 participação ativa) e conta o tempo do intervalo.
+  Future<void> _intervalo() async {
+    try {
+      final atv = await session.api.abrirAtividade(tipo: 'OUTRAS', subtipo: 'INTERVALO');
+      if (mounted) await _abrir(OutrasScreen(atividade: atv));
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.message, erro: true);
+    }
+  }
+
   Future<void> _reabrir(AtividadeResumo a) async {
     switch (a.tipo) {
       case 'DESCARGA_TRANSFERENCIA':
@@ -58,9 +70,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _finalizar(AtividadeResumo a) async {
-    if (!await confirmar(context, 'Finalizar', 'Finalizar a atividade #${a.id}?')) return;
+    // Descarga/carregamento usam "concluir" (efetiva o status final dos documentos).
+    final usaConcluir = a.tipo == 'DESCARGA_TRANSFERENCIA' || a.tipo == 'CARREGAMENTO';
+    final rotulo = usaConcluir ? 'Concluir' : 'Finalizar';
+    if (!await confirmar(context, rotulo, '$rotulo a atividade #${a.id}?')) return;
     try {
-      final f = await session.api.finalizar(a.id);
+      final f = usaConcluir ? await session.api.concluir(a.id) : await session.api.finalizar(a.id);
       if (mounted) {
         mostrarMensagem(context,
             'Finalizada: ${_fmt(f.duracaoSegundos)} de duração, ${f.totalParticipantes} pessoa(s).');
@@ -113,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: () async => _recarregar(),
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).viewPadding.bottom),
           children: [
             _grade(),
             const SizedBox(height: 24),
@@ -135,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _Fluxo('Carregamento', Icons.upload, () => _abrir(const CarregamentoScreen())),
       _Fluxo('Outras', Icons.handyman, () => _abrir(const OutrasScreen())),
       _Fluxo('Ocorrência', Icons.report_problem, () => _abrir(const OcorrenciaScreen())),
+      _Fluxo('Intervalo\n/ Almoço', Icons.lunch_dining, _intervalo),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -184,7 +200,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ListTile(
                       title: Text('${_rotuloTipo(a.tipo)}'
                           '${a.placaVeiculo != null ? ' · ${a.placaVeiculo}' : ''}'),
-                      subtitle: Text('#${a.id} · ${a.participantesAtivos} ativo(s)'),
+                      subtitle: Row(
+                        children: [
+                          Expanded(child: Text('#${a.id} · ${a.participantesAtivos} ativo(s)')),
+                          Cronometro(
+                            inicio: Cronometro.parse(a.iniciadaEm),
+                            estilo: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ],
+                      ),
                       onTap: () => _reabrir(a),
                       trailing: PopupMenuButton<String>(
                         onSelected: (v) {
@@ -192,10 +216,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (v == 'cancelar') _cancelar(a);
                           if (v == 'abrir') _reabrir(a);
                         },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'abrir', child: Text('Abrir')),
-                          PopupMenuItem(value: 'finalizar', child: Text('Finalizar')),
-                          PopupMenuItem(value: 'cancelar', child: Text('Cancelar')),
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(value: 'abrir', child: Text('Abrir')),
+                          PopupMenuItem(
+                              value: 'finalizar',
+                              child: Text(a.tipo == 'DESCARGA_TRANSFERENCIA' || a.tipo == 'CARREGAMENTO'
+                                  ? 'Concluir'
+                                  : 'Finalizar')),
+                          const PopupMenuItem(value: 'cancelar', child: Text('Cancelar')),
                         ],
                       ),
                     ),

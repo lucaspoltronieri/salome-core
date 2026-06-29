@@ -95,17 +95,19 @@ class ViagemAguardando {
 
 class Participante {
   final int? id;
+  final int? idUsuario;
   final String? nomeUsuario;
   final String? funcao;
   final String? entradaEm;
   final String? saidaEm;
 
-  Participante({this.id, this.nomeUsuario, this.funcao, this.entradaEm, this.saidaEm});
+  Participante({this.id, this.idUsuario, this.nomeUsuario, this.funcao, this.entradaEm, this.saidaEm});
 
   bool get ativo => saidaEm == null;
 
   factory Participante.fromJson(Map<String, dynamic> j) => Participante(
         id: _asInt(j['id']),
+        idUsuario: _asInt(j['idUsuario']),
         nomeUsuario: j['nomeUsuario'],
         funcao: j['funcao'],
         entradaEm: j['entradaEm']?.toString(),
@@ -139,6 +141,10 @@ class AtividadeResumo {
   });
 
   int get participantesAtivos => participantes.where((p) => p.ativo).length;
+
+  /// `true` se o usuário [meuId] está atualmente ativo (entrou e ainda não saiu).
+  bool souParticipanteAtivo(int? meuId) =>
+      meuId != null && participantes.any((p) => p.idUsuario == meuId && p.ativo);
 
   factory AtividadeResumo.fromJson(Map<String, dynamic> j) => AtividadeResumo(
         id: (j['id'] as num).toInt(),

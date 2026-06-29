@@ -15,9 +15,18 @@ class ChaveParser {
   static bool valida(String? s) => s != null && _so44.hasMatch(s);
 
   /// Número do documento (nº do CT-e na transferência; nº da NF na coleta).
-  static int? numero(String s) => valida(s) ? int.tryParse(s.substring(25, 34)) : null;
+  static int? numero(String s) =>
+      valida(s) ? int.tryParse(s.substring(25, 34)) : null;
+
+  /// Modelo fiscal da chave: 55 = NF-e, 57 = CT-e.
+  static String? modelo(String s) => valida(s) ? s.substring(20, 22) : null;
+
+  static bool isNfe(String s) => modelo(s) == '55';
+
+  static bool isCte(String s) => modelo(s) == '57';
 
   static String? serie(String s) => valida(s) ? s.substring(22, 25) : null;
 
-  static String? cnpjEmitente(String s) => valida(s) ? s.substring(6, 20) : null;
+  static String? cnpjEmitente(String s) =>
+      valida(s) ? s.substring(6, 20) : null;
 }
