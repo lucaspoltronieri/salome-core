@@ -42,6 +42,14 @@ public class DocumentoWebController {
         return documentoService.registrarDescarga(id, corpo.idConhecimento(), corpo.idLocalDestino(), usuario);
     }
 
+    /** Modo rápido: marca vários CT-es de uma vez para o mesmo box destino. */
+    @PostMapping("/documentos/lote")
+    public List<DocumentoOperacional> registrarLote(@PathVariable long id,
+                                                    @Valid @RequestBody RegistrarLote corpo,
+                                                    @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return documentoService.registrarDescargaLote(id, corpo.idsConhecimento(), corpo.idLocalDestino(), usuario);
+    }
+
     /** Documentos já registrados nesta atividade. */
     @GetMapping("/documentos")
     public List<DocumentoOperacional> listar(@PathVariable long id,
@@ -50,5 +58,8 @@ public class DocumentoWebController {
     }
 
     public record RegistrarDocumento(@NotNull Long idConhecimento, @NotNull Long idLocalDestino) {
+    }
+
+    public record RegistrarLote(@NotNull List<Long> idsConhecimento, @NotNull Long idLocalDestino) {
     }
 }

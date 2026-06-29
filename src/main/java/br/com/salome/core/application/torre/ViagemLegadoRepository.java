@@ -14,7 +14,8 @@ public interface ViagemLegadoRepository {
 
     /**
      * Viagens trazendo coletas da própria filial ainda em trânsito (status 'Em Viagem'),
-     * agrupadas por viagem (caminhão).
+     * agrupadas por viagem (caminhão). Só coletas que entraram em viagem a partir de
+     * {@code dataCorte} (evita arrastar coletas antigas presas em 'Em Viagem' no legado).
      */
-    List<ViagemAguardando> listarColetasAguardando(int idFilial, int limite);
+    List<ViagemAguardando> listarColetasAguardando(int idFilial, LocalDate dataCorte, int limite);
 }

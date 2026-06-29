@@ -66,6 +66,13 @@ public class MovimentacaoService {
         return documentoRepository.buscar(idDocumento, usuario.idFilial()).orElseThrow();
     }
 
+    /** Modo rápido: separa vários documentos para o mesmo box de uma vez. */
+    public List<DocumentoOperacional> separarLote(long idAtividade, List<Long> idsDocumento, long idLocal, UsuarioAutenticado usuario) {
+        return idsDocumento.stream()
+                .map(idDocumento -> separar(idAtividade, idDocumento, idLocal, usuario))
+                .toList();
+    }
+
     public DocumentoOperacional carregar(long idAtividade, long idDocumento, UsuarioAutenticado usuario) {
         Atividade atividade = exigirAtividade(idAtividade, usuario.idFilial(), TipoAtividade.CARREGAMENTO);
         DocumentoOperacional doc = exigirDocumento(idDocumento, usuario.idFilial());
@@ -77,11 +84,34 @@ public class MovimentacaoService {
         Long origem = crossDock ? documentoRepository.ultimaAtividadeDescarga(idDocumento).orElse(null) : null;
 
         var now = clock.instant();
+        // Marcar = "em carregamento". O status final (CARREGADO) só vem na conclusão do carregamento.
         documentoRepository.vincularAtividade(idAtividade, idDocumento, "CARREGADO", doc.volumes(), doc.peso(), usuario.id(), now);
-        documentoRepository.atualizarStatusELocal(idDocumento, StatusDocumento.CARREGADO, doc.idLocalAtual(), now);
+        documentoRepository.atualizarStatusELocal(idDocumento, StatusDocumento.EM_CARREGAMENTO, doc.idLocalAtual(), now);
         documentoRepository.inserirMovimento(idDocumento, crossDock ? "CROSS_DOCK" : "CARREGAMENTO",
                 origem, idAtividade, doc.idLocalAtual(), null, usuario.id(), now);
         return documentoRepository.buscar(idDocumento, usuario.idFilial()).orElseThrow();
+    }
+
+    /** Modo rápido: marca vários documentos para carregamento de uma vez. */
+    public List<DocumentoOperacional> carregarLote(long idAtividade, List<Long> idsDocumento, UsuarioAutenticado usuario) {
+        return idsDocumento.stream()
+                .map(idDocumento -> carregar(idAtividade, idDocumento, usuario))
+                .toList();
+    }
+
+    /** Conclui o carregamento: documentos EM_CARREGAMENTO desta atividade viram CARREGADO. */
+    public int concluirCarregamento(long idAtividade, UsuarioAutenticado usuario) {
+        exigirAtividade(idAtividade, usuario.idFilial(), TipoAtividade.CARREGAMENTO);
+        var now = clock.instant();
+        int efetivados = 0;
+        for (DocumentoOperacional doc : documentoRepository.listarPorAtividade(idAtividade)) {
+            if (doc.status() != StatusDocumento.EM_CARREGAMENTO) {
+                continue;
+            }
+            documentoRepository.atualizarStatusELocal(doc.id(), StatusDocumento.CARREGADO, doc.idLocalAtual(), now);
+            efetivados++;
+        }
+        return efetivados;
     }
 
     private Atividade exigirAtividade(long idAtividade, int idFilial, TipoAtividade tipoEsperado) {

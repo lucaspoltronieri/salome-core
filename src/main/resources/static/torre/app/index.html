@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Torre de Controle — Armazém</title>
+  <link rel="stylesheet" href="/torre/app/styles.css?v=20260625-2">
+</head>
+<body>
+
+  <!-- Login (mesma infra do mapa/painel) -->
+  <div id="login" class="login-overlay" hidden>
+    <form id="loginForm" class="login-card" autocomplete="off">
+      <h2>Torre de Controle</h2>
+      <p class="login-sub">Controle do armazém — entre com seu usuário</p>
+      <label>Usuário<input id="loginUsuario" type="text" required autocomplete="off"></label>
+      <label>Senha<input id="loginSenha" type="password" required autocomplete="new-password"></label>
+      <label class="login-check"><input id="loginManter" type="checkbox"> Manter conectado</label>
+      <button type="submit" id="loginBtn">Entrar</button>
+      <span id="loginErro" class="login-erro" hidden></span>
+    </form>
+  </div>
+
+  <div id="appShell" class="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">TC</span>
+        <span class="brand-title">Torre de Controle</span>
+        <span class="brand-sub">Armazém · WMS</span>
+        <span class="brand-version" id="versao"></span>
+      </div>
+      <nav>
+        <a data-route="/dashboard" href="#/dashboard">Dashboard</a>
+        <span class="nav-group">Operação</span>
+        <a data-route="/atividades" href="#/atividades">Atividades &amp; operadores</a>
+        <a data-route="/relatorios/operadores" href="#/relatorios/operadores">Relatório de operadores</a>
+        <span class="nav-group">Armazém</span>
+        <a data-route="/armazem/atual" href="#/armazem/atual">Armazém atual</a>
+        <a data-route="/armazem/aguardando" href="#/armazem/aguardando">Aguardando descarga</a>
+        <a data-route="/armazem/outros" href="#/armazem/outros">Outros armazéns</a>
+        <span class="nav-group" data-admin-only hidden>Administração</span>
+        <a data-route="/admin/usuarios" href="#/admin/usuarios" data-admin-only hidden>Usuários &amp; cadastros</a>
+        <a href="/torre/painel/" target="_blank" rel="noopener" class="nav-ext">Painel TV ↗</a>
+      </nav>
+      <div class="sidebar-note">
+        <span>Supervisão</span>
+        <p>A web acompanha e cadastra. As operações (descarga, separação, carga) vêm do app no celular.</p>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="topbar-title">
+          <p class="eyebrow" id="viewEyebrow"></p>
+          <h1 id="viewTitulo"></h1>
+        </div>
+        <div class="topbar-actions">
+          <select id="filialSel" class="filial-sel" hidden></select>
+          <span id="filialTxt" class="filial-txt" hidden></span>
+          <span id="atualizado" class="atualizado"></span>
+          <button id="atualizarBtn" class="btn">Atualizar</button>
+          <span id="usuarioInfo" class="usuario-info"></span>
+          <button id="sairBtn" class="btn btn-ghost btn-sm">sair</button>
+        </div>
+      </header>
+      <p id="appErro" class="app-erro" hidden></p>
+      <div id="view"></div>
+    </main>
+  </div>
+
+  <script src="/torre/app/js/api.js?v=20260625-2"></script>
+  <script src="/torre/app/js/router.js?v=20260625-2"></script>
+  <script src="/torre/app/js/dashboard.js?v=20260625-2"></script>
+  <script src="/torre/app/js/atividades.js?v=20260625-2"></script>
+  <script src="/torre/app/js/relatorios-operadores.js?v=20260626-1"></script>
+  <script src="/torre/app/js/armazem-atual.js?v=20260625-2"></script>
+  <script src="/torre/app/js/armazem-aguardando.js?v=20260625-2"></script>
+  <script src="/torre/app/js/armazem-outros.js?v=20260625-2"></script>
+  <script src="/torre/app/js/admin.js?v=20260625-2"></script>
+  <script src="/torre/app/js/app.js?v=20260625-2"></script>
+</body>
+</html>

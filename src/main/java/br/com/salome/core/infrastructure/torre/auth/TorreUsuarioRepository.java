@@ -92,6 +92,20 @@ public class TorreUsuarioRepository implements UsuarioRepository {
     }
 
     @Override
+    public Optional<UsuarioResumo> buscar(long id) {
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject("""
+                    SELECT u.id, u.nome, u.login, u.id_filial, p.codigo AS perfil, u.ativo
+                      FROM usuario u
+                      JOIN perfil p ON p.id = u.id_perfil
+                     WHERE u.id = ?
+                    """, RESUMO, id));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public boolean definirAtivo(long id, boolean ativo) {
         return jdbcTemplate.update("UPDATE usuario SET ativo = ? WHERE id = ?", ativo, id) > 0;
     }

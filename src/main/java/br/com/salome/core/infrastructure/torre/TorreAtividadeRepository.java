@@ -103,12 +103,15 @@ public class TorreAtividadeRepository implements AtividadeRepository {
 
     @Override
     public Set<Long> idsViagensComDescarga(int idFilial) {
+        // Só esconde o caminhão se a descarga estiver viva (ABERTA/FINALIZADA).
+        // Uma descarga CANCELADA libera a viagem pra reaparecer em "aguardando".
         List<Long> ids = jdbc.queryForList("""
                 SELECT DISTINCT id_viagem_legado
                   FROM atividade_armazem
                  WHERE id_filial = ?
                    AND tipo = 'DESCARGA_TRANSFERENCIA'
                    AND id_viagem_legado IS NOT NULL
+                   AND status <> 'CANCELADA'
                 """, Long.class, idFilial);
         return new HashSet<>(ids);
     }

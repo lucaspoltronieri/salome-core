@@ -47,7 +47,7 @@ public class MapaArmazemExportService {
             abaDescarregando(wb, header, date, snap.descarregando(), snap.atualizadoEm(), filtro);
             abaArmazenado(wb, header, date, number, snap.armazenado(), filtro);
             abaEntrega(wb, header, date, number, snap.emRotaEntrega(), filtro);
-            abaOutros(wb, header, number, snap.outrosArmazens(), filtro);
+            abaOutros(wb, header, date, number, snap.outrosArmazens(), filtro);
 
             wb.write(out);
             return out.toByteArray();
@@ -186,25 +186,26 @@ public class MapaArmazemExportService {
         autosize(sheet, 11);
     }
 
-    private void abaOutros(Workbook wb, CellStyle header, CellStyle number,
+    private void abaOutros(Workbook wb, CellStyle header, CellStyle date, CellStyle number,
                            List<MapaCte> ctes, MapaFiltro f) {
         Sheet sheet = novaAba(wb, "Outros armazéns", header,
-                "CT-e", "Armazém atual", "Destinatário", "Cidade", "Volumes", "Peso", "Situação");
+                "Data emissão", "CT-e", "Armazém atual", "Destinatário", "Cidade", "Volumes", "Peso", "Situação");
         int r = 1;
         for (MapaCte cte : ctes) {
             if (!casaCte(f, cte)) {
                 continue;
             }
             Row row = sheet.createRow(r++);
-            intCell(row, 0, cte.cte());
-            txt(row, 1, cte.armazemAtual());
-            txt(row, 2, cte.destinatario());
-            txt(row, 3, cte.cidadeDestinatario());
-            num(row, 4, cte.volumes(), number);
-            num(row, 5, cte.peso(), number);
-            txt(row, 6, cte.situacaoCte());
+            dat(row, 0, cte.dataEmissao(), date);
+            intCell(row, 1, cte.cte());
+            txt(row, 2, cte.armazemAtual());
+            txt(row, 3, cte.destinatario());
+            txt(row, 4, cte.cidadeDestinatario());
+            num(row, 5, cte.volumes(), number);
+            num(row, 6, cte.peso(), number);
+            txt(row, 7, cte.situacaoCte());
         }
-        autosize(sheet, 7);
+        autosize(sheet, 8);
     }
 
     private boolean casaCte(MapaFiltro f, MapaCte cte) {

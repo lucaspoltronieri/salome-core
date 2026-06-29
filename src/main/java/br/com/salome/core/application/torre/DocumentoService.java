@@ -6,6 +6,7 @@ import br.com.salome.core.domain.torre.CteDescarga;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.LocalArmazem;
 import br.com.salome.core.domain.torre.StatusAtividade;
+import br.com.salome.core.domain.torre.StatusDocumento;
 import br.com.salome.core.domain.torre.TipoAtividade;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
 import br.com.salome.core.domain.torre.erro.RecursoNaoEncontrado;
@@ -72,10 +73,12 @@ public class DocumentoService {
 
         Integer volumes = cte.volumes() == null ? null : cte.volumes().intValue();
         var now = clock.instant();
+        // Marcar = "sendo descarregado" (EM_DESCARGA). O box destino fica guardado em
+        // id_local_atual; só na conclusão da descarga o status vira final (NO_ARMAZEM/SEPARADO_BOX).
         DocumentoOperacional doc = new DocumentoOperacional(
                 null, usuario.idFilial(), cte.cte(), cte.idConhecimento(), a.idViagemLegado(),
                 false, volumes, cte.peso(), cte.remetente(), cte.destinatario(), cte.cidadeDestino(),
-                null, destino.statusAposDescarga(), box.id(), now);
+                null, StatusDocumento.EM_DESCARGA, box.id(), now);
 
         long docId = documentoRepository.salvar(doc);
         int vinculado = documentoRepository.vincularAtividade(
@@ -83,11 +86,49 @@ public class DocumentoService {
         // Só define destino/movimento na 1ª bipagem desta atividade (re-bipar é idempotente,
         // não altera o destino escolhido antes).
         if (vinculado > 0) {
-            documentoRepository.atualizarStatusELocal(docId, destino.statusAposDescarga(), box.id(), now);
+            documentoRepository.atualizarStatusELocal(docId, StatusDocumento.EM_DESCARGA, box.id(), now);
             documentoRepository.inserirMovimento(docId, "DESCARGA", idAtividade, idAtividade, null, box.id(), usuario.id(), now);
         }
 
         return documentoRepository.buscar(docId, usuario.idFilial()).orElseThrow();
+    }
+
+    /** Modo rápido: marca vários CT-es de uma vez para o mesmo box destino. */
+    public List<DocumentoOperacional> registrarDescargaLote(long idAtividade, List<Long> idsConhecimento,
+                                                            long idLocalDestino, UsuarioAutenticado usuario) {
+        return idsConhecimento.stream()
+                .map(idConhecimento -> registrarDescarga(idAtividade, idConhecimento, idLocalDestino, usuario))
+                .toList();
+    }
+
+    /**
+     * Conclui a descarga: cada documento ainda EM_DESCARGA desta atividade vira o status final
+     * conforme o box destino já escolhido (Separação → NO_ARMAZEM; Distribuição/Transferência →
+     * SEPARADO_BOX). Idempotente. Retorna quantos foram efetivados.
+     */
+    public int concluirDescarga(long idAtividade, UsuarioAutenticado usuario) {
+        exigir(idAtividade, usuario.idFilial());
+        var now = clock.instant();
+        int efetivados = 0;
+        for (DocumentoOperacional doc : documentoRepository.listarPorAtividade(idAtividade)) {
+            if (doc.status() != StatusDocumento.EM_DESCARGA || doc.idLocalAtual() == null) {
+                continue;
+            }
+            StatusDocumento finalStatus = statusFinalDoBox(doc.idLocalAtual(), usuario.idFilial());
+            documentoRepository.atualizarStatusELocal(doc.id(), finalStatus, doc.idLocalAtual(), now);
+            documentoRepository.inserirMovimento(doc.id(), "ARMAZENAGEM", idAtividade, idAtividade,
+                    doc.idLocalAtual(), doc.idLocalAtual(), usuario.id(), now);
+            efetivados++;
+        }
+        return efetivados;
+    }
+
+    /** Mapeia o box destino (SEP/DIST/TRANSF) para o status final do documento. */
+    private StatusDocumento statusFinalDoBox(long idLocal, int idFilial) {
+        return localRepository.buscar(idLocal, idFilial)
+                .flatMap(l -> BoxPadrao.porCodigo(l.codigo()))
+                .map(BoxPadrao::statusAposDescarga)
+                .orElse(StatusDocumento.NO_ARMAZEM);
     }
 
     @Transactional(value = "torreTransactionManager", readOnly = true)

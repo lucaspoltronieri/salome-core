@@ -6,5 +6,7 @@ package br.com.salome.core.domain.torre;
  */
 public enum PerfilCodigo {
     OPERADOR,
-    ADMIN
+    ADMIN,
+    /** Chapa: mão de obra esporádica, entra na atividade pelo líder, não acessa o app. */
+    CHAPA
 }

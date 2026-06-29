@@ -68,6 +68,7 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
               LEFT JOIN fornecedor fornecedorMotorista ON fornecedorMotorista.idFornecedor = motorista.idFornecedor
              WHERE col.idFilial = ?
                AND col.status = 'Em Viagem'
+               AND col.statusData >= ?
              GROUP BY v.idViagem, veiculo.placa, fornecedorMotorista.razaoSocial
              ORDER BY data DESC
              LIMIT ?
@@ -96,7 +97,7 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
     }
 
     @Override
-    public List<ViagemAguardando> listarColetasAguardando(int idFilial, int limite) {
+    public List<ViagemAguardando> listarColetasAguardando(int idFilial, LocalDate dataCorte, int limite) {
         return jdbcTemplate.query(SQL_COLETAS, (rs, n) -> {
             long idViagem = rs.getLong("idViagem");
             return new ViagemAguardando(
@@ -110,7 +111,7 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
                     rs.getInt("qtdColetas"),
                     zero(rs.getBigDecimal("volumes")),
                     zero(rs.getBigDecimal("peso")));
-        }, idFilial, limite);
+        }, idFilial, dataCorte, limite);
     }
 
     private static BigDecimal zero(BigDecimal v) {

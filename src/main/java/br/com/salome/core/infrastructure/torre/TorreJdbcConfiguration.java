@@ -24,6 +24,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
  * nenhuma rode contra o banco legado.
  */
 @Configuration
+@org.springframework.scheduling.annotation.EnableScheduling
 @ConditionalOnProperty(prefix = "salome.torre", name = "enabled", havingValue = "true")
 public class TorreJdbcConfiguration {
 

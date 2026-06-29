@@ -3,9 +3,14 @@ package br.com.salome.core.infrastructure.legacy.torre;
 import br.com.salome.core.application.torre.ConhecimentoLegadoRepository;
 import br.com.salome.core.domain.torre.CteDescarga;
 import java.math.BigDecimal;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -81,6 +86,21 @@ public class LegacyConhecimentoRepository implements ConhecimentoLegadoRepositor
         } catch (EmptyResultDataAccessException e) {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public Map<Long, LocalDate> emissaoPorConhecimento(Collection<Long> idsConhecimento) {
+        if (idsConhecimento.isEmpty()) {
+            return Map.of();
+        }
+        String marcadores = String.join(",", java.util.Collections.nCopies(idsConhecimento.size(), "?"));
+        String sql = "SELECT idConhecimento, cteEmissao FROM conhecimento WHERE idConhecimento IN (" + marcadores + ")";
+        Map<Long, LocalDate> emissoes = new HashMap<>();
+        jdbcTemplate.query(sql, rs -> {
+            Date emissao = rs.getDate("cteEmissao");
+            emissoes.put(rs.getLong("idConhecimento"), emissao == null ? null : emissao.toLocalDate());
+        }, idsConhecimento.toArray());
+        return emissoes;
     }
 
     private CteDescarga map(ResultSet rs, int rowNum) throws SQLException {

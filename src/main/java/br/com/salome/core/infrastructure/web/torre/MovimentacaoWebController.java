@@ -42,6 +42,14 @@ public class MovimentacaoWebController {
         return movimentacaoService.separar(id, corpo.idDocumento(), corpo.idLocal(), usuario);
     }
 
+    /** Modo rápido: separa vários documentos para o mesmo box de uma vez (ex.: Distribuição). */
+    @PostMapping("/api/torre/atividades/{id}/separar/lote")
+    public List<DocumentoOperacional> separarLote(@PathVariable long id,
+                                                  @RequestBody SepararLoteRequest corpo,
+                                                  @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return movimentacaoService.separarLote(id, corpo.idsDocumento(), corpo.idLocal(), usuario);
+    }
+
     @PostMapping("/api/torre/atividades/{id}/carregar")
     public DocumentoOperacional carregar(@PathVariable long id,
                                          @RequestBody CarregarRequest corpo,
@@ -49,9 +57,23 @@ public class MovimentacaoWebController {
         return movimentacaoService.carregar(id, corpo.idDocumento(), usuario);
     }
 
+    /** Modo rápido: marca vários documentos para carregamento de uma vez. */
+    @PostMapping("/api/torre/atividades/{id}/carregar/lote")
+    public List<DocumentoOperacional> carregarLote(@PathVariable long id,
+                                                   @RequestBody CarregarLoteRequest corpo,
+                                                   @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return movimentacaoService.carregarLote(id, corpo.idsDocumento(), usuario);
+    }
+
     public record SepararRequest(@NotNull Long idDocumento, @NotNull Long idLocal) {
     }
 
     public record CarregarRequest(@NotNull Long idDocumento) {
+    }
+
+    public record CarregarLoteRequest(@NotNull List<Long> idsDocumento) {
+    }
+
+    public record SepararLoteRequest(@NotNull List<Long> idsDocumento, @NotNull Long idLocal) {
     }
 }

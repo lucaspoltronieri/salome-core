@@ -126,7 +126,7 @@ public class MapaArmazemService {
 
     private MapaCte toMapaCte(CteMapaSjpRecord r) {
         return new MapaCte(
-                r.cte(), r.notasFiscais(), r.remetente(), r.destinatario(),
+                r.cte(), r.dataEmissao(), r.notasFiscais(), r.remetente(), r.destinatario(),
                 r.cidadeDestinatario(), r.setorRegiao(), nz(r.quantidadeVolumes()), nz(r.peso()),
                 r.situacaoCte(), r.dataEntradaArmazem(), r.horaEntradaArmazem(),
                 r.dataPrevistaEntrega(), r.armazemAtual(),

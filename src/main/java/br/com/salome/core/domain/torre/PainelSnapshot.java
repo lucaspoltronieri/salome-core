@@ -16,6 +16,7 @@ public record PainelSnapshot(
         List<AtividadeResumo> carregamentosEmAndamento,
         List<AtividadeResumo> outrasEmAndamento,
         List<DocumentoOperacional> noArmazem,
+        List<DocumentoOperacional> prontosBox,
         List<Ocorrencia> ocorrenciasRecentes
 ) {
 }

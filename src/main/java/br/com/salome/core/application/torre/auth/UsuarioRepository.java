@@ -17,6 +17,11 @@ public interface UsuarioRepository {
 
     List<UsuarioResumo> listar(int idFilial);
 
+    /** Usuário por id (para validar filial ao adicionar participante). Default vazio para fakes de teste. */
+    default Optional<UsuarioResumo> buscar(long id) {
+        return Optional.empty();
+    }
+
     /** Ativa/desativa o usuário. Retorna true se algum registro foi alterado. */
     boolean definirAtivo(long id, boolean ativo);
 }

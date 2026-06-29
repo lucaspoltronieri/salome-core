@@ -57,6 +57,7 @@ public class PainelService {
                 porTipo(abertas, TipoAtividade.CARREGAMENTO),
                 porTipo(abertas, TipoAtividade.OUTRAS),
                 documentoRepository.listarPorStatus(idFilial, List.of(StatusDocumento.NO_ARMAZEM)),
+                documentoRepository.listarPorStatus(idFilial, List.of(StatusDocumento.SEPARADO_BOX)),
                 ocorrenciaService.listar(idFilial));
     }
 

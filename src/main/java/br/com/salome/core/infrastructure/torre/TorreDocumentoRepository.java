@@ -1,6 +1,7 @@
 package br.com.salome.core.infrastructure.torre;
 
 import br.com.salome.core.application.torre.DocumentoRepository;
+import br.com.salome.core.domain.torre.DocumentoArmazenado;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.StatusDocumento;
 import java.math.BigDecimal;
@@ -46,6 +47,28 @@ public class TorreDocumentoRepository implements DocumentoRepository {
             StatusDocumento.valueOf(rs.getString("status")),
             rs.getObject("id_local_atual", Long.class),
             rs.getTimestamp("atualizado_em").toInstant());
+
+    private static final RowMapper<DocumentoArmazenado> ARMAZENADO_MAPPER = (rs, n) -> new DocumentoArmazenado(
+            rs.getLong("id"),
+            rs.getObject("numero_cte", Integer.class),
+            rs.getBoolean("pre_cte"),
+            rs.getObject("volumes", Integer.class),
+            rs.getBigDecimal("peso"),
+            rs.getString("remetente"),
+            rs.getString("destinatario"),
+            rs.getString("cidade_destino"),
+            null, // dataEmissao: enriquecida do legado em ArmazemService
+            StatusDocumento.valueOf(rs.getString("status")),
+            rs.getObject("id_local_atual", Long.class),
+            rs.getString("local_codigo"),
+            rs.getString("local_nome"),
+            rs.getString("local_tipo"),
+            rs.getObject("id_conhecimento_legado", Long.class),
+            rs.getTimestamp("atualizado_em").toInstant());
+
+    /** Estados "vivos" no galpão (fisicamente presentes), na ordem do ciclo. */
+    private static final String STATUS_NO_GALPAO =
+            "'NO_ARMAZEM','EM_SEPARACAO','SEPARADO_BOX','EM_CARREGAMENTO','AVARIA','DIVERGENCIA'";
 
     @Override
     public long salvar(DocumentoOperacional d) {
@@ -155,6 +178,21 @@ public class TorreDocumentoRepository implements DocumentoRepository {
         return jdbc.query(
                 "SELECT * FROM documento_operacional WHERE id_filial = ? AND status IN (" + marcadores + ") ORDER BY numero_cte",
                 MAPPER, args);
+    }
+
+    @Override
+    public List<DocumentoArmazenado> listarArmazenados(int idFilial) {
+        return jdbc.query("""
+                SELECT d.id, d.numero_cte, d.pre_cte, d.volumes, d.peso, d.remetente, d.destinatario,
+                       d.cidade_destino, d.status, d.id_local_atual, d.id_conhecimento_legado, d.atualizado_em,
+                       l.codigo AS local_codigo, l.nome AS local_nome, l.tipo AS local_tipo
+                  FROM documento_operacional d
+                  LEFT JOIN local_armazem l ON l.id = d.id_local_atual
+                 WHERE d.id_filial = ?
+                   AND d.status IN (""" + STATUS_NO_GALPAO + """
+                )
+                 ORDER BY l.codigo, d.numero_cte
+                """, ARMAZENADO_MAPPER, idFilial);
     }
 
     @Override

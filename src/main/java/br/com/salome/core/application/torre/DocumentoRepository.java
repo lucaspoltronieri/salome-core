@@ -1,5 +1,6 @@
 package br.com.salome.core.application.torre;
 
+import br.com.salome.core.domain.torre.DocumentoArmazenado;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.StatusDocumento;
 import java.math.BigDecimal;
@@ -16,6 +17,15 @@ public interface DocumentoRepository {
 
     /** Documentos da filial em qualquer um dos status informados. */
     List<DocumentoOperacional> listarPorStatus(int idFilial, List<StatusDocumento> status);
+
+    /**
+     * Documentos fisicamente no armazém (estados vivos da Torre), já resolvidos com
+     * o box/local onde estão. Base da tela "Armazém atual" e da ocupação do dashboard.
+     * Default vazio para fakes de teste; a implementação real (JDBC) sobrescreve.
+     */
+    default List<DocumentoArmazenado> listarArmazenados(int idFilial) {
+        return List.of();
+    }
 
     void atualizarStatusELocal(long id, StatusDocumento status, Long idLocalAtual, Instant em);
 

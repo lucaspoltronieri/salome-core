@@ -10,6 +10,7 @@ import java.time.LocalDate;
  */
 public record MapaCte(
         Integer cte,
+        LocalDate dataEmissao,
         String notasFiscais,
         String remetente,
         String destinatario,
