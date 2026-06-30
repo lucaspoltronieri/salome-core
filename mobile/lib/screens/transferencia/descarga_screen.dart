@@ -138,6 +138,15 @@ class _DescargaScreenState extends State<DescargaScreen> {
   }
 
   Future<void> _concluir() async {
+    final semMarcacao = _semMarcacao;
+    if (semMarcacao.isNotEmpty) {
+      mostrarMensagem(
+        context,
+        'Ainda existem ${semMarcacao.length} CT-e(s) sem destino na descarga.',
+        erro: true,
+      );
+      return;
+    }
     if (!await confirmar(context, 'Concluir descarga',
         'Concluir a descarga? Os CT-es marcados viram o status final no armazém.')) {
       return;
@@ -167,6 +176,9 @@ class _DescargaScreenState extends State<DescargaScreen> {
 
   List<CteDescarga> get _emDescarga =>
       _ctes.where((c) => _marcados.contains(c.idConhecimento)).toList();
+
+  List<CteDescarga> get _semMarcacao =>
+      _ctes.where((c) => !_marcados.contains(c.idConhecimento)).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -292,14 +304,18 @@ class _DescargaScreenState extends State<DescargaScreen> {
         ),
       );
     }
-    final primaria = (souParticipante && _marcados.isNotEmpty)
-        ? botaoGrandeAtividade(
-            icone: Icons.check_circle,
-            texto: 'Concluir descarga',
-            onPressed: _concluir,
-            cor: Colors.green,
-          )
-        : null;
+    Widget? primaria;
+    if (souParticipante && _ctes.isNotEmpty) {
+      final todosMarcados = _semMarcacao.isEmpty;
+      primaria = botaoGrandeAtividade(
+        icone: todosMarcados ? Icons.check_circle : Icons.pending_actions,
+        texto: todosMarcados
+            ? 'Concluir descarga'
+            : 'Marque todos (${_marcados.length}/${_ctes.length})',
+        onPressed: todosMarcados ? _concluir : null,
+        cor: todosMarcados ? Colors.green : null,
+      );
+    }
     return barraAtividadeCompartilhada(
       context,
       idAtividade: _idAtividade,

@@ -39,17 +39,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _recarregar();
   }
 
-  /// Intervalo/Almoço: abre uma atividade que pausa automaticamente a atividade
-  /// atual da pessoa (regra de 1 participação ativa) e conta o tempo do intervalo.
-  Future<void> _intervalo() async {
-    try {
-      final atv = await session.api.abrirAtividade(tipo: 'OUTRAS', subtipo: 'INTERVALO');
-      if (mounted) await _abrir(OutrasScreen(atividade: atv));
-    } on ApiException catch (e) {
-      if (mounted) mostrarMensagem(context, e.message, erro: true);
-    }
-  }
-
   Future<void> _reabrir(AtividadeResumo a) async {
     switch (a.tipo) {
       case 'DESCARGA_TRANSFERENCIA':
@@ -150,7 +139,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _Fluxo('Carregamento', Icons.upload, () => _abrir(const CarregamentoScreen())),
       _Fluxo('Outras', Icons.handyman, () => _abrir(const OutrasScreen())),
       _Fluxo('Ocorrência', Icons.report_problem, () => _abrir(const OcorrenciaScreen())),
-      _Fluxo('Intervalo\n/ Almoço', Icons.lunch_dining, _intervalo),
     ];
     return GridView.count(
       crossAxisCount: 2,

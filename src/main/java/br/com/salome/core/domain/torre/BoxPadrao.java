@@ -31,8 +31,8 @@ public enum BoxPadrao {
     /** Destinos válidos numa descarga de transferência. */
     public static final Set<BoxPadrao> DESTINOS_TRANSFERENCIA = EnumSet.of(DISTRIBUICAO, SEPARACAO);
 
-    /** Destinos válidos numa descarga de coleta. */
-    public static final Set<BoxPadrao> DESTINOS_COLETA = EnumSet.of(TRANSFERENCIA, SEPARACAO);
+    /** Destinos-box válidos numa descarga de coleta (o crossdock direto é tratado à parte). */
+    public static final Set<BoxPadrao> DESTINOS_COLETA = EnumSet.of(TRANSFERENCIA, DISTRIBUICAO);
 
     private final String codigo;
     private final String nome;

@@ -39,9 +39,10 @@ cp -r /tmp/scaffold/android "$WORK"/android
 
 # 2) Permissões + cleartext no manifesto principal (release NÃO traz INTERNET por padrão).
 #    Patches ancorados (não quebram o XML): permissões após a linha <manifest>,
-#    cleartext na linha bare "<application".
+#    cleartext no primeiro marcador "<application".
 MANIFEST="$WORK"/android/app/src/main/AndroidManifest.xml
-sed -i 's#^\( *\)<application$#\1<uses-permission android:name="android.permission.INTERNET"/>\n\1<uses-permission android:name="android.permission.CAMERA"/>\n\1<application android:usesCleartextTraffic="true"#' "$MANIFEST"
+sed -i '/<manifest /a\    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>' "$MANIFEST"
+sed -i '0,/<application/{s#<application#<application android:usesCleartextTraffic="true"#}' "$MANIFEST"
 
 # 2b) Gradle dentro do container: heap baixo + sem daemon (o default -Xmx8G é morto por OOM).
 GP="$WORK"/android/gradle.properties

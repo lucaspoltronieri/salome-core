@@ -50,7 +50,6 @@ class _OutrasScreenState extends State<OutrasScreen> {
   }
 
   String _rotulo(String? codigo) {
-    if (codigo == 'INTERVALO') return 'Intervalo / Almoço';
     return _subtipos.firstWhere((s) => s.codigo == codigo, orElse: () => _subtipos.last).rotulo;
   }
 

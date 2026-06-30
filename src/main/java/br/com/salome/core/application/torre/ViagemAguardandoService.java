@@ -7,36 +7,41 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
  * Lista as viagens de transferência aguardando descarga numa filial: lê do legado
- * (somente as baixadas de hoje em diante) e exclui as que já têm descarga na Torre.
+ * e exclui as que já têm descarga na Torre.
+ *
+ * <p>Transferências usam um <b>piso fixo</b> (virada de produção): baixados a partir
+ * dessa data ficam no painel até a descarga ser registrada na Torre; baixas anteriores
+ * (backlog do legado) são ignoradas — quem tira da lista é a descarga, não a data.
+ * Coletas mostram <b>apenas o dia</b> (corte = hoje).
  */
 @Service
 @ConditionalOnProperty(prefix = "salome.torre", name = "enabled", havingValue = "true")
 public class ViagemAguardandoService {
 
     private static final int LIMITE = 500;
-    // Caminhão baixado no fim de semana só é descarregado na segunda: o corte olha
-    // alguns dias pra trás pra não sumir do painel. A exclusão por descarga na Torre
-    // (idsViagensComDescarga) é quem tira da lista, não a data.
-    private static final int DIAS_RETROATIVOS = 3;
 
     private final ViagemLegadoRepository viagemLegadoRepository;
     private final FilialTorreRepository filialTorreRepository;
     private final AtividadeRepository atividadeRepository;
     private final Clock clock;
+    private final LocalDate dataInicioAguardando;
 
     public ViagemAguardandoService(ViagemLegadoRepository viagemLegadoRepository,
                                    FilialTorreRepository filialTorreRepository,
                                    AtividadeRepository atividadeRepository,
-                                   Clock clock) {
+                                   Clock clock,
+                                   @Value("${salome.torre.aguardando.data-inicio:2026-07-01}") String dataInicio) {
         this.viagemLegadoRepository = viagemLegadoRepository;
         this.filialTorreRepository = filialTorreRepository;
         this.atividadeRepository = atividadeRepository;
         this.clock = clock;
+        this.dataInicioAguardando = LocalDate.parse(dataInicio);
     }
 
     public List<ViagemAguardando> listar(int idFilial) {
@@ -44,8 +49,10 @@ public class ViagemAguardandoService {
                 .filter(FilialTorre::ativa)
                 .orElseThrow(() -> new RecursoNaoEncontrado("Filial não está ativa na Torre."));
 
-        // Janela retroativa: cobre baixas do fim de semana ainda não descarregadas.
-        LocalDate dataCorte = LocalDate.now(clock).minusDays(DIAS_RETROATIVOS);
+        // Piso fixo da virada de produção: ignora o backlog antigo do legado. O caminhão
+        // segue no painel até a descarga ser registrada (idsViagensComDescarga), mesmo
+        // que a baixa seja de dias anteriores.
+        LocalDate dataCorte = dataInicioAguardando;
         List<ViagemAguardando> viagens =
                 viagemLegadoRepository.listarAguardandoDescarga(idFilial, dataCorte, LIMITE);
         // Descarga é por viagem (caminhão): abrir uma cobre todos os manifestos.
@@ -66,9 +73,8 @@ public class ViagemAguardandoService {
                 .filter(FilialTorre::ativa)
                 .orElseThrow(() -> new RecursoNaoEncontrado("Filial não está ativa na Torre."));
 
-        // Mesma janela retroativa da transferência: evita arrastar coletas antigas
-        // presas em 'Em Viagem', mas mantém as do fim de semana visíveis.
-        LocalDate dataCorte = LocalDate.now(clock).minusDays(DIAS_RETROATIVOS);
+        // Coletas: só as do dia. Cada dia mostra apenas as viagens de coleta de hoje.
+        LocalDate dataCorte = LocalDate.now(clock);
         List<ViagemAguardando> viagens = viagemLegadoRepository.listarColetasAguardando(idFilial, dataCorte, LIMITE);
         Set<Long> jaAbertas = atividadeRepository.idsViagensComDescarga(idFilial);
 

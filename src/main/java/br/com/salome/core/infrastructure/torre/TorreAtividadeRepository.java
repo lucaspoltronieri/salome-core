@@ -2,6 +2,7 @@ package br.com.salome.core.infrastructure.torre;
 
 import br.com.salome.core.application.torre.AtividadeRepository;
 import br.com.salome.core.domain.torre.Atividade;
+import br.com.salome.core.domain.torre.CaminhaoEmDescarga;
 import br.com.salome.core.domain.torre.StatusAtividade;
 import br.com.salome.core.domain.torre.TipoAtividade;
 import java.sql.PreparedStatement;
@@ -114,6 +115,28 @@ public class TorreAtividadeRepository implements AtividadeRepository {
                    AND status <> 'CANCELADA'
                 """, Long.class, idFilial);
         return new HashSet<>(ids);
+    }
+
+    @Override
+    public List<CaminhaoEmDescarga> listarCaminhoesEmDescarga(int idFilial, Instant finalizadaDesde) {
+        return jdbc.query("""
+                SELECT a.id_viagem_legado AS id_viagem,
+                       MAX(a.placa_veiculo) AS placa,
+                       MAX(a.status = 'ABERTA') AS descarga_aberta
+                  FROM atividade_armazem a
+                 WHERE a.id_filial = ?
+                   AND a.tipo = 'DESCARGA_TRANSFERENCIA'
+                   AND a.id_viagem_legado IS NOT NULL
+                   AND ( a.status = 'ABERTA'
+                         OR (a.status = 'FINALIZADA' AND a.finalizada_em >= ?) )
+                 GROUP BY a.id_viagem_legado
+                 ORDER BY descarga_aberta DESC, placa
+                """,
+                (rs, n) -> new CaminhaoEmDescarga(
+                        rs.getObject("id_viagem", Long.class),
+                        rs.getString("placa"),
+                        rs.getBoolean("descarga_aberta")),
+                idFilial, Timestamp.from(finalizadaDesde));
     }
 
     private static Instant instante(Timestamp ts) {

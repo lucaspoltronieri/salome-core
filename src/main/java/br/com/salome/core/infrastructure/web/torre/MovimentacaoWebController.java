@@ -1,8 +1,12 @@
 package br.com.salome.core.infrastructure.web.torre;
 
 import br.com.salome.core.application.torre.MovimentacaoService;
+import br.com.salome.core.domain.torre.CaminhaoEmDescarga;
+import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
+import br.com.salome.core.domain.torre.TipoVeiculo;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
+import br.com.salome.core.domain.torre.erro.RegraViolada;
 import br.com.salome.core.infrastructure.torre.auth.AutenticacaoContexto;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -33,6 +37,28 @@ public class MovimentacaoWebController {
         return "carregar".equalsIgnoreCase(para)
                 ? movimentacaoService.disponiveisParaCarregar(idFilial)
                 : movimentacaoService.disponiveisParaSeparar(idFilial);
+    }
+
+    /** Carregáveis por tipo de carregamento (ENTREGA|TRANSFERENCIA), já com o box atual. */
+    @GetMapping("/api/torre/documentos/carregaveis")
+    public List<DocumentoComLocal> carregaveis(@RequestParam String tipo,
+                                               @RequestParam(required = false) Integer filial) {
+        TipoVeiculo t = TipoVeiculo.porCodigo(tipo)
+                .orElseThrow(() -> new RegraViolada("Tipo de carregamento inválido: use ENTREGA ou TRANSFERENCIA."));
+        return movimentacaoService.carregaveis(AutenticacaoContexto.filialAtiva(filial), t);
+    }
+
+    /** Caminhões em descarga (ou descarregados hoje) para escolher na separação por caminhão. */
+    @GetMapping("/api/torre/separacao/caminhoes")
+    public List<CaminhaoEmDescarga> caminhoesParaSeparar(@RequestParam(required = false) Integer filial) {
+        return movimentacaoService.caminhoesParaSeparar(AutenticacaoContexto.filialAtiva(filial));
+    }
+
+    /** CT-es separáveis de um caminhão (viagem): EM_DESCARGA ou NO_ARMAZEM. */
+    @GetMapping("/api/torre/separacao/documentos")
+    public List<DocumentoComLocal> separaveisDoCaminhao(@RequestParam long idViagem,
+                                                        @RequestParam(required = false) Integer filial) {
+        return movimentacaoService.separaveisDoCaminhao(AutenticacaoContexto.filialAtiva(filial), idViagem);
     }
 
     @PostMapping("/api/torre/atividades/{id}/separar")

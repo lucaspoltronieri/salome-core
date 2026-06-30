@@ -1,15 +1,19 @@
 package br.com.salome.core.application.torre;
 
 import br.com.salome.core.domain.torre.Atividade;
+import br.com.salome.core.domain.torre.CaminhaoEmDescarga;
+import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.LocalArmazem;
 import br.com.salome.core.domain.torre.StatusAtividade;
 import br.com.salome.core.domain.torre.StatusDocumento;
 import br.com.salome.core.domain.torre.TipoAtividade;
+import br.com.salome.core.domain.torre.TipoVeiculo;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
 import br.com.salome.core.domain.torre.erro.RecursoNaoEncontrado;
 import br.com.salome.core.domain.torre.erro.RegraViolada;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -44,10 +48,32 @@ public class MovimentacaoService {
         return documentoRepository.listarPorStatus(idFilial, List.of(StatusDocumento.NO_ARMAZEM));
     }
 
+    /** Caminhões em descarga (ou descarregados hoje) — escolha do caminhão a separar. */
+    @Transactional(value = "torreTransactionManager", readOnly = true)
+    public List<CaminhaoEmDescarga> caminhoesParaSeparar(int idFilial) {
+        var inicioDoDia = LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
+        return atividadeRepository.listarCaminhoesEmDescarga(idFilial, inicioDoDia);
+    }
+
+    /** CT-es separáveis de um caminhão: ainda saindo (EM_DESCARGA) ou no armazém (NO_ARMAZEM). */
+    @Transactional(value = "torreTransactionManager", readOnly = true)
+    public List<DocumentoComLocal> separaveisDoCaminhao(int idFilial, long idViagem) {
+        return documentoRepository.listarSeparaveisDaViagem(idFilial, idViagem);
+    }
+
     @Transactional(value = "torreTransactionManager", readOnly = true)
     public List<DocumentoOperacional> disponiveisParaCarregar(int idFilial) {
         return documentoRepository.listarPorStatus(idFilial,
                 List.of(StatusDocumento.NO_ARMAZEM, StatusDocumento.SEPARADO_BOX));
+    }
+
+    /**
+     * Carregáveis por tipo (Entrega/Transferência), já com o box atual para o app agrupar
+     * em Distribuição / Separação / Em descarga (Entrega) ou Box Transferência.
+     */
+    @Transactional(value = "torreTransactionManager", readOnly = true)
+    public List<DocumentoComLocal> carregaveis(int idFilial, TipoVeiculo tipo) {
+        return documentoRepository.listarParaCarregar(idFilial, tipo);
     }
 
     public DocumentoOperacional separar(long idAtividade, long idDocumento, long idLocal, UsuarioAutenticado usuario) {
@@ -55,7 +81,9 @@ public class MovimentacaoService {
         DocumentoOperacional doc = exigirDocumento(idDocumento, usuario.idFilial());
         LocalArmazem local = localRepository.buscar(idLocal, usuario.idFilial())
                 .orElseThrow(() -> new RecursoNaoEncontrado("Local não encontrado."));
-        if (doc.status() != StatusDocumento.NO_ARMAZEM && doc.status() != StatusDocumento.EM_SEPARACAO) {
+        if (doc.status() != StatusDocumento.NO_ARMAZEM
+                && doc.status() != StatusDocumento.EM_SEPARACAO
+                && doc.status() != StatusDocumento.EM_DESCARGA) {
             throw new RegraViolada("Documento não está disponível para separação (status " + doc.status() + ").");
         }
         var now = clock.instant();
@@ -76,11 +104,14 @@ public class MovimentacaoService {
     public DocumentoOperacional carregar(long idAtividade, long idDocumento, UsuarioAutenticado usuario) {
         Atividade atividade = exigirAtividade(idAtividade, usuario.idFilial(), TipoAtividade.CARREGAMENTO);
         DocumentoOperacional doc = exigirDocumento(idDocumento, usuario.idFilial());
-        if (doc.status() != StatusDocumento.NO_ARMAZEM && doc.status() != StatusDocumento.SEPARADO_BOX) {
+        if (doc.status() != StatusDocumento.NO_ARMAZEM
+                && doc.status() != StatusDocumento.SEPARADO_BOX
+                && doc.status() != StatusDocumento.EM_DESCARGA) {
             throw new RegraViolada("Documento não está disponível para carregamento (status " + doc.status() + ").");
         }
-        // Cross-dock direto: documento carregado sem ter passado por separação.
-        boolean crossDock = doc.status() == StatusDocumento.NO_ARMAZEM;
+        // Cross-dock direto: documento carregado sem ter passado por separação — seja parado no
+        // armazém (NO_ARMAZEM) ou ainda saindo do caminhão em descarga (EM_DESCARGA).
+        boolean crossDock = doc.status() != StatusDocumento.SEPARADO_BOX;
         Long origem = crossDock ? documentoRepository.ultimaAtividadeDescarga(idDocumento).orElse(null) : null;
 
         var now = clock.instant();

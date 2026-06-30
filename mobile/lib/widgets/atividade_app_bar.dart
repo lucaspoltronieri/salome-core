@@ -27,17 +27,28 @@ PreferredSizeWidget appBarAtividade(
         acoesAtividadeMenu(context, idAtividade, apenasCancelar: true, aoMudar: aoMudar),
     ],
     bottom: PreferredSize(
-      preferredSize: const Size.fromHeight(44),
+      preferredSize: const Size.fromHeight(52),
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Cronometro(
-          inicio: Cronometro.parse(iniciadaEm),
-          icone: Icons.timer_outlined,
-          estilo: const TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            fontFeatures: [FontFeature.tabularFigures()],
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Center(
+          widthFactor: 1,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              // Tarjeta cinza escuro pra destacar o tempo do operador.
+              color: const Color(0xFF37474F),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Cronometro(
+              inicio: Cronometro.parse(iniciadaEm),
+              icone: Icons.timer_outlined,
+              estilo: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
           ),
         ),
       ),

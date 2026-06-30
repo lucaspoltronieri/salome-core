@@ -85,6 +85,59 @@ class CadastroServiceTest {
     }
 
     @Test
+    void criarChapa_geraLoginDoNomeEPerfilChapa() {
+        AtomicReference<String> loginGravado = new AtomicReference<>();
+        AtomicReference<PerfilCodigo> perfilGravado = new AtomicReference<>();
+        UsuarioRepository usuarios = new UsuarioRepository() {
+            @Override
+            public long criar(String login, String nome, String senhaHash, int idFilial, PerfilCodigo perfil) {
+                loginGravado.set(login);
+                perfilGravado.set(perfil);
+                return 42L;
+            }
+
+            @Override
+            public Optional<UsuarioCredencial> buscarPorLogin(String login) {
+                return Optional.empty(); // nenhum login ocupado
+            }
+
+            @Override
+            public List<UsuarioResumo> listar(int idFilial) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean definirAtivo(long id, boolean ativo) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        FilialTorreRepository filiais = filialComBusca(Optional.of(
+                new FilialTorre(2, "Rio Preto", LocalDate.of(2026, 6, 1), true)));
+        CadastroService service = new CadastroService(usuarios, localStub(), filiais, encoder, auditoria());
+
+        UsuarioResumo chapa = service.criarChapa(2, "José da Silva", admin);
+
+        assertThat(chapa.id()).isEqualTo(42L);
+        assertThat(chapa.nome()).isEqualTo("José da Silva");
+        assertThat(chapa.perfil()).isEqualTo(PerfilCodigo.CHAPA);
+        assertThat(perfilGravado.get()).isEqualTo(PerfilCodigo.CHAPA);
+        assertThat(loginGravado.get()).isEqualTo("chapa.jos.da.silva");
+        assertThat(acaoAuditada.get()).isEqualTo("CRIAR_CHAPA");
+    }
+
+    @Test
+    void criarChapa_nomeVazio_lancaRegraViolada() {
+        CadastroService service = new CadastroService(
+                usuarioRepoCriando(new AtomicReference<>(), 1L), localStub(),
+                filialComBusca(Optional.of(new FilialTorre(2, "Rio Preto", LocalDate.of(2026, 6, 1), true))),
+                encoder, auditoria());
+
+        assertThatThrownBy(() -> service.criarChapa(2, "   ", admin))
+                .isInstanceOf(RegraViolada.class);
+        assertThat(acaoAuditada.get()).isNull();
+    }
+
+    @Test
     void salvarFilial_criaOsTresBoxesPadrao() {
         List<LocalArmazem> criados = new ArrayList<>();
         LocalArmazemRepository locais = localCapturando(criados);

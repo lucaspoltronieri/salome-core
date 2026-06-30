@@ -1,6 +1,7 @@
 package br.com.salome.core.infrastructure.web.torre;
 
 import br.com.salome.core.application.torre.ColetaService;
+import br.com.salome.core.domain.torre.BiparNfCrossdockRequest;
 import br.com.salome.core.domain.torre.BiparNfRequest;
 import br.com.salome.core.domain.torre.CasamentoResultado;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
@@ -33,6 +34,14 @@ public class ColetaWebController {
                                         @Valid @RequestBody BiparNfRequest req,
                                         @AuthenticationPrincipal UsuarioAutenticado usuario) {
         return coletaService.biparNf(id, req, usuario);
+    }
+
+    /** Bipa uma NF na coleta com crossdock direto (entra no carregamento de transferência). */
+    @PostMapping("/api/torre/atividades/{id}/coletas/crossdock")
+    public DocumentoOperacional biparNfCrossdock(@PathVariable long id,
+                                                 @Valid @RequestBody BiparNfCrossdockRequest req,
+                                                 @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return coletaService.biparNfCrossdock(id, req, usuario);
     }
 
     /** Casa os pré-CTes pendentes com CT-es já emitidos. */

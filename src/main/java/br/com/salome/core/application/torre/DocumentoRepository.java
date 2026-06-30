@@ -1,8 +1,10 @@
 package br.com.salome.core.application.torre;
 
 import br.com.salome.core.domain.torre.DocumentoArmazenado;
+import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.StatusDocumento;
+import br.com.salome.core.domain.torre.TipoVeiculo;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +26,24 @@ public interface DocumentoRepository {
      * Default vazio para fakes de teste; a implementação real (JDBC) sobrescreve.
      */
     default List<DocumentoArmazenado> listarArmazenados(int idFilial) {
+        return List.of();
+    }
+
+    /**
+     * Documentos carregáveis da filial conforme o tipo de carregamento, já com o box atual:
+     * ENTREGA → Distribuição (SEPARADO_BOX/DIST) + sem separação (NO_ARMAZEM) + ainda no caminhão
+     * descarregando (EM_DESCARGA); TRANSFERENCIA → Box Transferência (SEPARADO_BOX/TRANSF).
+     * Default vazio para fakes de teste; a implementação real (JDBC) sobrescreve.
+     */
+    default List<DocumentoComLocal> listarParaCarregar(int idFilial, TipoVeiculo tipo) {
+        return List.of();
+    }
+
+    /**
+     * CT-es de uma viagem (caminhão) ainda separáveis: sendo descarregados (EM_DESCARGA) ou
+     * já no armazém aguardando separação (NO_ARMAZEM). Default vazio para fakes de teste.
+     */
+    default List<DocumentoComLocal> listarSeparaveisDaViagem(int idFilial, long idViagem) {
         return List.of();
     }
 

@@ -13,7 +13,6 @@ public enum SubtipoOutras {
     ATENDIMENTO("Atendimento ao cliente"),
     LIMPEZA_ARMAZEM("Limpeza e arrumação do armazém"),
     LIMPEZA_VEICULOS("Limpeza de veículos"),
-    INTERVALO("Intervalo / Almoço"),
     OUTRAS("Outras atividade");
 
     private final String rotulo;

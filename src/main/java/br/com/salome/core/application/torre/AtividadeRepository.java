@@ -1,6 +1,7 @@
 package br.com.salome.core.application.torre;
 
 import br.com.salome.core.domain.torre.Atividade;
+import br.com.salome.core.domain.torre.CaminhaoEmDescarga;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -21,4 +22,12 @@ public interface AtividadeRepository {
 
     /** Ids de viagens (legado) que já têm descarga de transferência na filial (qualquer status). */
     Set<Long> idsViagensComDescarga(int idFilial);
+
+    /**
+     * Caminhões com descarga de transferência aberta ou finalizada desde {@code finalizadaDesde}
+     * (ex.: começo do dia) — para escolher qual caminhão separar. Default vazio para fakes de teste.
+     */
+    default List<CaminhaoEmDescarga> listarCaminhoesEmDescarga(int idFilial, Instant finalizadaDesde) {
+        return List.of();
+    }
 }

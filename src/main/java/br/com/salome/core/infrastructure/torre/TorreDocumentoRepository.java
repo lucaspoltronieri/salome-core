@@ -2,8 +2,10 @@ package br.com.salome.core.infrastructure.torre;
 
 import br.com.salome.core.application.torre.DocumentoRepository;
 import br.com.salome.core.domain.torre.DocumentoArmazenado;
+import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.StatusDocumento;
+import br.com.salome.core.domain.torre.TipoVeiculo;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
@@ -65,6 +67,29 @@ public class TorreDocumentoRepository implements DocumentoRepository {
             rs.getString("local_tipo"),
             rs.getObject("id_conhecimento_legado", Long.class),
             rs.getTimestamp("atualizado_em").toInstant());
+
+    private static final RowMapper<DocumentoComLocal> COM_LOCAL_MAPPER = (rs, n) -> new DocumentoComLocal(
+            rs.getLong("id"),
+            rs.getObject("numero_cte", Integer.class),
+            rs.getObject("id_conhecimento_legado", Long.class),
+            rs.getBoolean("pre_cte"),
+            rs.getObject("volumes", Integer.class),
+            rs.getBigDecimal("peso"),
+            rs.getString("remetente"),
+            rs.getString("destinatario"),
+            rs.getString("cidade_destino"),
+            rs.getString("chave_nf"),
+            StatusDocumento.valueOf(rs.getString("status")),
+            rs.getObject("id_local_atual", Long.class),
+            rs.getString("codigo_local"));
+
+    private static final String SELECT_COM_LOCAL = """
+            SELECT d.id, d.numero_cte, d.id_conhecimento_legado, d.pre_cte, d.volumes, d.peso,
+                   d.remetente, d.destinatario, d.cidade_destino, d.chave_nf, d.status, d.id_local_atual,
+                   l.codigo AS codigo_local
+              FROM documento_operacional d
+              LEFT JOIN local_armazem l ON l.id = d.id_local_atual
+            """;
 
     /** Estados "vivos" no galpão (fisicamente presentes), na ordem do ciclo. */
     private static final String STATUS_NO_GALPAO =
@@ -193,6 +218,34 @@ public class TorreDocumentoRepository implements DocumentoRepository {
                 )
                  ORDER BY l.codigo, d.numero_cte
                 """, ARMAZENADO_MAPPER, idFilial);
+    }
+
+    @Override
+    public List<DocumentoComLocal> listarParaCarregar(int idFilial, TipoVeiculo tipo) {
+        if (tipo == TipoVeiculo.TRANSFERENCIA) {
+            return jdbc.query(SELECT_COM_LOCAL + """
+                     WHERE d.id_filial = ?
+                       AND d.status = 'SEPARADO_BOX' AND l.codigo = 'TRANSF'
+                     ORDER BY d.numero_cte
+                    """, COM_LOCAL_MAPPER, idFilial);
+        }
+        // ENTREGA: Distribuição (pronto) + sem separação + ainda no caminhão (crossdock direto).
+        return jdbc.query(SELECT_COM_LOCAL + """
+                 WHERE d.id_filial = ?
+                   AND ( (d.status = 'SEPARADO_BOX' AND l.codigo = 'DIST')
+                         OR d.status = 'NO_ARMAZEM'
+                         OR d.status = 'EM_DESCARGA' )
+                 ORDER BY d.status, l.codigo, d.numero_cte
+                """, COM_LOCAL_MAPPER, idFilial);
+    }
+
+    @Override
+    public List<DocumentoComLocal> listarSeparaveisDaViagem(int idFilial, long idViagem) {
+        return jdbc.query(SELECT_COM_LOCAL + """
+                 WHERE d.id_filial = ? AND d.id_viagem_legado = ?
+                   AND d.status IN ('EM_DESCARGA','NO_ARMAZEM')
+                 ORDER BY d.status, d.numero_cte
+                """, COM_LOCAL_MAPPER, idFilial, idViagem);
     }
 
     @Override

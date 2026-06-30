@@ -4,7 +4,8 @@ rm -rf /tmp/sc /work/android /work/build
 flutter create --org br.com.salome --project-name torre_app --platforms=android /tmp/sc >/dev/null 2>&1
 cp -r /tmp/sc/android /work/android
 M=/work/android/app/src/main/AndroidManifest.xml
-sed -i 's#^\( *\)<application$#\1<uses-permission android:name="android.permission.INTERNET"/>\n\1<uses-permission android:name="android.permission.CAMERA"/>\n\1<application android:usesCleartextTraffic="true"#' "$M"
+sed -i '/<manifest /a\    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>' "$M"
+sed -i '0,/<application/{s#<application#<application android:usesCleartextTraffic="true"#}' "$M"
 echo "== manifest top =="; head -4 "$M"
 flutter pub get >/dev/null 2>&1
 echo "== building apk =="

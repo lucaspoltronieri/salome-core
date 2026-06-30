@@ -6,6 +6,7 @@ import br.com.salome.core.domain.torre.AtividadeFinalizada;
 import br.com.salome.core.domain.torre.AtividadeResumo;
 import br.com.salome.core.domain.torre.CancelarAtividadeRequest;
 import br.com.salome.core.domain.torre.EntrarAtividadeRequest;
+import br.com.salome.core.domain.torre.TipoAtividade;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
 import br.com.salome.core.infrastructure.torre.auth.AutenticacaoContexto;
 import jakarta.validation.Valid;
@@ -83,6 +84,15 @@ public class AtividadeWebController {
         return atividadeService.buscarResumo(id, AutenticacaoContexto.filialAtiva(filial));
     }
 
+    /** Carregamento(s) de transferência abertos na filial — para o crossdock direto da coleta. */
+    @GetMapping("/carregamento-transferencia-aberto")
+    public List<AtividadeResumo> carregamentoTransferenciaAberto(@RequestParam(required = false) Integer filial) {
+        return atividadeService.listarAbertas(AutenticacaoContexto.filialAtiva(filial)).stream()
+                .filter(a -> a.tipo() == TipoAtividade.CARREGAMENTO
+                        && "TRANSFERENCIA".equalsIgnoreCase(a.subtipo()))
+                .toList();
+    }
+
     /** Adiciona outra pessoa (colega/chapa) à atividade. */
     @PostMapping("/{id}/participantes")
     public AtividadeResumo adicionarParticipante(@PathVariable long id,
@@ -91,6 +101,16 @@ public class AtividadeWebController {
                                                  @AuthenticationPrincipal UsuarioAutenticado usuario) {
         return atividadeService.adicionarParticipante(
                 id, AutenticacaoContexto.filialAtiva(filial), corpo.idUsuario(), corpo.funcao(), usuario);
+    }
+
+    /** Cadastra uma chapa avulsa (só pelo nome) e já a adiciona à atividade. */
+    @PostMapping("/{id}/chapas")
+    public AtividadeResumo adicionarChapa(@PathVariable long id,
+                                          @RequestParam(required = false) Integer filial,
+                                          @Valid @RequestBody AdicionarChapa corpo,
+                                          @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return atividadeService.adicionarChapa(
+                id, AutenticacaoContexto.filialAtiva(filial), corpo.nome(), corpo.funcao(), usuario);
     }
 
     /** Remove a pessoa da atividade (encerra o tempo dela). */
@@ -104,5 +124,8 @@ public class AtividadeWebController {
     }
 
     public record AdicionarParticipante(@jakarta.validation.constraints.NotNull Long idUsuario, String funcao) {
+    }
+
+    public record AdicionarChapa(@jakarta.validation.constraints.NotBlank String nome, String funcao) {
     }
 }

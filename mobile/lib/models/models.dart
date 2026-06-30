@@ -209,6 +209,10 @@ class DocumentoOperacional {
   final String status;
   final int? idLocalAtual;
 
+  /// Código do box atual (SEP/DIST/TRANSF) — só vem nos endpoints de carregamento/
+  /// separação que fazem join com o local; nos demais fica nulo.
+  final String? codigoLocal;
+
   DocumentoOperacional({
     this.id,
     this.numeroCte,
@@ -222,6 +226,7 @@ class DocumentoOperacional {
     this.chaveNf,
     required this.status,
     this.idLocalAtual,
+    this.codigoLocal,
   });
 
   factory DocumentoOperacional.fromJson(Map<String, dynamic> j) => DocumentoOperacional(
@@ -237,6 +242,7 @@ class DocumentoOperacional {
         chaveNf: j['chaveNf'],
         status: j['status'],
         idLocalAtual: _asInt(j['idLocalAtual']),
+        codigoLocal: j['codigoLocal'],
       );
 }
 
@@ -261,6 +267,44 @@ class LocalArmazem {
         nome: j['nome'] ?? '',
         tipo: j['tipo'] ?? '',
         ativo: j['ativo'] ?? true,
+      );
+}
+
+class Veiculo {
+  final int id;
+  final int idFilial;
+  final String placa;
+  final String tipo; // ENTREGA | TRANSFERENCIA
+  final bool ativo;
+
+  Veiculo({
+    required this.id,
+    required this.idFilial,
+    required this.placa,
+    required this.tipo,
+    required this.ativo,
+  });
+
+  factory Veiculo.fromJson(Map<String, dynamic> j) => Veiculo(
+        id: (j['id'] as num).toInt(),
+        idFilial: (j['idFilial'] as num).toInt(),
+        placa: j['placa'] ?? '',
+        tipo: j['tipo'] ?? 'ENTREGA',
+        ativo: j['ativo'] ?? true,
+      );
+}
+
+class CaminhaoEmDescarga {
+  final int? idViagem;
+  final String? placa;
+  final bool descargaAberta;
+
+  CaminhaoEmDescarga({this.idViagem, this.placa, required this.descargaAberta});
+
+  factory CaminhaoEmDescarga.fromJson(Map<String, dynamic> j) => CaminhaoEmDescarga(
+        idViagem: _asInt(j['idViagem']),
+        placa: j['placa'],
+        descargaAberta: j['descargaAberta'] ?? false,
       );
 }
 

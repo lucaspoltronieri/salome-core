@@ -49,6 +49,11 @@ salome:
       # por filial, p/ não multiplicar as consultas pesadas no legado.
       dias-corte: ${SALOME_TORRE_MAPA_DIAS_CORTE:30}
       cache-segundos: ${SALOME_TORRE_MAPA_CACHE_SEGUNDOS:25}
+    aguardando:
+      # Veículos aguardando descarga (transferências): piso fixo = virada de produção.
+      # Baixados a partir desta data ficam no painel até a descarga ser registrada na
+      # Torre; baixas anteriores (backlog do legado) são ignoradas. Coletas usam só o dia.
+      data-inicio: ${SALOME_TORRE_AGUARDANDO_DATA_INICIO:2026-07-01}
     datasource:
       url: ${SALOME_TORRE_DB_URL:}
       username: ${SALOME_TORRE_DB_USERNAME:}

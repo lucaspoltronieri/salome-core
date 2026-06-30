@@ -33,6 +33,7 @@ public class AtividadeService {
     private final DocumentoService documentoService;
     private final MovimentacaoService movimentacaoService;
     private final br.com.salome.core.application.torre.auth.UsuarioRepository usuarioRepository;
+    private final CadastroService cadastroService;
     private final AuditoriaService auditoriaService;
     private final Clock clock;
 
@@ -42,6 +43,7 @@ public class AtividadeService {
                             DocumentoService documentoService,
                             MovimentacaoService movimentacaoService,
                             br.com.salome.core.application.torre.auth.UsuarioRepository usuarioRepository,
+                            CadastroService cadastroService,
                             AuditoriaService auditoriaService,
                             Clock clock) {
         this.atividadeRepository = atividadeRepository;
@@ -50,6 +52,7 @@ public class AtividadeService {
         this.documentoService = documentoService;
         this.movimentacaoService = movimentacaoService;
         this.usuarioRepository = usuarioRepository;
+        this.cadastroService = cadastroService;
         this.auditoriaService = auditoriaService;
         this.clock = clock;
     }
@@ -73,6 +76,23 @@ public class AtividadeService {
             auditoriaService.registrar(lider, "ADICIONAR_PARTICIPANTE", "atividade_armazem", idAtividade,
                     alvo.nome() + " (#" + idUsuario + ")");
         }
+        return montarResumo(idAtividade, idFilial);
+    }
+
+    /**
+     * Cadastra uma chapa avulsa (só pelo nome) e já a adiciona à atividade — tudo na
+     * mesma transação, então se a entrada falhar a chapa não fica órfã.
+     */
+    public AtividadeResumo adicionarChapa(long idAtividade, int idFilial, String nome,
+                                          String funcao, UsuarioAutenticado lider) {
+        Atividade atividade = exigirAtividade(idAtividade, idFilial);
+        if (atividade.status() != StatusAtividade.ABERTA) {
+            throw new RegraViolada("Atividade não está aberta.");
+        }
+        var chapa = cadastroService.criarChapa(idFilial, nome, lider);
+        entrarInterno(idAtividade, chapa.id(), funcao, clock.instant());
+        auditoriaService.registrar(lider, "ADICIONAR_PARTICIPANTE", "atividade_armazem", idAtividade,
+                chapa.nome() + " (#" + chapa.id() + ", chapa avulsa)");
         return montarResumo(idAtividade, idFilial);
     }
 

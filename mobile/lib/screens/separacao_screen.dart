@@ -11,10 +11,10 @@ import '../widgets/dialogos.dart';
 import '../widgets/scanner_sheet.dart';
 import 'atividade_actions.dart';
 
-/// Separação: lista os documentos disponíveis (NO_ARMAZEM) e separa enviando para
-/// o box de Distribuição. Igual à descarga: dá pra **filtrar** (remetente/destinatário/
-/// CT-e), **selecionar vários** e mandar todos pra Distribuição de uma vez, ou separar
-/// um a um (toque/bipe).
+/// Separação por caminhão: escolhe o caminhão em descarga (ou já descarregado hoje),
+/// abre a separação e marca os CT-es daquele caminhão — que vão direto pro Box
+/// Distribuição. Dá pra ir separando o que já saiu do caminhão mesmo antes da descarga
+/// concluir. Pessoas/chapa/sair/concluir igual à descarga de coleta.
 class SeparacaoScreen extends StatefulWidget {
   final AtividadeResumo? atividade;
   const SeparacaoScreen({super.key, this.atividade});
@@ -25,27 +25,38 @@ class SeparacaoScreen extends StatefulWidget {
 
 class _SeparacaoScreenState extends State<SeparacaoScreen> {
   AtividadeResumo? _atv;
-  List<DocumentoOperacional> _docs = [];
+  List<CaminhaoEmDescarga> _caminhoes = [];
+  List<DocumentoOperacional> _docs = []; // separáveis do caminhão
+  List<DocumentoOperacional> _separados = []; // já SEPARADO_BOX nesta atividade
   List<LocalArmazem> _locais = [];
   final Set<int> _selecionados = {};
   bool _modoSelecao = false;
   bool _ocupado = false;
   bool _carregando = true;
-  String _erro = '';
   String _filtro = '';
+  String? _erro;
 
   @override
   void initState() {
     super.initState();
     _atv = widget.atividade;
-    _init();
+    if (_atv == null) {
+      _carregarCaminhoes();
+    } else {
+      _carregarDocs();
+    }
   }
 
-  Future<void> _init() async {
-    // NÃO abre atividade só por entrar na tela. A atividade (e a cronometragem)
-    // só nasce quando o operador separa o primeiro CT-e — ver _separar()/_marcarSelecionados().
+  // ---- Passo 1: escolher o caminhão ----------------------------------
+  Future<void> _carregarCaminhoes() async {
+    setState(() => _carregando = true);
     try {
-      await _carregar();
+      final c = await session.api.caminhoesParaSeparar();
+      setState(() {
+        _caminhoes = c;
+        _erro = null;
+        _carregando = false;
+      });
     } on ApiException catch (e) {
       setState(() {
         _erro = e.message;
@@ -54,26 +65,52 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     }
   }
 
-  Future<void> _carregar() async {
-    setState(() => _carregando = true);
-    final docs = await session.api.disponiveis('separar');
-    final locais = _locais.isEmpty ? await session.api.locais() : _locais;
-    setState(() {
-      _docs = docs;
-      _locais = locais;
-      _carregando = false;
-    });
+  Future<void> _abrirCaminhao(CaminhaoEmDescarga c) async {
+    if (!await confirmar(context, 'Separar caminhão',
+        'Abrir a separação do caminhão ${c.placa ?? c.idViagem}?')) {
+      return;
+    }
+    try {
+      final atv = await session.api.abrirAtividade(
+        tipo: 'SEPARACAO',
+        idViagem: c.idViagem,
+        placa: c.placa,
+      );
+      if (!mounted) return;
+      setState(() => _atv = atv);
+      await _carregarDocs();
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.message, erro: true);
+    }
   }
 
-  List<DocumentoOperacional> get _filtrados {
-    final f = _filtro.toLowerCase();
-    if (f.isEmpty) return _docs;
-    return _docs.where((d) {
-      return (d.numeroCte?.toString() ?? '').contains(f) ||
-          (d.remetente ?? '').toLowerCase().contains(f) ||
-          (d.destinatario ?? '').toLowerCase().contains(f) ||
-          (d.cidadeDestino ?? '').toLowerCase().contains(f);
-    }).toList();
+  // ---- Passo 2: CT-es do caminhão ------------------------------------
+  Future<void> _carregarDocs() async {
+    setState(() => _carregando = true);
+    try {
+      final idViagem = _atv!.idViagemLegado;
+      final docs = idViagem != null
+          ? await session.api.separaveisDoCaminhao(idViagem)
+          : await session.api.disponiveis('separar'); // legado: atividade sem viagem
+      final separados = (await session.api.documentosDaAtividade(_atv!.id))
+          .where((d) => d.status == 'SEPARADO_BOX')
+          .toList();
+      final locais = _locais.isEmpty ? await session.api.locais() : _locais;
+      setState(() {
+        _docs = docs;
+        _separados = separados;
+        _locais = locais;
+        _erro = null;
+        _carregando = false;
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _erro = e.message;
+          _carregando = false;
+        });
+      }
+    }
   }
 
   LocalArmazem? _boxDistribuicao() {
@@ -83,12 +120,15 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     return null;
   }
 
-  Future<int> _garantirAtividade() async {
-    _atv ??= await session.api.abrirAtividade(tipo: 'SEPARACAO');
-    return _atv!.id;
+  Future<void> _participar() async {
+    if (_atv == null) return;
+    final ok = await entrarAtividade(context, _atv!.id);
+    if (ok) {
+      final a = await session.api.buscarAtividade(_atv!.id);
+      if (mounted) setState(() => _atv = a);
+    }
   }
 
-  // ---- Modo detalhado (um CT-e) ---------------------------------------
   Future<void> _separar(DocumentoOperacional d) async {
     final local = _boxDistribuicao();
     if (local == null) {
@@ -98,19 +138,14 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
       return;
     }
     try {
-      final id = await _garantirAtividade();
-      await session.api.separar(id, d.id!, local.id);
-      if (mounted) {
-        setState(() {}); // revela o cabeçalho/ações da atividade
-        mostrarMensagem(context, 'CT-e ${d.numeroCte ?? d.id} → ${local.nome}');
-      }
-      await _carregar();
+      await session.api.separar(_atv!.id, d.id!, local.id);
+      if (mounted) mostrarMensagem(context, 'CT-e ${d.numeroCte ?? d.id} → ${local.nome}');
+      await _carregarDocs();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
     }
   }
 
-  // ---- Modo rápido (vários CT-es → Distribuição) ----------------------
   Future<void> _marcarSelecionados() async {
     if (_selecionados.isEmpty) return;
     final local = _boxDistribuicao();
@@ -122,16 +157,13 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     }
     setState(() => _ocupado = true);
     try {
-      final id = await _garantirAtividade();
-      await session.api.separarLote(id, _selecionados.toList(), local.id);
-      if (mounted) {
-        mostrarMensagem(context, '${_selecionados.length} CT-e(s) → ${local.nome}');
-      }
+      await session.api.separarLote(_atv!.id, _selecionados.toList(), local.id);
+      if (mounted) mostrarMensagem(context, '${_selecionados.length} CT-e(s) → ${local.nome}');
       setState(() {
         _selecionados.clear();
         _modoSelecao = false;
       });
-      await _carregar();
+      await _carregarDocs();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
     } finally {
@@ -145,8 +177,7 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
       for (final d in _docs) {
         if (d.chaveNf == chave) return d;
       }
-      final numero =
-          ChaveParser.isCte(chave) ? ChaveParser.numero(chave) : null;
+      final numero = ChaveParser.isCte(chave) ? ChaveParser.numero(chave) : null;
       if (numero != null) {
         for (final d in _docs) {
           if (d.numeroCte == numero) return d;
@@ -154,7 +185,6 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
       }
       return null;
     }
-
     final numero = int.tryParse(raw.replaceAll(RegExp(r'\D'), ''));
     if (numero == null) return null;
     for (final d in _docs) {
@@ -169,9 +199,7 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     final doc = _resolverBip(raw);
     if (doc == null) {
       if (mounted) {
-        mostrarMensagem(
-            context, 'Documento bipado não está disponível para separação.',
-            erro: true);
+        mostrarMensagem(context, 'Documento bipado não está neste caminhão.', erro: true);
       }
       return;
     }
@@ -189,23 +217,74 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     });
   }
 
-  Future<void> _finalizar() async {
+  Future<void> _concluir() async {
     if (_atv == null) return;
     await finalizarAtividade(context, _atv!.id, aoMudar: () {
       if (mounted) Navigator.pop(context);
     });
   }
 
-  Future<void> _cancelar() async {
-    if (_atv == null) return;
-    await cancelarAtividade(context, _atv!.id, aoMudar: () {
-      if (mounted) Navigator.pop(context);
-    });
+  List<DocumentoOperacional> get _filtrados {
+    final f = _filtro.toLowerCase();
+    if (f.isEmpty) return _docs;
+    return _docs.where((d) {
+      return (d.numeroCte?.toString() ?? '').contains(f) ||
+          (d.remetente ?? '').toLowerCase().contains(f) ||
+          (d.destinatario ?? '').toLowerCase().contains(f) ||
+          (d.cidadeDestino ?? '').toLowerCase().contains(f);
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final emAtividade = _atv != null;
+    if (_atv == null) return _telaCaminhoes();
+    return _telaSeparacao();
+  }
+
+  // ---- Tela 1: escolha do caminhão -----------------------------------
+  Widget _telaCaminhoes() {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Separação · escolha o caminhão')),
+      body: _carregando
+          ? const Center(child: CircularProgressIndicator())
+          : _erro != null
+              ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(_erro!)))
+              : RefreshIndicator(
+                  onRefresh: _carregarCaminhoes,
+                  child: _caminhoes.isEmpty
+                      ? ListView(children: const [
+                          Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Center(child: Text('Nenhum caminhão em descarga hoje.')))
+                        ])
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _caminhoes.length,
+                          itemBuilder: (_, i) {
+                            final c = _caminhoes[i];
+                            return Card(
+                              child: ListTile(
+                                leading: Icon(Icons.local_shipping,
+                                    color: c.descargaAberta ? Colors.orange : Colors.green),
+                                title: Text(c.placa ?? 'Viagem ${c.idViagem}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(c.descargaAberta
+                                    ? 'Descarregando agora'
+                                    : 'Descarregado hoje'),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => _abrirCaminhao(c),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+    );
+  }
+
+  // ---- Tela 2: separação do caminhão ---------------------------------
+  Widget _telaSeparacao() {
+    final souParticipante = _atv!.souParticipanteAtivo(session.usuario?.id);
+    final docs = _filtrados;
     final toggle = <Widget>[
       if (_docs.isNotEmpty)
         IconButton(
@@ -218,23 +297,23 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
         ),
     ];
     return PopScope(
-      canPop: !emAtividade,
+      canPop: !souParticipante,
       onPopInvoked: (didPop) {
         if (!didPop && mounted) {
-          mostrarMensagem(context, 'Use "Finalizar" ou "Cancelar" para fechar a atividade.');
+          mostrarMensagem(context, 'Use "Sair" ou "Concluir" para fechar a atividade.');
         }
       },
       child: Scaffold(
-        appBar: emAtividade
-            ? appBarAtividade(
-                context,
-                titulo: 'Separação',
-                iniciadaEm: _atv!.iniciadaEm,
-                idAtividade: _atv!.id,
-                mostrarCancelar: false,
-                acoesExtras: toggle,
-              )
-            : AppBar(title: const Text('Separação'), actions: toggle),
+        appBar: appBarAtividade(
+          context,
+          titulo: 'Separação · ${_atv!.placaVeiculo ?? '#${_atv!.id}'}',
+          iniciadaEm: _atv!.iniciadaEm,
+          idAtividade: _atv!.id,
+          aoMudar: () {
+            if (mounted) Navigator.pop(context);
+          },
+          acoesExtras: toggle,
+        ),
         floatingActionButton: _modoSelecao
             ? null
             : FloatingActionButton.extended(
@@ -242,40 +321,66 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
                 icon: const Icon(Icons.qr_code_scanner),
                 label: const Text('Bipar'),
               ),
-        bottomNavigationBar: _barraInferior(),
-        body: _erro.isNotEmpty
-            ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(_erro)))
+        bottomNavigationBar: _modoSelecao
+            ? SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: botaoGrandeAtividade(
+                    icone: Icons.playlist_add_check,
+                    texto: 'Marcar ${_selecionados.length} → Distribuição',
+                    onPressed: (_selecionados.isEmpty || _ocupado) ? null : _marcarSelecionados,
+                  ),
+                ),
+              )
+            : barraAtividadeCompartilhada(
+                context,
+                idAtividade: _atv!.id,
+                ativos: _atv!.participantesAtivos,
+                souParticipante: souParticipante,
+                onParticipar: _participar,
+                onSair: () => sairAtividade(context, _atv!.id, aoMudar: () {
+                  if (mounted) Navigator.pop(context);
+                }),
+                primaria: souParticipante
+                    ? botaoGrandeAtividade(
+                        icone: Icons.check_circle,
+                        texto: 'Concluir separação',
+                        onPressed: _concluir,
+                        cor: Colors.green,
+                      )
+                    : null,
+              ),
+        body: _erro != null
+            ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(_erro!)))
             : _carregando
                 ? const Center(child: CircularProgressIndicator())
                 : Column(
                     children: [
-                      if (_docs.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: TextField(
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.search),
-                              hintText: 'Filtrar por CT-e, remetente, destinatário...',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            onChanged: (v) => setState(() => _filtro = v),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            hintText: 'Filtrar por CT-e, remetente, destino...',
+                            border: OutlineInputBorder(),
+                            isDense: true,
                           ),
+                          onChanged: (v) => setState(() => _filtro = v),
                         ),
-                      if (_modoSelecao) _barraSelecao(),
+                      ),
                       Expanded(
                         child: RefreshIndicator(
-                          onRefresh: _carregar,
-                          child: _filtrados.isEmpty
-                              ? ListView(children: const [
-                                  Padding(
-                                      padding: EdgeInsets.all(24),
-                                      child: Center(child: Text('Nada para separar.')))
-                                ])
-                              : ListView.builder(
-                                  itemCount: _filtrados.length,
-                                  itemBuilder: (_, i) => _linha(_filtrados[i]),
-                                ),
+                          onRefresh: _carregarDocs,
+                          child: ListView(
+                            children: [
+                              ...docs.map(_linha),
+                              if (_separados.isNotEmpty) _secaoSeparados(),
+                              if (docs.isEmpty && _separados.isEmpty)
+                                const Padding(
+                                    padding: EdgeInsets.all(24),
+                                    child: Center(child: Text('Nada para separar neste caminhão.'))),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -284,39 +389,16 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     );
   }
 
-  Widget _barraSelecao() {
-    final ids = _filtrados.map((d) => d.id).whereType<int>().toList();
-    final todosSel = ids.isNotEmpty && ids.every(_selecionados.contains);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Text('${_selecionados.length} selecionado(s)'),
-          const Spacer(),
-          TextButton.icon(
-            icon: Icon(todosSel ? Icons.deselect : Icons.select_all),
-            label: Text(todosSel ? 'Limpar' : 'Selecionar todos'),
-            onPressed: () => setState(() {
-              if (todosSel) {
-                _selecionados.removeAll(ids);
-              } else {
-                _selecionados.addAll(ids);
-              }
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _linha(DocumentoOperacional d) {
     final sel = _selecionados.contains(d.id);
+    final emDescarga = d.status == 'EM_DESCARGA';
     return ListTile(
       leading: _modoSelecao
           ? Checkbox(value: sel, onChanged: (_) => _alternar(d.id))
-          : const Icon(Icons.call_split, color: Colors.orange),
+          : Icon(Icons.call_split, color: emDescarga ? Colors.purple : Colors.orange),
       title: Text('CT-e ${d.numeroCte ?? d.id}'),
       subtitle: Text([
+        if (emDescarga) 'ainda no caminhão',
         if (d.remetente != null) d.remetente!,
         if (d.destinatario != null) d.destinatario!,
         if (d.cidadeDestino != null) d.cidadeDestino!,
@@ -326,36 +408,18 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     );
   }
 
-  Widget? _barraInferior() {
-    if (_modoSelecao) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: botaoGrandeAtividade(
-            icone: Icons.playlist_add_check,
-            texto: 'Marcar ${_selecionados.length} → Distribuição',
-            onPressed: (_selecionados.isEmpty || _ocupado) ? null : _marcarSelecionados,
-          ),
-        ),
-      );
-    }
-    if (_atv == null) return null;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            botaoGrandeAtividade(
-              icone: Icons.check_circle,
-              texto: 'Finalizar',
-              onPressed: _finalizar,
-              cor: Colors.green,
-            ),
-            TextButton(onPressed: _cancelar, child: const Text('Cancelar atividade')),
-          ],
-        ),
-      ),
+  Widget _secaoSeparados() {
+    return ExpansionTile(
+      leading: const Icon(Icons.inventory_2, color: Colors.green),
+      title: Text('Separados → Distribuição (${_separados.length})'),
+      children: _separados
+          .map((d) => ListTile(
+                dense: true,
+                leading: const Icon(Icons.check_circle, color: Colors.green),
+                title: Text('CT-e ${d.numeroCte ?? d.id}'),
+                subtitle: Text(d.destinatario ?? d.cidadeDestino ?? ''),
+              ))
+          .toList(),
     );
   }
 }

@@ -13,6 +13,9 @@ import br.com.salome.core.domain.torre.erro.RecursoNaoEncontrado;
 import br.com.salome.core.domain.torre.erro.RegraViolada;
 import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -107,10 +110,12 @@ public class DocumentoService {
      * SEPARADO_BOX). Idempotente. Retorna quantos foram efetivados.
      */
     public int concluirDescarga(long idAtividade, UsuarioAutenticado usuario) {
-        exigir(idAtividade, usuario.idFilial());
+        Atividade atividade = exigir(idAtividade, usuario.idFilial());
+        List<DocumentoOperacional> documentos = documentoRepository.listarPorAtividade(idAtividade);
+        exigirTodosCtesMarcados(atividade, documentos);
         var now = clock.instant();
         int efetivados = 0;
-        for (DocumentoOperacional doc : documentoRepository.listarPorAtividade(idAtividade)) {
+        for (DocumentoOperacional doc : documentos) {
             if (doc.status() != StatusDocumento.EM_DESCARGA || doc.idLocalAtual() == null) {
                 continue;
             }
@@ -121,6 +126,29 @@ public class DocumentoService {
             efetivados++;
         }
         return efetivados;
+    }
+
+    private void exigirTodosCtesMarcados(Atividade atividade, List<DocumentoOperacional> documentos) {
+        if (atividade.idViagemLegado() == null) {
+            throw new RegraViolada("Atividade sem viagem associada.");
+        }
+        Set<Long> idsMarcados = documentos.stream()
+                .map(DocumentoOperacional::idConhecimentoLegado)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<CteDescarga> pendentes = conhecimentoLegadoRepository
+                .listarCtesDaViagem(atividade.idViagemLegado()).stream()
+                .filter(cte -> !idsMarcados.contains(cte.idConhecimento()))
+                .toList();
+        if (!pendentes.isEmpty()) {
+            String amostra = pendentes.stream()
+                    .limit(5)
+                    .map(cte -> cte.cte() == null ? "#" + cte.idConhecimento() : cte.cte().toString())
+                    .collect(Collectors.joining(", "));
+            throw new RegraViolada("Existem " + pendentes.size()
+                    + " CT-e(s) da viagem ainda sem destino na descarga. Marque todos antes de concluir."
+                    + " Pendentes: " + amostra + (pendentes.size() > 5 ? "..." : ""));
+        }
     }
 
     /** Mapeia o box destino (SEP/DIST/TRANSF) para o status final do documento. */

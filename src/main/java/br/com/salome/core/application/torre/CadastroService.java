@@ -5,6 +5,7 @@ import br.com.salome.core.domain.torre.BoxPadrao;
 import br.com.salome.core.domain.torre.CriarLocalRequest;
 import br.com.salome.core.domain.torre.FilialTorre;
 import br.com.salome.core.domain.torre.LocalArmazem;
+import br.com.salome.core.domain.torre.PerfilCodigo;
 import br.com.salome.core.domain.torre.SalvarFilialRequest;
 import br.com.salome.core.domain.torre.auth.CriarUsuarioRequest;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
@@ -12,6 +13,7 @@ import br.com.salome.core.domain.torre.auth.UsuarioResumo;
 import br.com.salome.core.domain.torre.erro.RecursoNaoEncontrado;
 import br.com.salome.core.domain.torre.erro.RegraViolada;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -55,6 +57,44 @@ public class CadastroService {
         auditoriaService.registrar(admin, "CRIAR_USUARIO", "usuario", id,
                 req.login() + " (" + req.perfil() + ", filial " + req.idFilial() + ")");
         return new UsuarioResumo(id, req.nome().trim(), req.login().trim(), req.idFilial(), req.perfil(), true);
+    }
+
+    /**
+     * Cadastra uma chapa avulsa (mão de obra esporádica) só pelo nome. Diferente de
+     * {@link #criarUsuario}, NÃO exige admin nem senha: a chapa não acessa o app — entra
+     * na atividade pelo líder. O login é gerado a partir do nome (único) e a senha é
+     * aleatória/descartável só pra satisfazer o NOT NULL.
+     */
+    public UsuarioResumo criarChapa(int idFilial, String nome, UsuarioAutenticado autor) {
+        String nomeLimpo = nome == null ? "" : nome.trim();
+        if (nomeLimpo.isBlank()) {
+            throw new RegraViolada("Informe o nome da chapa.");
+        }
+        filialRepository.buscar(idFilial)
+                .orElseThrow(() -> new RegraViolada("Filial " + idFilial + " não cadastrada na Torre."));
+        String login = loginChapaDisponivel(nomeLimpo);
+        String hash = passwordEncoder.encode(UUID.randomUUID().toString());
+        long id = usuarioRepository.criar(login, nomeLimpo, hash, idFilial, PerfilCodigo.CHAPA);
+        auditoriaService.registrar(autor, "CRIAR_CHAPA", "usuario", id,
+                nomeLimpo + " (chapa avulsa, filial " + idFilial + ")");
+        return new UsuarioResumo(id, nomeLimpo, login, idFilial, PerfilCodigo.CHAPA, true);
+    }
+
+    /** Gera um login livre derivado do nome (chapa.<slug>, com sufixo numérico se já existir). */
+    private String loginChapaDisponivel(String nome) {
+        String slug = nome.toLowerCase()
+                .replaceAll("[^a-z0-9]+", ".")
+                .replaceAll("(^\\.+)|(\\.+$)", "");
+        if (slug.isBlank()) {
+            slug = "avulsa";
+        }
+        String base = "chapa." + slug;
+        String login = base;
+        int sufixo = 1;
+        while (usuarioRepository.buscarPorLogin(login).isPresent()) {
+            login = base + "." + (++sufixo);
+        }
+        return login;
     }
 
     public void definirUsuarioAtivo(long id, boolean ativo, UsuarioAutenticado admin) {

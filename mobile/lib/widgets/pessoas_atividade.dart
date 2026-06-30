@@ -97,6 +97,40 @@ class _PainelPessoasState extends State<_PainelPessoas> {
     }
   }
 
+  Future<void> _adicionarChapa() async {
+    final ctrl = TextEditingController();
+    final nome = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Chapa avulsa'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'Nome da pessoa'),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+    if (nome == null || nome.isEmpty) return;
+    try {
+      final a = await session.api.adicionarChapa(widget.idAtividade, nome);
+      if (mounted) {
+        setState(() => _atv = a);
+        mostrarMensagem(context, '$nome entrou como chapa.');
+      }
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.message, erro: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ativos = (_atv?.participantes ?? []).where((p) => p.ativo).toList();
@@ -138,8 +172,14 @@ class _PainelPessoasState extends State<_PainelPessoas> {
             const SizedBox(height: 8),
             FilledButton.icon(
               icon: const Icon(Icons.person_add),
-              label: const Text('Adicionar pessoa / chapa'),
+              label: const Text('Adicionar pessoa'),
               onPressed: _adicionar,
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.engineering),
+              label: const Text('Chapa avulsa (digitar nome)'),
+              onPressed: _adicionarChapa,
             ),
           ],
         ),

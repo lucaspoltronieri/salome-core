@@ -128,9 +128,56 @@ class TorreApi {
     return DocumentoOperacional.fromJson(j as Map<String, dynamic>);
   }
 
+  /// Crossdock direto na coleta: a NF entra direto no carregamento de transferência.
+  Future<DocumentoOperacional> biparNfCrossdock(
+    int idAtividade, {
+    required String chaveNf,
+    String? numeroNf,
+    String? serie,
+    String? cnpjEmitente,
+    int? volumes,
+    double? peso,
+    required int idAtividadeCarregamento,
+  }) async {
+    final j = await _c.post('/api/torre/atividades/$idAtividade/coletas/crossdock', body: {
+      'chaveNf': chaveNf,
+      if (numeroNf != null) 'numeroNf': numeroNf,
+      if (serie != null) 'serie': serie,
+      if (cnpjEmitente != null) 'cnpjEmitente': cnpjEmitente,
+      if (volumes != null) 'volumes': volumes,
+      if (peso != null) 'peso': peso,
+      'idAtividadeCarregamento': idAtividadeCarregamento,
+    });
+    return DocumentoOperacional.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Carregamento(s) de transferência abertos na filial (para o crossdock da coleta).
+  Future<List<AtividadeResumo>> carregamentoTransferenciaAberto() async {
+    final j = await _c.get('/api/torre/atividades/carregamento-transferencia-aberto');
+    return (j as List).map((e) => AtividadeResumo.fromJson(e)).toList();
+  }
+
   // ---- Separação / Carregamento --------------------------------------
   Future<List<DocumentoOperacional>> disponiveis(String para) async {
     final j = await _c.get('/api/torre/documentos/disponiveis', query: {'para': para});
+    return (j as List).map((e) => DocumentoOperacional.fromJson(e)).toList();
+  }
+
+  /// Carregáveis por tipo (ENTREGA|TRANSFERENCIA), já com o código do box atual.
+  Future<List<DocumentoOperacional>> carregaveis(String tipo) async {
+    final j = await _c.get('/api/torre/documentos/carregaveis', query: {'tipo': tipo});
+    return (j as List).map((e) => DocumentoOperacional.fromJson(e)).toList();
+  }
+
+  /// Caminhões em descarga (ou descarregados hoje) para a separação por caminhão.
+  Future<List<CaminhaoEmDescarga>> caminhoesParaSeparar() async {
+    final j = await _c.get('/api/torre/separacao/caminhoes');
+    return (j as List).map((e) => CaminhaoEmDescarga.fromJson(e)).toList();
+  }
+
+  /// CT-es separáveis de um caminhão (viagem): EM_DESCARGA ou NO_ARMAZEM.
+  Future<List<DocumentoOperacional>> separaveisDoCaminhao(int idViagem) async {
+    final j = await _c.get('/api/torre/separacao/documentos', query: {'idViagem': '$idViagem'});
     return (j as List).map((e) => DocumentoOperacional.fromJson(e)).toList();
   }
 
@@ -174,6 +221,13 @@ class TorreApi {
     return AtividadeResumo.fromJson(j as Map<String, dynamic>);
   }
 
+  /// Cadastra uma chapa avulsa (só pelo nome) e já a adiciona à atividade.
+  Future<AtividadeResumo> adicionarChapa(int idAtividade, String nome, {String? funcao}) async {
+    final j = await _c.post('/api/torre/atividades/$idAtividade/chapas',
+        body: {'nome': nome, if (funcao != null) 'funcao': funcao});
+    return AtividadeResumo.fromJson(j as Map<String, dynamic>);
+  }
+
   Future<AtividadeResumo> removerParticipante(int idAtividade, int idUsuario) async {
     final j = await _c.delete('/api/torre/atividades/$idAtividade/participantes/$idUsuario');
     return AtividadeResumo.fromJson(j as Map<String, dynamic>);
@@ -183,6 +237,17 @@ class TorreApi {
   Future<List<LocalArmazem>> locais() async {
     final j = await _c.get('/api/torre/locais');
     return (j as List).map((e) => LocalArmazem.fromJson(e)).toList();
+  }
+
+  // ---- Veículos (placas de saída) ------------------------------------
+  Future<List<Veiculo>> veiculos(String tipo) async {
+    final j = await _c.get('/api/torre/veiculos', query: {'tipo': tipo});
+    return (j as List).map((e) => Veiculo.fromJson(e)).toList();
+  }
+
+  Future<Veiculo> cadastrarVeiculo(String placa, String tipo) async {
+    final j = await _c.post('/api/torre/veiculos', body: {'placa': placa, 'tipo': tipo});
+    return Veiculo.fromJson(j as Map<String, dynamic>);
   }
 
   // ---- Ocorrência -----------------------------------------------------
