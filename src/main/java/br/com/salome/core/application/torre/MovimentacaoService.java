@@ -64,8 +64,10 @@ public class MovimentacaoService {
     public List<CaminhaoEmDescarga> caminhoesParaSeparar(int idFilial) {
         var inicioDoDia = LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
         var jaSeparadas = atividadeRepository.idsViagensComSeparacaoConcluida(idFilial);
+        var emSeparacao = atividadeRepository.idsViagensComSeparacaoAberta(idFilial);
         List<CaminhaoEmDescarga> base = atividadeRepository.listarCaminhoesEmDescarga(idFilial, inicioDoDia).stream()
-                .filter(c -> c.idViagem() == null || !jaSeparadas.contains(c.idViagem()))
+                .filter(c -> c.idViagem() == null
+                        || (!jaSeparadas.contains(c.idViagem()) && !emSeparacao.contains(c.idViagem())))
                 .toList();
 
         var idsViagem = base.stream().map(CaminhaoEmDescarga::idViagem).filter(Objects::nonNull).toList();

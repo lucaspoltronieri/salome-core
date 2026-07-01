@@ -41,6 +41,15 @@ public interface AtividadeRepository {
     }
 
     /**
+     * Ids de viagens (legado) que já têm uma separação ABERTA na filial — o caminhão sai da
+     * lista "para separar" enquanto a separação está em andamento (quem for ajudar entra pelo
+     * aviso de atividade ativa, não abrindo outra). Default vazio para fakes de teste.
+     */
+    default Set<Long> idsViagensComSeparacaoAberta(int idFilial) {
+        return Set.of();
+    }
+
+    /**
      * Separação ABERTA daquela viagem na filial, se houver — para reaproveitar a atividade
      * (2º operador entra na mesma) em vez de criar outra. Default vazio para fakes de teste.
      */

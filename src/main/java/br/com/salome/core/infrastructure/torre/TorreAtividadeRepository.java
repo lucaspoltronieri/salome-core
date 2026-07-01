@@ -133,6 +133,21 @@ public class TorreAtividadeRepository implements AtividadeRepository {
     }
 
     @Override
+    public Set<Long> idsViagensComSeparacaoAberta(int idFilial) {
+        // Viagem com separação ABERTA (em andamento) some da lista de caminhões a separar —
+        // não se abre outra por cima; quem for ajudar entra pelo aviso de atividade ativa.
+        List<Long> ids = jdbc.queryForList("""
+                SELECT DISTINCT id_viagem_legado
+                  FROM atividade_armazem
+                 WHERE id_filial = ?
+                   AND tipo = 'SEPARACAO'
+                   AND id_viagem_legado IS NOT NULL
+                   AND status = 'ABERTA'
+                """, Long.class, idFilial);
+        return new HashSet<>(ids);
+    }
+
+    @Override
     public Optional<Atividade> buscarSeparacaoAbertaDaViagem(int idFilial, long idViagem) {
         try {
             return Optional.ofNullable(jdbc.queryForObject("""
