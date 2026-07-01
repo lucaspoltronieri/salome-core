@@ -6,15 +6,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.com.salome.core.application.torre.AtividadeRepository;
 import br.com.salome.core.application.torre.AtividadeService;
 import br.com.salome.core.application.torre.MovimentacaoService;
+import br.com.salome.core.application.torre.ViagemLegadoRepository;
 import br.com.salome.core.domain.torre.AbrirAtividadeRequest;
 import br.com.salome.core.domain.torre.Atividade;
 import br.com.salome.core.domain.torre.CaminhaoEmDescarga;
 import br.com.salome.core.domain.torre.PerfilCodigo;
 import br.com.salome.core.domain.torre.TipoAtividade;
+import br.com.salome.core.domain.torre.ViagemAguardando;
 import br.com.salome.core.domain.torre.auth.UsuarioAutenticado;
 import br.com.salome.core.domain.torre.erro.RegraViolada;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -41,7 +44,7 @@ class SeparacaoUnicaTest {
                 return Set.of(200L); // viagem 200 já separada uma vez
             }
         };
-        var service = new MovimentacaoService(repo, null, null, clock);
+        var service = new MovimentacaoService(repo, null, null, fakeViagemLegado(), clock);
 
         var caminhoes = service.caminhoesParaSeparar(FILIAL);
 
@@ -72,5 +75,17 @@ class SeparacaoUnicaTest {
         @Override public void finalizar(long id, Instant finalizadaEm) { throw new UnsupportedOperationException(); }
         @Override public void cancelar(long id, Instant canceladaEm, String motivo) { throw new UnsupportedOperationException(); }
         @Override public Set<Long> idsViagensComDescarga(int idFilial) { throw new UnsupportedOperationException(); }
+    }
+
+    /** Sem resumo do legado nestes testes — usa o default de buscarResumoPorViagens (mapa vazio). */
+    private static ViagemLegadoRepository fakeViagemLegado() {
+        return new ViagemLegadoRepository() {
+            @Override public List<ViagemAguardando> listarAguardandoDescarga(int idFilialDestino, LocalDate dataCorte, int limite) {
+                throw new UnsupportedOperationException();
+            }
+            @Override public List<ViagemAguardando> listarColetasAguardando(int idFilial, LocalDate dataCorte, int limite) {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 }

@@ -5,6 +5,7 @@ import br.com.salome.core.domain.torre.CaminhaoEmDescarga;
 import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
 import br.com.salome.core.domain.torre.LocalArmazem;
+import br.com.salome.core.domain.torre.ResumoViagemLegado;
 import br.com.salome.core.domain.torre.StatusAtividade;
 import br.com.salome.core.domain.torre.StatusDocumento;
 import br.com.salome.core.domain.torre.TipoAtividade;
@@ -15,6 +16,8 @@ import br.com.salome.core.domain.torre.erro.RegraViolada;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,15 +34,18 @@ public class MovimentacaoService {
     private final AtividadeRepository atividadeRepository;
     private final DocumentoRepository documentoRepository;
     private final LocalArmazemRepository localRepository;
+    private final ViagemLegadoRepository viagemLegadoRepository;
     private final Clock clock;
 
     public MovimentacaoService(AtividadeRepository atividadeRepository,
                                DocumentoRepository documentoRepository,
                                LocalArmazemRepository localRepository,
+                               ViagemLegadoRepository viagemLegadoRepository,
                                Clock clock) {
         this.atividadeRepository = atividadeRepository;
         this.documentoRepository = documentoRepository;
         this.localRepository = localRepository;
+        this.viagemLegadoRepository = viagemLegadoRepository;
         this.clock = clock;
     }
 
@@ -51,14 +57,29 @@ public class MovimentacaoService {
     /**
      * Caminhões em descarga (ou descarregados hoje) — escolha do caminhão a separar.
      * Viagens cuja separação já foi concluída saem da lista: cada viagem se separa uma vez.
+     * Enriquecido em lote com origem/motorista/CT-e/vol/peso/data de chegada do legado, pra
+     * o app mostrar a mesma informação que a lista de "aguardando descarga" já mostra.
      */
     @Transactional(value = "torreTransactionManager", readOnly = true)
     public List<CaminhaoEmDescarga> caminhoesParaSeparar(int idFilial) {
         var inicioDoDia = LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
         var jaSeparadas = atividadeRepository.idsViagensComSeparacaoConcluida(idFilial);
-        return atividadeRepository.listarCaminhoesEmDescarga(idFilial, inicioDoDia).stream()
+        List<CaminhaoEmDescarga> base = atividadeRepository.listarCaminhoesEmDescarga(idFilial, inicioDoDia).stream()
                 .filter(c -> c.idViagem() == null || !jaSeparadas.contains(c.idViagem()))
                 .toList();
+
+        var idsViagem = base.stream().map(CaminhaoEmDescarga::idViagem).filter(Objects::nonNull).toList();
+        Map<Long, ResumoViagemLegado> resumos = viagemLegadoRepository.buscarResumoPorViagens(idsViagem);
+
+        return base.stream().map(c -> {
+            ResumoViagemLegado r = c.idViagem() == null ? null : resumos.get(c.idViagem());
+            if (r == null) {
+                return c;
+            }
+            return new CaminhaoEmDescarga(c.idViagem(), c.placa(), c.descargaAberta(),
+                    r.origem(), r.motorista(), r.qtdCtes(), r.volumes(), r.peso(),
+                    r.dataBaixa(), r.horaBaixa(), r.qtdManifestos());
+        }).toList();
     }
 
     /** CT-es separáveis de um caminhão: ainda saindo (EM_DESCARGA) ou no armazém (NO_ARMAZEM). */

@@ -93,6 +93,29 @@ class ViagemAguardando {
       );
 }
 
+/// Data de chegada + contagem de manifestos de uma viagem — usado como fallback pra
+/// enriquecer Descarga/Separação quando reabertas sem o contexto rico da lista original.
+class ManifestoResumo {
+  final int idViagem;
+  final int qtdManifestos;
+  final String? dataBaixa;
+  final String? horaBaixa;
+
+  ManifestoResumo({
+    required this.idViagem,
+    required this.qtdManifestos,
+    this.dataBaixa,
+    this.horaBaixa,
+  });
+
+  factory ManifestoResumo.fromJson(Map<String, dynamic> j) => ManifestoResumo(
+        idViagem: (j['idViagem'] as num).toInt(),
+        qtdManifestos: (j['qtdManifestos'] as num).toInt(),
+        dataBaixa: j['dataBaixa']?.toString(),
+        horaBaixa: j['horaBaixa'],
+      );
+}
+
 class Participante {
   final int? id;
   final int? idUsuario;
@@ -317,13 +340,41 @@ class CaminhaoEmDescarga {
   final int? idViagem;
   final String? placa;
   final bool descargaAberta;
+  final String? origem;
+  final String? motorista;
+  final int qtdCtes;
+  final double volumes;
+  final double peso;
+  final String? dataBaixa;
+  final String? horaBaixa;
+  final int qtdManifestos;
 
-  CaminhaoEmDescarga({this.idViagem, this.placa, required this.descargaAberta});
+  CaminhaoEmDescarga({
+    this.idViagem,
+    this.placa,
+    required this.descargaAberta,
+    this.origem,
+    this.motorista,
+    this.qtdCtes = 0,
+    this.volumes = 0,
+    this.peso = 0,
+    this.dataBaixa,
+    this.horaBaixa,
+    this.qtdManifestos = 1,
+  });
 
   factory CaminhaoEmDescarga.fromJson(Map<String, dynamic> j) => CaminhaoEmDescarga(
         idViagem: _asInt(j['idViagem']),
         placa: j['placa'],
         descargaAberta: j['descargaAberta'] ?? false,
+        origem: j['origem'],
+        motorista: j['motorista'],
+        qtdCtes: _asInt(j['qtdCtes']) ?? 0,
+        volumes: _asDouble(j['volumes']) ?? 0,
+        peso: _asDouble(j['peso']) ?? 0,
+        dataBaixa: j['dataBaixa']?.toString(),
+        horaBaixa: j['horaBaixa'],
+        qtdManifestos: _asInt(j['qtdManifestos']) ?? 1,
       );
 }
 

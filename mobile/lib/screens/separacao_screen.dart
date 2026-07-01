@@ -17,7 +17,25 @@ import 'atividade_actions.dart';
 /// concluir. Pessoas/chapa/sair/concluir igual à descarga de coleta.
 class SeparacaoScreen extends StatefulWidget {
   final AtividadeResumo? atividade;
-  const SeparacaoScreen({super.key, this.atividade});
+  /// Opcionais: preenchidos quando vem da Tela 1 (CaminhaoEmDescarga já enriquecido).
+  /// Se nulos (ex. reaberta via Home), a tela busca via manifestoDaViagem() como fallback.
+  final String? origemInicial;
+  final String? motoristaInicial;
+  final String? dataBaixaInicial;
+  final String? horaBaixaInicial;
+  final int? qtdManifestosInicial;
+  final bool? descargaAbertaInicial;
+
+  const SeparacaoScreen({
+    super.key,
+    this.atividade,
+    this.origemInicial,
+    this.motoristaInicial,
+    this.dataBaixaInicial,
+    this.horaBaixaInicial,
+    this.qtdManifestosInicial,
+    this.descargaAbertaInicial,
+  });
 
   @override
   State<SeparacaoScreen> createState() => _SeparacaoScreenState();
@@ -37,16 +55,33 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
   final TextEditingController _filtroCtrl = TextEditingController();
   String? _erro;
 
+  String? _origem;
+  String? _motorista;
+  String? _dataBaixa;
+  String? _horaBaixa;
+  int _qtdManifestos = 1;
+  bool? _descargaAberta;
+
   @override
   void initState() {
     super.initState();
     _atv = widget.atividade;
+    _origem = widget.origemInicial;
+    _motorista = widget.motoristaInicial;
+    _dataBaixa = widget.dataBaixaInicial;
+    _horaBaixa = widget.horaBaixaInicial;
+    _qtdManifestos = widget.qtdManifestosInicial ?? 1;
+    _descargaAberta = widget.descargaAbertaInicial;
     if (_atv == null) {
       _carregarCaminhoes();
     } else {
       _carregarDocs();
     }
   }
+
+  /// "Ainda descarregando" quando reaberta sem o status conhecido: qualquer documento
+  /// EM_DESCARGA na lista indica que ainda tem mercadoria saindo do caminhão.
+  bool get _aindaDescarregando => _descargaAberta ?? _docs.any((d) => d.status == 'EM_DESCARGA');
 
   @override
   void dispose() {
@@ -94,7 +129,15 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
         placa: c.placa,
       );
       if (!mounted) return;
-      setState(() => _atv = atv);
+      setState(() {
+        _atv = atv;
+        _origem = c.origem;
+        _motorista = c.motorista;
+        _dataBaixa = c.dataBaixa;
+        _horaBaixa = c.horaBaixa;
+        _qtdManifestos = c.qtdManifestos;
+        _descargaAberta = c.descargaAberta;
+      });
       await _carregarDocs();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
@@ -113,6 +156,18 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
           .where((d) => d.status == 'SEPARADO_BOX')
           .toList();
       final locais = _locais.isEmpty ? await session.api.locais() : _locais;
+      // Sem os dados iniciais (reaberta via Home, sem o CaminhaoEmDescarga da Tela 1):
+      // busca a data de chegada/manifesto via fallback. Falha silenciosa (só omite o chip).
+      if (_dataBaixa == null && idViagem != null) {
+        try {
+          final m = await session.api.manifestoDaViagem(idViagem);
+          _dataBaixa = m.dataBaixa;
+          _horaBaixa = m.horaBaixa;
+          _qtdManifestos = m.qtdManifestos;
+        } on ApiException {
+          // omite o chip
+        }
+      }
       setState(() {
         _docs = docs;
         _separados = separados;
@@ -320,11 +375,40 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
                               child: ListTile(
                                 leading: Icon(Icons.local_shipping,
                                     color: c.descargaAberta ? Colors.orange : Colors.green),
-                                title: Text(c.placa ?? 'Viagem ${c.idViagem}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(c.descargaAberta
-                                    ? 'Descarregando agora'
-                                    : 'Descarregado hoje'),
+                                title: Row(children: [
+                                  Flexible(
+                                      child: Text(c.placa ?? 'Viagem ${c.idViagem}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold))),
+                                  if (c.qtdManifestos > 1) ...[
+                                    const SizedBox(width: 6),
+                                    _badgeManifesto(c.qtdManifestos),
+                                  ],
+                                ]),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (c.origem != null) Text(c.origem!),
+                                    if (c.motorista != null) Text(c.motorista!),
+                                    if (c.qtdCtes > 0)
+                                      Text(
+                                          '${c.qtdCtes} CT-es · ${c.volumes.toStringAsFixed(0)} vol · ${c.peso.toStringAsFixed(0)} kg'),
+                                    Row(children: [
+                                      Icon(c.descargaAberta ? Icons.local_shipping : Icons.check_circle,
+                                          size: 14, color: c.descargaAberta ? Colors.orange : Colors.green),
+                                      const SizedBox(width: 4),
+                                      Text(c.descargaAberta ? 'Descarregando agora' : 'Descarregado',
+                                          style: TextStyle(
+                                              color: c.descargaAberta ? Colors.orange : Colors.green,
+                                              fontWeight: FontWeight.bold)),
+                                      if (!c.descargaAberta && c.dataBaixa != null) ...[
+                                        const SizedBox(width: 6),
+                                        Text('· ${_haQuanto(c.dataBaixa!, c.horaBaixa)}',
+                                            style: const TextStyle(color: Colors.grey)),
+                                      ],
+                                    ]),
+                                  ],
+                                ),
+                                isThreeLine: true,
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () => _abrirCaminhao(c),
                               ),
@@ -416,6 +500,7 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
                         padding: const EdgeInsets.all(12),
                         child: Column(
                           children: [
+                            _infoCabecalho(),
                             LinearProgressIndicator(
                                 value: total == 0 ? 0 : feitos / total),
                             const SizedBox(height: 6),
@@ -455,6 +540,42 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     );
   }
 
+  Widget _infoCabecalho() {
+    final semNada = _origem == null && _motorista == null && _dataBaixa == null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          Chip(
+            avatar: Icon(_aindaDescarregando ? Icons.local_shipping : Icons.check_circle,
+                size: 16, color: _aindaDescarregando ? Colors.orange : Colors.green),
+            label: Text(_aindaDescarregando ? 'Descarregando' : 'Descarregado'),
+            backgroundColor: (_aindaDescarregando ? Colors.orange : Colors.green).withOpacity(.12),
+          ),
+          if (!_aindaDescarregando && _dataBaixa != null)
+            Chip(label: Text(_haQuanto(_dataBaixa!, _horaBaixa))),
+          if (_origem != null) Chip(avatar: const Icon(Icons.route, size: 16), label: Text(_origem!)),
+          if (_motorista != null) Chip(avatar: const Icon(Icons.person, size: 16), label: Text(_motorista!)),
+          if (_dataBaixa != null)
+            Chip(
+              avatar: const Icon(Icons.event_available, size: 16),
+              label: Text('Chegada: $_dataBaixa ${_horaBaixa ?? ''}'),
+            ),
+          if (!semNada)
+            Chip(
+              avatar: const Icon(Icons.description, size: 16),
+              label: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Text('Manifesto'),
+                if (_qtdManifestos > 1) ...[const SizedBox(width: 6), _badgeManifesto(_qtdManifestos)],
+              ]),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _linha(DocumentoOperacional d) {
     final sel = _selecionados.contains(d.id);
     final emDescarga = d.status == 'EM_DESCARGA';
@@ -488,4 +609,22 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
           .toList(),
     );
   }
+}
+
+Widget _badgeManifesto(int n) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(10)),
+      child: Text('×$n',
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+    );
+
+/// "há Xh" a partir de dataBaixa (yyyy-MM-dd) + horaBaixa (HH:mm:ss) — cálculo estático,
+/// não usa o widget Cronometro (pensado pra timers ativos, não pra um evento passado).
+String _haQuanto(String dataBaixa, String? horaBaixa) {
+  final dt = DateTime.tryParse('$dataBaixa ${horaBaixa ?? '00:00:00'}');
+  if (dt == null) return '';
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 60) return 'há ${diff.inMinutes} min';
+  if (diff.inHours < 24) return 'há ${diff.inHours}h';
+  return 'há ${diff.inDays}d';
 }

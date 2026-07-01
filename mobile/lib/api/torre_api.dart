@@ -25,6 +25,13 @@ class TorreApi {
     return (j as List).map((e) => ViagemAguardando.fromJson(e)).toList();
   }
 
+  /// Data de chegada + contagem de manifestos — fallback quando a tela (Descarga/Separação)
+  /// é reaberta sem o contexto rico da lista original.
+  Future<ManifestoResumo> manifestoDaViagem(int idViagem) async {
+    final j = await _c.get('/api/torre/viagens/$idViagem/manifesto');
+    return ManifestoResumo.fromJson(j as Map<String, dynamic>);
+  }
+
   // ---- Atividade ------------------------------------------------------
   Future<AtividadeResumo> abrirAtividade({
     required String tipo,

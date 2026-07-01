@@ -1,11 +1,13 @@
 package br.com.salome.core.application.torre;
 
 import br.com.salome.core.domain.torre.FilialTorre;
+import br.com.salome.core.domain.torre.ManifestoResumo;
 import br.com.salome.core.domain.torre.ViagemAguardando;
 import br.com.salome.core.domain.torre.erro.RecursoNaoEncontrado;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -65,6 +67,14 @@ public class ViagemAguardandoService {
                     return !jaAbertas.contains(chave);
                 })
                 .toList();
+    }
+
+    /**
+     * Data de chegada + contagem de manifestos de uma viagem — usado pelas telas de
+     * Descarga/Separação quando reabertas sem o contexto rico da lista original.
+     */
+    public Optional<ManifestoResumo> buscarManifesto(long idViagem) {
+        return viagemLegadoRepository.buscarManifestoDaViagem(idViagem);
     }
 
     /** Viagens trazendo coletas da própria filial ('Em Viagem'), exceto as já em descarga. */
