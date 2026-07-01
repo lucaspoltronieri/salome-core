@@ -120,7 +120,12 @@ class _ScannerSheetState extends State<_ScannerSheet> {
       return 'Permissão de câmera negada — libere nas configurações do aparelho '
           'e tente de novo, ou digite o código manualmente.';
     }
-    return 'Não foi possível abrir a câmera. Digite o código manualmente.';
+    // Diagnóstico: expõe o erro real da câmera pra identificar a causa (a permissão já
+    // está concedida, então start() falha por outro motivo).
+    final det = e is MobileScannerException
+        ? 'code=${e.errorCode}; ${e.errorDetails?.message ?? ''}'
+        : e.toString();
+    return 'Não foi possível abrir a câmera. Digite o código manualmente.\n\n[$det]';
   }
 
   @override
@@ -206,7 +211,8 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                 MobileScanner(
                   controller: _controller,
                   onDetect: _onDetect,
-                  errorBuilder: (context, error, child) => _ErroCamera(
+                  // v7: errorBuilder passou a receber apenas (context, error).
+                  errorBuilder: (context, error) => _ErroCamera(
                     mensagem: _mensagemErro(error),
                     aoDigitar: _digitarManual,
                     aoTentar: _iniciarCamera,
