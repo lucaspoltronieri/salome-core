@@ -25,6 +25,30 @@ Future<bool> confirmar(BuildContext context, String titulo, String mensagem,
   return r ?? false;
 }
 
+/// Pergunta se o usuário quer "participar" (entrar contando tempo) ou apenas
+/// "visualizar" (ver a tela sem entrar) uma atividade em que ele ainda não é
+/// participante ativo. Retorna 'participar', 'visualizar' ou null (fechou sem escolher).
+Future<String?> perguntarParticiparOuVisualizar(BuildContext context, {required String titulo}) {
+  return showDialog<String>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(titulo),
+      content: const Text('Você ainda não está participando desta atividade. O que deseja fazer?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, 'visualizar'),
+          child: const Text('Visualizar'),
+        ),
+        FilledButton.icon(
+          icon: const Icon(Icons.login),
+          onPressed: () => Navigator.pop(context, 'participar'),
+          label: const Text('Participar'),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Pede um motivo (texto obrigatório). Retorna null se cancelar.
 Future<String?> pedirMotivo(BuildContext context, String titulo) async {
   final ctrl = TextEditingController();

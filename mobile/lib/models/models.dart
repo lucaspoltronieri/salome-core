@@ -146,6 +146,8 @@ class AtividadeResumo {
   bool souParticipanteAtivo(int? meuId) =>
       meuId != null && participantes.any((p) => p.idUsuario == meuId && p.ativo);
 
+  String get rotuloTipo => rotuloTipoAtividade(tipo);
+
   factory AtividadeResumo.fromJson(Map<String, dynamic> j) => AtividadeResumo(
         id: (j['id'] as num).toInt(),
         idFilial: (j['idFilial'] as num).toInt(),
@@ -160,6 +162,23 @@ class AtividadeResumo {
             .map((e) => Participante.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+}
+
+/// Rótulo legível do tipo de atividade — usado na lista da Home e na faixa
+/// "você está numa atividade".
+String rotuloTipoAtividade(String tipo) {
+  switch (tipo) {
+    case 'DESCARGA_TRANSFERENCIA':
+      return 'Descarga transferência';
+    case 'DESCARGA_COLETA':
+      return 'Descarga coleta';
+    case 'SEPARACAO':
+      return 'Separação';
+    case 'CARREGAMENTO':
+      return 'Carregamento';
+    default:
+      return 'Outras';
+  }
 }
 
 class CteDescarga {

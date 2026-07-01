@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../main.dart';
 import '../models/models.dart';
+import '../widgets/atividade_ativa_banner.dart';
 import '../widgets/cronometro.dart';
 import '../widgets/dialogos.dart';
+import 'atividade_actions.dart';
 import 'carregamento_screen.dart';
 import 'coleta/coleta_screen.dart';
 import 'coleta/viagens_coleta_screen.dart';
@@ -21,13 +23,27 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late Future<List<AtividadeResumo>> _abertas;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _recarregar();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Voltou do background: recarrega pra faixa "você está numa atividade" refletir
+    // o estado atual (ex.: esqueceu de sair antes de minimizar o app).
+    if (state == AppLifecycleState.resumed) _recarregar();
   }
 
   void _recarregar() {
@@ -39,23 +55,53 @@ class _HomeScreenState extends State<HomeScreen> {
     _recarregar();
   }
 
-  Future<void> _reabrir(AtividadeResumo a) async {
+  Widget _telaParaAtividade(AtividadeResumo a) {
     switch (a.tipo) {
       case 'DESCARGA_TRANSFERENCIA':
-        await _abrir(DescargaScreen(atividade: a));
-        break;
+        return DescargaScreen(atividade: a);
       case 'DESCARGA_COLETA':
-        await _abrir(ColetaScreen(atividade: a));
-        break;
+        return ColetaScreen(atividade: a);
       case 'SEPARACAO':
-        await _abrir(SeparacaoScreen(atividade: a));
-        break;
+        return SeparacaoScreen(atividade: a);
       case 'CARREGAMENTO':
-        await _abrir(CarregamentoScreen(atividade: a));
-        break;
+        return CarregamentoScreen(atividade: a);
       default:
-        await _abrir(OutrasScreen(atividade: a));
+        return OutrasScreen(atividade: a);
     }
+  }
+
+  /// Ao tocar numa atividade em que ainda não participa, pergunta antes de navegar
+  /// (participar entra contando tempo; visualizar abre a tela sem entrar, igual hoje).
+  /// Se já é participante ativo, entra direto — sem perguntar de novo.
+  Future<void> _reabrir(AtividadeResumo a) async {
+    final meuId = session.usuario?.id;
+    if (!a.souParticipanteAtivo(meuId)) {
+      final escolha = await perguntarParticiparOuVisualizar(
+        context,
+        titulo: '${a.rotuloTipo}${a.placaVeiculo != null ? ' · ${a.placaVeiculo}' : ''}',
+      );
+      if (escolha == null || !mounted) return;
+      if (escolha == 'participar') {
+        final ok = await entrarAtividade(context, a.id);
+        if (!ok || !mounted) return;
+        final atualizada = await session.api.buscarAtividade(a.id);
+        if (!mounted) return;
+        await _abrir(_telaParaAtividade(atualizada));
+        return;
+      }
+      // 'visualizar' segue pro fluxo padrão abaixo, igual ao comportamento de hoje.
+    }
+    await _abrir(_telaParaAtividade(a));
+  }
+
+  /// Primeira atividade em que o usuário tem participação ativa, se houver — usado
+  /// pela faixa de aviso no topo da Home.
+  AtividadeResumo? _minhaAtiva(List<AtividadeResumo> lista) {
+    final meuId = session.usuario?.id;
+    for (final a in lista) {
+      if (a.souParticipanteAtivo(meuId)) return a;
+    }
+    return null;
   }
 
   Future<void> _finalizar(AtividadeResumo a) async {
@@ -114,20 +160,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async => _recarregar(),
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).viewPadding.bottom),
-          children: [
-            _grade(),
-            const SizedBox(height: 24),
-            const Text('Atividades abertas',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            _listaAbertas(),
-          ],
-        ),
+      body: Column(
+        children: [
+          _faixaAtividadeAtiva(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async => _recarregar(),
+              child: ListView(
+                padding:
+                    EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).viewPadding.bottom),
+                children: [
+                  _grade(),
+                  const SizedBox(height: 24),
+                  const Text('Atividades abertas',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  _listaAbertas(),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  /// Faixa fixa no topo avisando que o usuário está numa atividade — reusa o mesmo
+  /// snapshot de `_abertas` já carregado pra lista, sem chamada de rede extra.
+  Widget _faixaAtividadeAtiva() {
+    return FutureBuilder<List<AtividadeResumo>>(
+      future: _abertas,
+      builder: (context, snap) {
+        final minha = _minhaAtiva(snap.data ?? []);
+        if (minha == null) return const SizedBox.shrink();
+        return AtividadeAtivaBanner(atividade: minha, onTap: () => _reabrir(minha));
+      },
     );
   }
 
@@ -186,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: lista
               .map((a) => Card(
                     child: ListTile(
-                      title: Text('${_rotuloTipo(a.tipo)}'
+                      title: Text('${a.rotuloTipo}'
                           '${a.placaVeiculo != null ? ' · ${a.placaVeiculo}' : ''}'),
                       subtitle: Row(
                         children: [
@@ -228,21 +295,6 @@ class _Fluxo {
   final IconData icone;
   final VoidCallback onTap;
   _Fluxo(this.titulo, this.icone, this.onTap);
-}
-
-String _rotuloTipo(String tipo) {
-  switch (tipo) {
-    case 'DESCARGA_TRANSFERENCIA':
-      return 'Descarga transferência';
-    case 'DESCARGA_COLETA':
-      return 'Descarga coleta';
-    case 'SEPARACAO':
-      return 'Separação';
-    case 'CARREGAMENTO':
-      return 'Carregamento';
-    default:
-      return 'Outras';
-  }
 }
 
 String _fmt(int segundos) {
