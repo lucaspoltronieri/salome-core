@@ -46,15 +46,7 @@ class _ViagensScreenState extends State<ViagensScreen> {
       if (!mounted) return;
       await Navigator.push(
           context,
-          MaterialPageRoute(
-              builder: (_) => DescargaScreen(
-                    atividade: atv,
-                    origemInicial: g.origem,
-                    motoristaInicial: g.motorista,
-                    dataBaixaInicial: g.dataBaixa,
-                    horaBaixaInicial: g.horaBaixa,
-                    qtdManifestosInicial: g.manifestos,
-                  )));
+          MaterialPageRoute(builder: (_) => DescargaScreen(atividade: atv)));
       _recarregar();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
@@ -92,17 +84,15 @@ class _ViagensScreenState extends State<ViagensScreen> {
                 return Card(
                   child: ListTile(
                     leading: const Icon(Icons.local_shipping, color: Colors.blue),
-                    title: Row(children: [
-                      Flexible(
-                          child: Text(g.placa ?? 'Viagem ${g.chave}',
-                              style: const TextStyle(fontWeight: FontWeight.bold))),
-                      if (g.manifestos > 1) ...[const SizedBox(width: 6), _badgeManifesto(g.manifestos)],
-                    ]),
+                    title: Text(g.placa ?? 'Viagem ${g.chave}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text([
                       if (g.origem != null) g.origem!,
                       if (g.motorista != null) g.motorista!,
                       '${g.qtdCtes} CT-es · ${g.volumes.toStringAsFixed(0)} vol · ${g.peso.toStringAsFixed(0)} kg',
-                      if (g.dataBaixa != null) 'Baixa: ${g.dataBaixa} ${g.horaBaixa ?? ''}',
+                      if (g.dataBaixa != null) 'Chegada: ${g.dataBaixa} ${g.horaBaixa ?? ''}',
+                      if (g.idsManifesto.isNotEmpty)
+                        'Manifesto: ${(g.idsManifesto.toList()..sort()).join(', ')}',
                     ].join('\n')),
                     isThreeLine: true,
                     trailing: const Icon(Icons.chevron_right),
@@ -129,7 +119,7 @@ class _ViagemGrupo {
   double peso = 0;
   String? dataBaixa;
   String? horaBaixa;
-  int manifestos = 0;
+  final List<int> idsManifesto = [];
   _ViagemGrupo(this.chave, this.idViagem, this.placa, this.motorista, this.origem);
 }
 
@@ -142,7 +132,7 @@ List<_ViagemGrupo> _agrupar(List<ViagemAguardando> viagens) {
     g.qtdCtes += v.qtdCtes;
     g.volumes += v.volumes;
     g.peso += v.peso;
-    g.manifestos += 1;
+    g.idsManifesto.add(v.idViagemTransferencia);
     // mantém a baixa mais recente do grupo (mesmo critério do painel TV: agruparViagens()).
     final chaveOrd = '${v.dataBaixa} ${v.horaBaixa ?? ''}';
     final chaveAtual = '${g.dataBaixa} ${g.horaBaixa ?? ''}';
@@ -153,10 +143,3 @@ List<_ViagemGrupo> _agrupar(List<ViagemAguardando> viagens) {
   }
   return mapa.values.toList();
 }
-
-Widget _badgeManifesto(int n) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(10)),
-      child: Text('×$n',
-          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-    );

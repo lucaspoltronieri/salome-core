@@ -2,6 +2,7 @@ package br.com.salome.core.domain.torre;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Caminhão (viagem de transferência) que está sendo descarregado ou já foi
@@ -24,10 +25,11 @@ public record CaminhaoEmDescarga(
         BigDecimal peso,
         LocalDate dataBaixa,
         String horaBaixa,
-        int qtdManifestos
+        int qtdManifestos,
+        List<Long> idsManifesto
 ) {
     /** Construtor de conveniência pra quando ainda não há resumo do legado (recém-listado). */
     public CaminhaoEmDescarga(Long idViagem, String placa, boolean descargaAberta) {
-        this(idViagem, placa, descargaAberta, null, null, 0, BigDecimal.ZERO, BigDecimal.ZERO, null, null, 1);
+        this(idViagem, placa, descargaAberta, null, null, 0, BigDecimal.ZERO, BigDecimal.ZERO, null, null, 1, List.of());
     }
 }

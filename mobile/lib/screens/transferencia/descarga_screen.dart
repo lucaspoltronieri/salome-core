@@ -16,23 +16,10 @@ import '../atividade_actions.dart';
 /// Dois modos: rápido (selecionar vários → 1 destino) e detalhado (um a um / câmera).
 class DescargaScreen extends StatefulWidget {
   final AtividadeResumo atividade;
-  /// Opcionais: quando a tela é aberta a partir de ViagensScreen (grupo já calculado),
-  /// evita 1 chamada de API extra. Se nulos, o "Chegada"/"Manifesto" é buscado via
-  /// manifestoDaViagem() (ex.: reabertura pela Home, sem o contexto rico da lista).
-  final String? origemInicial;
-  final String? motoristaInicial;
-  final String? dataBaixaInicial;
-  final String? horaBaixaInicial;
-  final int? qtdManifestosInicial;
 
   const DescargaScreen({
     super.key,
     required this.atividade,
-    this.origemInicial,
-    this.motoristaInicial,
-    this.dataBaixaInicial,
-    this.horaBaixaInicial,
-    this.qtdManifestosInicial,
   });
 
   @override
@@ -51,23 +38,12 @@ class _DescargaScreenState extends State<DescargaScreen> {
   String _filtro = '';
   final TextEditingController _filtroCtrl = TextEditingController();
 
-  String? _origem;
-  String? _motorista;
-  String? _dataBaixa;
-  String? _horaBaixa;
-  int _qtdManifestos = 1;
-
   int get _idAtividade => _atv.id;
 
   @override
   void initState() {
     super.initState();
     _atv = widget.atividade;
-    _origem = widget.origemInicial;
-    _motorista = widget.motoristaInicial;
-    _dataBaixa = widget.dataBaixaInicial;
-    _horaBaixa = widget.horaBaixaInicial;
-    _qtdManifestos = widget.qtdManifestosInicial ?? 1;
     _carregar();
   }
 
@@ -101,19 +77,6 @@ class _DescargaScreenState extends State<DescargaScreen> {
       final ctes = await session.api.ctesDisponiveis(_idAtividade);
       final docs = await session.api.documentosDaAtividade(_idAtividade);
       final locais = _locais.isEmpty ? await session.api.locais() : _locais;
-      // Sem os dados iniciais (reaberta via Home, sem o contexto rico da lista de origem):
-      // busca a data de chegada/manifesto num endpoint leve. Falha silenciosa — sem esses
-      // dados a tela só omite o chip, não quebra a descarga em si.
-      if (_dataBaixa == null && _atv.idViagemLegado != null) {
-        try {
-          final m = await session.api.manifestoDaViagem(_atv.idViagemLegado!);
-          _dataBaixa = m.dataBaixa;
-          _horaBaixa = m.horaBaixa;
-          _qtdManifestos = m.qtdManifestos;
-        } on ApiException {
-          // omite o chip
-        }
-      }
       setState(() {
         _ctes = ctes;
         _locais = locais;
@@ -257,7 +220,7 @@ class _DescargaScreenState extends State<DescargaScreen> {
         appBar: appBarAtividade(
           context,
           titulo: 'Descarga · ${_atv.placaVeiculo ?? '#$_idAtividade'}',
-          iniciadaEm: _atv.iniciadaEm,
+          iniciadaEm: _atv.minhaEntradaAtiva(session.usuario?.id) ?? _atv.iniciadaEm,
           idAtividade: _idAtividade,
           aoMudar: () {
             if (mounted) Navigator.pop(context);
@@ -289,7 +252,6 @@ class _DescargaScreenState extends State<DescargaScreen> {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      _infoViagem(),
                       LinearProgressIndicator(value: total == 0 ? 0 : feitos / total),
                       const SizedBox(height: 6),
                       Text('$feitos de $total CT-es em descarga'),
@@ -326,45 +288,6 @@ class _DescargaScreenState extends State<DescargaScreen> {
               ],
             ),
       ),
-    );
-  }
-
-  Widget _infoViagem() {
-    if (_origem == null && _motorista == null && _dataBaixa == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        children: [
-          if (_origem != null) Chip(avatar: const Icon(Icons.route, size: 16), label: Text(_origem!)),
-          if (_motorista != null) Chip(avatar: const Icon(Icons.person, size: 16), label: Text(_motorista!)),
-          if (_dataBaixa != null)
-            Chip(
-              avatar: const Icon(Icons.event_available, size: 16),
-              label: Text('Chegada: $_dataBaixa ${_horaBaixa ?? ''}'),
-            ),
-          _manifestoChip(),
-        ],
-      ),
-    );
-  }
-
-  Widget _manifestoChip() {
-    return Chip(
-      avatar: const Icon(Icons.description, size: 16),
-      label: Row(mainAxisSize: MainAxisSize.min, children: [
-        Text('Manifesto${_atv.idViagemLegado != null ? ' #${_atv.idViagemLegado}' : ''}'),
-        if (_qtdManifestos > 1) ...[
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(10)),
-            child: Text('×$_qtdManifestos',
-                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ]),
     );
   }
 

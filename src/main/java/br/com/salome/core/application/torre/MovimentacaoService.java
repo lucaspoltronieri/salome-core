@@ -78,7 +78,7 @@ public class MovimentacaoService {
             }
             return new CaminhaoEmDescarga(c.idViagem(), c.placa(), c.descargaAberta(),
                     r.origem(), r.motorista(), r.qtdCtes(), r.volumes(), r.peso(),
-                    r.dataBaixa(), r.horaBaixa(), r.qtdManifestos());
+                    r.dataBaixa(), r.horaBaixa(), r.qtdManifestos(), r.idsManifesto());
         }).toList();
     }
 

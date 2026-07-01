@@ -1,20 +1,18 @@
 package br.com.salome.core.infrastructure.legacy.torre;
 
 import br.com.salome.core.application.torre.ViagemLegadoRepository;
-import br.com.salome.core.domain.torre.ManifestoResumo;
 import br.com.salome.core.domain.torre.ResumoViagemLegado;
 import br.com.salome.core.domain.torre.ViagemAguardando;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Repository;
@@ -124,29 +122,6 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
     }
 
     @Override
-    public Optional<ManifestoResumo> buscarManifestoDaViagem(long idViagem) {
-        Integer qtd = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM viagemtransferencia
-                 WHERE idViagem = ? AND status = 'Baixado' AND dataBaixa IS NOT NULL
-                """, Integer.class, idViagem);
-        if (qtd == null || qtd == 0) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(jdbcTemplate.queryForObject("""
-                    SELECT dataBaixa, horaBaixa FROM viagemtransferencia
-                     WHERE idViagem = ? AND status = 'Baixado' AND dataBaixa IS NOT NULL
-                     ORDER BY dataBaixa DESC, horaBaixa DESC LIMIT 1
-                    """, (rs, n) -> new ManifestoResumo(
-                    idViagem, qtd,
-                    rs.getDate("dataBaixa") == null ? null : rs.getDate("dataBaixa").toLocalDate(),
-                    rs.getString("horaBaixa")), idViagem));
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
-    }
-
-    @Override
     public Map<Long, ResumoViagemLegado> buscarResumoPorViagens(Collection<Long> idsViagem) {
         if (idsViagem.isEmpty()) {
             return Map.of();
@@ -164,7 +139,9 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
                        (SELECT vt2.horaBaixa FROM viagemtransferencia vt2
                          WHERE vt2.idViagem = vt.idViagem AND vt2.dataBaixa IS NOT NULL
                          ORDER BY vt2.dataBaixa DESC, vt2.horaBaixa DESC LIMIT 1)           AS horaBaixa,
-                       COUNT(DISTINCT vt.idViagemTransferencia)                            AS qtdManifestos
+                       COUNT(DISTINCT vt.idViagemTransferencia)                            AS qtdManifestos,
+                       GROUP_CONCAT(DISTINCT vt.idViagemTransferencia
+                                    ORDER BY vt.idViagemTransferencia)                      AS idsManifesto
                   FROM viagemtransferencia vt
                   INNER JOIN viagem v ON v.idViagem = vt.idViagem
                   INNER JOIN filial filialOrigem ON filialOrigem.idFilial = vt.idFilialOrigem
@@ -190,8 +167,24 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
                         zero(rs.getBigDecimal("peso")),
                         rs.getDate("dataBaixa") == null ? null : rs.getDate("dataBaixa").toLocalDate(),
                         rs.getString("horaBaixa"),
-                        rs.getInt("qtdManifestos"))), idsViagem.toArray());
+                        rs.getInt("qtdManifestos"),
+                        parseIds(rs.getString("idsManifesto")))), idsViagem.toArray());
         return resumos;
+    }
+
+    /** Converte o GROUP_CONCAT "1,2,3" em lista de ids (vazia quando nulo/branco). */
+    private static List<Long> parseIds(String csv) {
+        if (csv == null || csv.isBlank()) {
+            return List.of();
+        }
+        List<Long> ids = new ArrayList<>();
+        for (String parte : csv.split(",")) {
+            String s = parte.trim();
+            if (!s.isEmpty()) {
+                ids.add(Long.parseLong(s));
+            }
+        }
+        return ids;
     }
 
     private static BigDecimal zero(BigDecimal v) {

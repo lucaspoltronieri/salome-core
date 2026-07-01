@@ -93,29 +93,6 @@ class ViagemAguardando {
       );
 }
 
-/// Data de chegada + contagem de manifestos de uma viagem — usado como fallback pra
-/// enriquecer Descarga/Separação quando reabertas sem o contexto rico da lista original.
-class ManifestoResumo {
-  final int idViagem;
-  final int qtdManifestos;
-  final String? dataBaixa;
-  final String? horaBaixa;
-
-  ManifestoResumo({
-    required this.idViagem,
-    required this.qtdManifestos,
-    this.dataBaixa,
-    this.horaBaixa,
-  });
-
-  factory ManifestoResumo.fromJson(Map<String, dynamic> j) => ManifestoResumo(
-        idViagem: (j['idViagem'] as num).toInt(),
-        qtdManifestos: (j['qtdManifestos'] as num).toInt(),
-        dataBaixa: j['dataBaixa']?.toString(),
-        horaBaixa: j['horaBaixa'],
-      );
-}
-
 class Participante {
   final int? id;
   final int? idUsuario;
@@ -168,6 +145,16 @@ class AtividadeResumo {
   /// `true` se o usuário [meuId] está atualmente ativo (entrou e ainda não saiu).
   bool souParticipanteAtivo(int? meuId) =>
       meuId != null && participantes.any((p) => p.idUsuario == meuId && p.ativo);
+
+  /// Entrada da sessão ativa do usuário [meuId] (ISO), ou null se ele não está ativo.
+  /// Base do cronômetro: conta o tempo da sessão atual do operador, não da atividade.
+  String? minhaEntradaAtiva(int? meuId) {
+    if (meuId == null) return null;
+    for (final p in participantes) {
+      if (p.idUsuario == meuId && p.ativo) return p.entradaEm;
+    }
+    return null;
+  }
 
   String get rotuloTipo => rotuloTipoAtividade(tipo);
 
@@ -348,6 +335,7 @@ class CaminhaoEmDescarga {
   final String? dataBaixa;
   final String? horaBaixa;
   final int qtdManifestos;
+  final List<int> idsManifesto;
 
   CaminhaoEmDescarga({
     this.idViagem,
@@ -361,6 +349,7 @@ class CaminhaoEmDescarga {
     this.dataBaixa,
     this.horaBaixa,
     this.qtdManifestos = 1,
+    this.idsManifesto = const [],
   });
 
   factory CaminhaoEmDescarga.fromJson(Map<String, dynamic> j) => CaminhaoEmDescarga(
@@ -375,6 +364,9 @@ class CaminhaoEmDescarga {
         dataBaixa: j['dataBaixa']?.toString(),
         horaBaixa: j['horaBaixa'],
         qtdManifestos: _asInt(j['qtdManifestos']) ?? 1,
+        idsManifesto: ((j['idsManifesto'] as List?) ?? const [])
+            .map((e) => (e as num).toInt())
+            .toList(),
       );
 }
 

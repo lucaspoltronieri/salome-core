@@ -2,6 +2,7 @@ package br.com.salome.core.domain.torre;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Resumo agregado (1 linha por viagem, não por manifesto) usado para enriquecer a lista
@@ -16,6 +17,7 @@ public record ResumoViagemLegado(
         BigDecimal peso,
         LocalDate dataBaixa,
         String horaBaixa,
-        int qtdManifestos
+        int qtdManifestos,
+        List<Long> idsManifesto
 ) {
 }
