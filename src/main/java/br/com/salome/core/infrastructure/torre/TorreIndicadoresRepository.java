@@ -1,7 +1,9 @@
 package br.com.salome.core.infrastructure.torre;
 
 import br.com.salome.core.application.torre.IndicadoresRepository;
+import br.com.salome.core.domain.torre.AgregadoOperacional;
 import br.com.salome.core.domain.torre.IndicadoresDia;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -66,6 +68,25 @@ public class TorreIndicadoresRepository implements IndicadoresRepository {
 
         return new IndicadoresDia(atividadesFinalizadas, horasHomemSeg, pessoasAtivas,
                 documentosNoArmazem, ocorrenciasHoje, tempoMedioDescargaSeg);
+    }
+
+    @Override
+    public AgregadoOperacional descargasFinalizadasHoje(int idFilial, Instant inicioDia) {
+        Timestamp inicio = Timestamp.from(inicioDia);
+        return jdbc.queryForObject("""
+                SELECT COUNT(DISTINCT a.id)      AS qtd,
+                       COALESCE(SUM(ad.volumes), 0) AS volumes,
+                       COALESCE(SUM(ad.peso), 0)    AS peso
+                  FROM atividade_armazem a
+                  LEFT JOIN atividade_documento ad ON ad.id_atividade = a.id
+                 WHERE a.id_filial = ?
+                   AND a.tipo IN ('DESCARGA_TRANSFERENCIA', 'DESCARGA_COLETA')
+                   AND a.status = 'FINALIZADA'
+                   AND a.finalizada_em >= ?
+                """, (rs, n) -> new AgregadoOperacional(
+                        rs.getInt("qtd"), rs.getInt("volumes"),
+                        rs.getBigDecimal("peso") == null ? BigDecimal.ZERO : rs.getBigDecimal("peso")),
+                idFilial, inicio);
     }
 
     private static int intOf(Integer v) {

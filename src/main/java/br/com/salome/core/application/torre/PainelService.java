@@ -1,7 +1,9 @@
 package br.com.salome.core.application.torre;
 
+import br.com.salome.core.domain.torre.AgregadoOperacional;
 import br.com.salome.core.domain.torre.AtividadeResumo;
 import br.com.salome.core.domain.torre.IndicadoresDia;
+import br.com.salome.core.domain.torre.MapaCaminhao;
 import br.com.salome.core.domain.torre.PainelSnapshot;
 import br.com.salome.core.domain.torre.StatusDocumento;
 import br.com.salome.core.domain.torre.TipoAtividade;
@@ -20,11 +22,16 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(prefix = "salome.torre", name = "enabled", havingValue = "true")
 public class PainelService {
 
+    private static final List<StatusDocumento> STATUS_ARMAZEM_ATUAL = List.of(
+            StatusDocumento.NO_ARMAZEM, StatusDocumento.EM_SEPARACAO,
+            StatusDocumento.SEPARADO_BOX, StatusDocumento.EM_CARREGAMENTO);
+
     private final ViagemAguardandoService viagemAguardandoService;
     private final AtividadeService atividadeService;
     private final DocumentoRepository documentoRepository;
     private final OcorrenciaService ocorrenciaService;
     private final IndicadoresRepository indicadoresRepository;
+    private final MapaArmazemService mapaArmazemService;
     private final Clock clock;
 
     public PainelService(ViagemAguardandoService viagemAguardandoService,
@@ -32,12 +39,14 @@ public class PainelService {
                          DocumentoRepository documentoRepository,
                          OcorrenciaService ocorrenciaService,
                          IndicadoresRepository indicadoresRepository,
+                         MapaArmazemService mapaArmazemService,
                          Clock clock) {
         this.viagemAguardandoService = viagemAguardandoService;
         this.atividadeService = atividadeService;
         this.documentoRepository = documentoRepository;
         this.ocorrenciaService = ocorrenciaService;
         this.indicadoresRepository = indicadoresRepository;
+        this.mapaArmazemService = mapaArmazemService;
         this.clock = clock;
     }
 
@@ -46,6 +55,13 @@ public class PainelService {
         List<AtividadeResumo> abertas = atividadeService.listarAbertas(idFilial);
         Instant inicioDia = LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
         IndicadoresDia indicadores = indicadoresRepository.calcular(idFilial, inicioDia);
+
+        AgregadoOperacional aguardandoSeparacao =
+                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.NO_ARMAZEM);
+        AgregadoOperacional descargasFinalizadas =
+                indicadoresRepository.descargasFinalizadasHoje(idFilial, inicioDia);
+        AgregadoOperacional armazemAtual = documentoRepository.agregarPorStatus(idFilial, STATUS_ARMAZEM_ATUAL);
+        List<MapaCaminhao> emTransito = mapaArmazemService.snapshot(idFilial).vindoDeOutrasBases();
 
         return new PainelSnapshot(
                 idFilial,
@@ -58,7 +74,11 @@ public class PainelService {
                 porTipo(abertas, TipoAtividade.OUTRAS),
                 documentoRepository.listarPorStatus(idFilial, List.of(StatusDocumento.NO_ARMAZEM)),
                 documentoRepository.listarPorStatus(idFilial, List.of(StatusDocumento.SEPARADO_BOX)),
-                ocorrenciaService.listar(idFilial));
+                ocorrenciaService.listar(idFilial),
+                aguardandoSeparacao,
+                descargasFinalizadas,
+                armazemAtual,
+                emTransito);
     }
 
     private List<AtividadeResumo> porTipo(List<AtividadeResumo> abertas, TipoAtividade... tipos) {

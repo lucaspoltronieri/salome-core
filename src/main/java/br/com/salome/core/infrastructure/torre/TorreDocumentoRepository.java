@@ -1,6 +1,7 @@
 package br.com.salome.core.infrastructure.torre;
 
 import br.com.salome.core.application.torre.DocumentoRepository;
+import br.com.salome.core.domain.torre.AgregadoOperacional;
 import br.com.salome.core.domain.torre.DocumentoArmazenado;
 import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
@@ -13,6 +14,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -306,6 +308,42 @@ public class TorreDocumentoRepository implements DocumentoRepository {
                  WHERE id = ?
                 """, numeroCte, idConhecimentoLegado, remetente, destinatario, cidadeDestino, idDocumento);
     }
+
+    @Override
+    public AgregadoOperacional agregarPorStatus(int idFilial, StatusDocumento status) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(DISTINCT id_viagem_legado) AS qtd,
+                       COALESCE(SUM(volumes), 0)        AS volumes,
+                       COALESCE(SUM(peso), 0)            AS peso
+                  FROM documento_operacional
+                 WHERE id_filial = ? AND status = ?
+                """, AGREGADO_MAPPER, idFilial, status.name());
+    }
+
+    @Override
+    public AgregadoOperacional agregarPorStatus(int idFilial, List<StatusDocumento> status) {
+        if (status.isEmpty()) {
+            return AgregadoOperacional.vazio();
+        }
+        String marcadores = String.join(",", Collections.nCopies(status.size(), "?"));
+        String sql = """
+                SELECT COUNT(*)                   AS qtd,
+                       COALESCE(SUM(volumes), 0)  AS volumes,
+                       COALESCE(SUM(peso), 0)      AS peso
+                  FROM documento_operacional
+                 WHERE id_filial = ? AND status IN (""" + marcadores + ")";
+        Object[] args = new Object[status.size() + 1];
+        args[0] = idFilial;
+        int i = 1;
+        for (StatusDocumento s : status) {
+            args[i++] = s.name();
+        }
+        return jdbc.queryForObject(sql, AGREGADO_MAPPER, args);
+    }
+
+    private static final RowMapper<AgregadoOperacional> AGREGADO_MAPPER = (rs, n) -> new AgregadoOperacional(
+            rs.getInt("qtd"), rs.getInt("volumes"),
+            rs.getBigDecimal("peso") == null ? BigDecimal.ZERO : rs.getBigDecimal("peso"));
 
     private static void setInt(PreparedStatement ps, int i, Integer v) throws java.sql.SQLException {
         if (v == null) ps.setNull(i, Types.INTEGER); else ps.setInt(i, v);

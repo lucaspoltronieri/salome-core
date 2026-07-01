@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Torre de Controle — Painel</title>
-  <link rel="stylesheet" href="styles.css?v=20260625-1">
+  <link rel="stylesheet" href="styles.css?v=20260701-1">
 </head>
 <body>
   <div id="login" class="login-overlay">
@@ -31,74 +31,51 @@
   </header>
 
   <section class="indicadores" id="indicadores">
-    <div class="kpi"><span class="kpi-num" id="kpiFinalizadas">0</span><span class="kpi-rot">Atividades finalizadas</span></div>
+    <div class="kpi">
+      <span class="kpi-num" id="kpiDescargasFinalizadas">0</span>
+      <span class="kpi-rot">Descargas finalizadas</span>
+      <span class="kpi-sub" id="kpiDescargasFinalizadasSub"></span>
+    </div>
     <div class="kpi"><span class="kpi-num" id="kpiPessoas">0</span><span class="kpi-rot">Pessoas ativas agora</span></div>
     <div class="kpi"><span class="kpi-num" id="kpiHorasHomem">0h</span><span class="kpi-rot">Horas-homem hoje</span></div>
     <div class="kpi"><span class="kpi-num" id="kpiTempoDescarga">—</span><span class="kpi-rot">Tempo médio descarga</span></div>
-    <div class="kpi"><span class="kpi-num" id="kpiArmazem">0</span><span class="kpi-rot">No armazém</span></div>
+    <div class="kpi">
+      <span class="kpi-num" id="kpiArmazem">0</span>
+      <span class="kpi-rot">No armazém (CT-e)</span>
+      <span class="kpi-sub" id="kpiArmazemSub"></span>
+    </div>
     <div class="kpi"><span class="kpi-num" id="kpiOcorrencias">0</span><span class="kpi-rot">Ocorrências hoje</span></div>
   </section>
 
-  <!-- Esteira do ciclo: contagem por estágio, da chegada à expedição -->
-  <section class="esteira" id="esteira">
-    <div class="etapa"><span class="etapa-num" id="etAguardando">0</span><span class="etapa-rot">Aguardando descarga</span></div>
-    <div class="seta">›</div>
-    <div class="etapa"><span class="etapa-num" id="etDescarregando">0</span><span class="etapa-rot">Descarregando</span></div>
-    <div class="seta">›</div>
-    <div class="etapa"><span class="etapa-num" id="etSeparar">0</span><span class="etapa-rot">Aguardando separação</span></div>
-    <div class="seta">›</div>
-    <div class="etapa"><span class="etapa-num" id="etSeparando">0</span><span class="etapa-rot">Em separação</span></div>
-    <div class="seta">›</div>
-    <div class="etapa"><span class="etapa-num" id="etPronto">0</span><span class="etapa-rot">Box distribuição</span></div>
-    <div class="seta">›</div>
-    <div class="etapa"><span class="etapa-num" id="etCarregando">0</span><span class="etapa-rot">Carregando</span></div>
-  </section>
-
-  <main class="grade">
-    <section class="bloco">
-      <div class="bloco-cab"><h2>Aguardando descarga</h2><span class="contador" id="contViagens">0</span></div>
-      <div class="tabela-wrap">
-        <table>
-          <thead><tr><th>Placa</th><th>Origem</th><th>Baixa</th><th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th></tr></thead>
-          <tbody id="tbViagens"></tbody>
-        </table>
-        <p class="vazio" id="vazioViagens" hidden>Nenhuma viagem aguardando.</p>
+  <main class="secoes-grandes">
+    <section class="bloco-grande">
+      <div class="bloco-cab"><h2>Aguardando descarga</h2></div>
+      <div class="totais-linha">
+        <div class="total-item"><span class="total-num" id="agdVeiculos">0</span><span class="total-rot">Veículos</span></div>
+        <div class="total-item"><span class="total-num" id="agdVolumes">0</span><span class="total-rot">Volumes</span></div>
+        <div class="total-item"><span class="total-num" id="agdPeso">0</span><span class="total-rot">Peso (kg)</span></div>
+        <div class="total-item destaque" id="agdEmAndamento"><span class="total-num">0</span><span class="total-rot">Descarregando agora</span></div>
       </div>
+      <div class="detalhe-compacto" id="agdDetalhe"></div>
     </section>
 
-    <section class="bloco">
-      <div class="bloco-cab"><h2>Descarregando agora</h2><span class="contador" id="contDescargas">0</span></div>
-      <div class="tabela-wrap">
-        <table>
-          <thead><tr><th>Viagem</th><th>Placa</th><th class="num">Pessoas</th><th class="num">Tempo</th></tr></thead>
-          <tbody id="tbDescargas"></tbody>
-        </table>
-        <p class="vazio" id="vazioDescargas" hidden>Nenhuma descarga em andamento.</p>
+    <section class="bloco-grande">
+      <div class="bloco-cab"><h2>Aguardando separação</h2></div>
+      <div class="totais-linha">
+        <div class="total-item"><span class="total-num" id="agsVeiculos">0</span><span class="total-rot">Veículos</span></div>
+        <div class="total-item"><span class="total-num" id="agsVolumes">0</span><span class="total-rot">Volumes</span></div>
+        <div class="total-item"><span class="total-num" id="agsPeso">0</span><span class="total-rot">Peso (kg)</span></div>
+        <div class="total-item destaque" id="agsEmAndamento"><span class="total-num">0</span><span class="total-rot">Separações em andamento</span></div>
       </div>
-    </section>
-
-    <section class="bloco">
-      <div class="bloco-cab"><h2>Aguardando separação</h2><span class="contador" id="contSeparar">0</span></div>
-      <div class="tabela-wrap">
-        <table>
-          <thead><tr><th>CT-e</th><th>Destinatário</th><th>Cidade</th><th class="num">Volumes</th></tr></thead>
-          <tbody id="tbSeparar"></tbody>
-        </table>
-        <p class="vazio" id="vazioSeparar" hidden>Nada aguardando separação.</p>
-      </div>
-    </section>
-
-    <section class="bloco">
-      <div class="bloco-cab"><h2>Carregando / pronto no box</h2><span class="contador" id="contCarregar">0</span></div>
-      <div class="tabela-wrap">
-        <table>
-          <thead><tr><th>Placa / viagem</th><th>Situação</th><th class="num">Pessoas</th><th class="num">Tempo</th></tr></thead>
-          <tbody id="tbCarregar"></tbody>
-        </table>
-        <p class="vazio" id="vazioCarregar" hidden>Nada carregando agora.</p>
-      </div>
+      <div class="detalhe-compacto" id="agsDetalhe"></div>
     </section>
   </main>
+
+  <!-- Só aparece se houver caminhões vindo de outra base (não ocupa espaço fixo quando vazia) -->
+  <section class="bloco-transito" id="blocoTransito" hidden>
+    <div class="bloco-cab"><h2>Em trânsito (chegando)</h2><span class="contador" id="contTransito">0</span></div>
+    <div class="detalhe-compacto" id="tbTransito"></div>
+  </section>
 
   <footer class="rodape">
     <span id="erro" class="erro" hidden></span>
@@ -109,6 +86,6 @@
     </span>
   </footer>
 
-  <script src="app.js?v=20260625-1"></script>
+  <script src="app.js?v=20260701-1"></script>
 </body>
 </html>

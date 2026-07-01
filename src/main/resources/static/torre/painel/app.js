@@ -35,14 +35,18 @@ function fmtDuracao(seg) {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m} min`;
 }
 
-function renderIndicadores(ind) {
+function renderIndicadores(ind, agregDescargas, agregArmazem) {
   ind = ind || {};
-  document.getElementById("kpiFinalizadas").textContent = fmtInt.format(ind.atividadesFinalizadasHoje || 0);
+  document.getElementById("kpiDescargasFinalizadas").textContent = fmtInt.format(agregDescargas?.qtd || 0);
+  document.getElementById("kpiDescargasFinalizadasSub").textContent =
+    `${fmtInt.format(agregDescargas?.volumes || 0)} vol · ${fmtPeso.format(agregDescargas?.peso || 0)} kg`;
   document.getElementById("kpiPessoas").textContent = fmtInt.format(ind.pessoasAtivasAgora || 0);
   document.getElementById("kpiHorasHomem").textContent = fmtDuracao(ind.horasHomemHojeSeg);
   document.getElementById("kpiTempoDescarga").textContent =
     ind.tempoMedioDescargaSeg ? fmtDuracao(ind.tempoMedioDescargaSeg) : "—";
-  document.getElementById("kpiArmazem").textContent = fmtInt.format(ind.documentosNoArmazem || 0);
+  document.getElementById("kpiArmazem").textContent = fmtInt.format(agregArmazem?.qtd || 0);
+  document.getElementById("kpiArmazemSub").textContent =
+    `${fmtInt.format(agregArmazem?.volumes || 0)} vol · ${fmtPeso.format(agregArmazem?.peso || 0)} kg`;
   document.getElementById("kpiOcorrencias").textContent = fmtInt.format(ind.ocorrenciasHoje || 0);
 }
 
@@ -78,80 +82,64 @@ function agruparViagens(viagens) {
   return [...grupos.values()];
 }
 
-function renderViagens(viagens) {
-  const grupos = agruparViagens(viagens);
-  document.getElementById("contViagens").textContent = grupos.length;
-  document.getElementById("vazioViagens").hidden = grupos.length > 0;
-  document.getElementById("tbViagens").innerHTML = grupos.map(g => {
+function setNum(id, n) { document.getElementById(id).textContent = fmtInt.format(n || 0); }
+
+// Aguardando descarga: totais grandes (veículos/volumes/peso) + detalhe compacto por
+// caminhão + destaque de quantos estão descarregando agora.
+function renderAguardandoDescarga(viagens, descargasEmAndamento) {
+  const grupos = agruparViagens(viagens || []);
+  setNum("agdVeiculos", grupos.length);
+  setNum("agdVolumes", grupos.reduce((s, g) => s + g.volumes, 0));
+  document.getElementById("agdPeso").textContent = fmtPeso.format(grupos.reduce((s, g) => s + g.peso, 0));
+  document.querySelector("#agdEmAndamento .total-num").textContent =
+    fmtInt.format((descargasEmAndamento || []).length);
+  document.getElementById("agdDetalhe").innerHTML = grupos.slice(0, 8).map(g => {
     const fresca = vistas.size && !vistas.has(g.chave) ? "fresca" : "";
     const badge = g.manifestos > 1
       ? ` <span class="badge-grupo" title="${g.manifestos} manifestos na mesma viagem">×${g.manifestos}</span>`
       : "";
-    return `<tr class="${fresca}">
-      <td class="placa">${escapar(g.placa) || "—"}${badge}</td>
-      <td>${escapar(limparOrigem(g.origem))}</td>
-      <td>${escapar(g.dataBaixa)} ${escapar(g.horaBaixa) || ""}</td>
-      <td class="num">${fmtInt.format(g.qtdCtes)}</td>
-      <td class="num">${fmtInt.format(g.volumes)}</td>
-      <td class="num">${fmtPeso.format(g.peso)}</td>
-    </tr>`;
-  }).join("");
+    return `<div class="linha ${fresca}">
+      <span class="placa">${escapar(g.placa) || "—"}${badge}</span>
+      <span>${escapar(limparOrigem(g.origem))} · ${escapar(g.dataBaixa)} ${escapar(g.horaBaixa) || ""}</span>
+    </div>`;
+  }).join("") || '<p class="vazio">Nenhuma viagem aguardando.</p>';
   vistas = new Set(grupos.map(g => g.chave));
 }
 
-function renderDescargas(descargas) {
-  document.getElementById("contDescargas").textContent = descargas.length;
-  document.getElementById("vazioDescargas").hidden = descargas.length > 0;
-  document.getElementById("tbDescargas").innerHTML = descargas.map(d => `
-    <tr>
-      <td>${d.idViagemLegado ?? "—"}</td>
-      <td class="placa">${escapar(d.placaVeiculo) || "—"}</td>
-      <td class="num">${d.participantes.filter(p => !p.saidaEm).length}</td>
-      <td class="num">${tempoDecorrido(d.iniciadaEm)}</td>
-    </tr>`).join("");
+// Aguardando separação: agregado do backend (veículos/volumes/peso, status NO_ARMAZEM) +
+// detalhe compacto agrupando os documentos por viagem + destaque de separações em andamento.
+function renderAguardandoSeparacao(agregado, separacoesEmAndamento, noArmazem) {
+  setNum("agsVeiculos", agregado?.qtd || 0);
+  setNum("agsVolumes", agregado?.volumes || 0);
+  document.getElementById("agsPeso").textContent = fmtPeso.format(agregado?.peso || 0);
+  document.querySelector("#agsEmAndamento .total-num").textContent =
+    fmtInt.format((separacoesEmAndamento || []).length);
+  const porViagem = new Map();
+  for (const d of (noArmazem || [])) {
+    const chave = d.idViagemLegado ?? "s/viagem";
+    const g = porViagem.get(chave) || { qtd: 0, volumes: 0 };
+    g.qtd += 1;
+    g.volumes += d.volumes || 0;
+    porViagem.set(chave, g);
+  }
+  document.getElementById("agsDetalhe").innerHTML = [...porViagem.entries()].slice(0, 8).map(([chave, g]) => `
+    <div class="linha"><span>Viagem ${escapar(chave)}</span><span class="num">${fmtInt.format(g.qtd)} CT-es · ${fmtInt.format(g.volumes)} vol</span></div>
+  `).join("") || '<p class="vazio">Nada aguardando separação.</p>';
 }
 
-function setNum(id, n) { document.getElementById(id).textContent = fmtInt.format(n || 0); }
-
-// Esteira: contagem por estágio do ciclo (chegada → expedição).
-function renderEsteira(snap) {
-  setNum("etAguardando", agruparViagens(snap.viagensAguardando || []).length);
-  setNum("etDescarregando", (snap.descargasEmAndamento || []).length);
-  setNum("etSeparar", (snap.noArmazem || []).length);
-  setNum("etSeparando", (snap.separacoesEmAndamento || []).length);
-  setNum("etPronto", (snap.prontosBox || []).length);
-  setNum("etCarregando", (snap.carregamentosEmAndamento || []).length);
-}
-
-// Aguardando separação: documentos NO_ARMAZEM (descarregados, esperando separar).
-function renderSeparar(docs) {
-  docs = docs || [];
-  document.getElementById("contSeparar").textContent = docs.length;
-  document.getElementById("vazioSeparar").hidden = docs.length > 0;
-  document.getElementById("tbSeparar").innerHTML = docs.map(d => `<tr>
-    <td>${escapar(d.numeroCte) || '<span class="pre">NF</span>'}</td>
-    <td>${escapar(d.destinatario)}</td>
-    <td>${escapar(d.cidadeDestino)}</td>
-    <td class="num">${fmtInt.format(d.volumes || 0)}</td>
-  </tr>`).join("");
-}
-
-// Carregando agora (atividades) + o que já está pronto no box de distribuição.
-function renderCarregar(atividades, prontos) {
-  atividades = atividades || [];
-  prontos = prontos || [];
-  const rows = atividades.map(a => `<tr>
-    <td class="placa">${escapar(a.placaVeiculo) || (a.idViagemLegado ? "viagem " + a.idViagemLegado : "—")}</td>
-    <td>Carregando</td>
-    <td class="num">${a.participantes.filter(p => !p.saidaEm).length}</td>
-    <td class="num">${tempoDecorrido(a.iniciadaEm)}</td>
-  </tr>`).concat(prontos.map(d => `<tr>
-    <td>${escapar(d.numeroCte) || escapar(d.destinatario) || "—"}</td>
-    <td>Pronto no box</td><td class="num">—</td><td class="num">—</td>
-  </tr>`));
-  document.getElementById("contCarregar").textContent = atividades.length + prontos.length;
-  document.getElementById("vazioCarregar").hidden = rows.length > 0;
-  document.getElementById("tbCarregar").innerHTML = rows.join("");
+// Em trânsito (chegando): só aparece se houver caminhões vindo de outra base.
+function renderTransito(lista) {
+  lista = lista || [];
+  const el = document.getElementById("blocoTransito");
+  el.hidden = !lista.length;
+  if (!lista.length) return;
+  document.getElementById("contTransito").textContent = fmtInt.format(lista.length);
+  document.getElementById("tbTransito").innerHTML = lista.map(c => `
+    <div class="linha">
+      <span class="placa">${escapar(c.placa) || "—"}</span>
+      <span>${escapar(c.dataPrevisaoChegada || "")} ${escapar(c.horaPrevisaoChegada || "")}</span>
+      <span class="num">${fmtInt.format(c.volumes || 0)} vol · ${fmtPeso.format(c.peso || 0)} kg</span>
+    </div>`).join("");
 }
 
 // ---- Autenticação (mesmo login da Torre; modo TV pode manter a sessão) ----
@@ -232,12 +220,10 @@ async function carregar() {
     if (r.status === 401) return aoExpirar();
     if (!r.ok) throw new Error("HTTP " + r.status);
     const snap = await r.json();
-    renderIndicadores(snap.indicadores);
-    renderEsteira(snap);
-    renderViagens(snap.viagensAguardando || []);
-    renderDescargas(snap.descargasEmAndamento || []);
-    renderSeparar(snap.noArmazem || []);
-    renderCarregar(snap.carregamentosEmAndamento || [], snap.prontosBox || []);
+    renderIndicadores(snap.indicadores, snap.descargasFinalizadasAgregado, snap.armazemAtualAgregado);
+    renderAguardandoDescarga(snap.viagensAguardando || [], snap.descargasEmAndamento || []);
+    renderAguardandoSeparacao(snap.aguardandoSeparacaoAgregado, snap.separacoesEmAndamento || [], snap.noArmazem || []);
+    renderTransito(snap.emTransito || []);
     document.getElementById("atualizado").textContent =
       "atualizado " + new Date(snap.atualizadoEm).toLocaleTimeString("pt-BR");
     erro.hidden = true;
