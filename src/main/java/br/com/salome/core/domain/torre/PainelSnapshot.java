@@ -21,6 +21,8 @@ public record PainelSnapshot(
         AgregadoOperacional aguardandoSeparacaoAgregado,
         AgregadoOperacional descargasFinalizadasAgregado,
         AgregadoOperacional armazemAtualAgregado,
-        List<MapaCaminhao> emTransito
+        SaldoArmazem saldoArmazem,
+        List<MapaCaminhao> emTransito,
+        List<MapaCaminhao> emRotaEntrega
 ) {
 }

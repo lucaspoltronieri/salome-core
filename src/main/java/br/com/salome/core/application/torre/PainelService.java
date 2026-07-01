@@ -3,8 +3,10 @@ package br.com.salome.core.application.torre;
 import br.com.salome.core.domain.torre.AgregadoOperacional;
 import br.com.salome.core.domain.torre.AtividadeResumo;
 import br.com.salome.core.domain.torre.IndicadoresDia;
+import br.com.salome.core.domain.torre.MapaArmazemSnapshot;
 import br.com.salome.core.domain.torre.MapaCaminhao;
 import br.com.salome.core.domain.torre.PainelSnapshot;
+import br.com.salome.core.domain.torre.SaldoArmazem;
 import br.com.salome.core.domain.torre.StatusDocumento;
 import br.com.salome.core.domain.torre.TipoAtividade;
 import br.com.salome.core.domain.torre.ViagemAguardando;
@@ -61,7 +63,17 @@ public class PainelService {
         AgregadoOperacional descargasFinalizadas =
                 indicadoresRepository.descargasFinalizadasHoje(idFilial, inicioDia);
         AgregadoOperacional armazemAtual = documentoRepository.agregarPorStatus(idFilial, STATUS_ARMAZEM_ATUAL);
-        List<MapaCaminhao> emTransito = mapaArmazemService.snapshot(idFilial).vindoDeOutrasBases();
+        SaldoArmazem saldoArmazem = new SaldoArmazem(
+                armazemAtual,
+                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.NO_ARMAZEM),
+                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.EM_SEPARACAO),
+                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.SEPARADO_BOX),
+                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.EM_CARREGAMENTO));
+
+        // O mapa é cacheado por filial (~25s), então uma chamada alimenta chegando + pra rua.
+        MapaArmazemSnapshot mapa = mapaArmazemService.snapshot(idFilial);
+        List<MapaCaminhao> emTransito = mapa.vindoDeOutrasBases();
+        List<MapaCaminhao> emRotaEntrega = mapa.emRotaEntrega();
 
         return new PainelSnapshot(
                 idFilial,
@@ -78,7 +90,9 @@ public class PainelService {
                 aguardandoSeparacao,
                 descargasFinalizadas,
                 armazemAtual,
-                emTransito);
+                saldoArmazem,
+                emTransito,
+                emRotaEntrega);
     }
 
     private List<AtividadeResumo> porTipo(List<AtividadeResumo> abertas, TipoAtividade... tipos) {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Torre de Controle — Painel</title>
-  <link rel="stylesheet" href="styles.css?v=20260701-1">
+  <link rel="stylesheet" href="styles.css?v=20260701-3">
 </head>
 <body>
   <div id="login" class="login-overlay">
@@ -30,52 +30,110 @@
     </div>
   </header>
 
+  <!-- KPIs do dia (fluxo/produtividade). Cores semânticas: verde=ok, amarelo=atenção. -->
   <section class="indicadores" id="indicadores">
-    <div class="kpi">
+    <div class="kpi" id="kpiCardVolumes">
+      <span class="kpi-ico">📦</span>
+      <span class="kpi-num" id="kpiVolumes">0</span>
+      <span class="kpi-rot">Volumes movimentados</span>
+      <span class="kpi-sub" id="kpiVolumesSub">hoje</span>
+    </div>
+    <div class="kpi" id="kpiCardDescargas">
+      <span class="kpi-ico">✅</span>
       <span class="kpi-num" id="kpiDescargasFinalizadas">0</span>
       <span class="kpi-rot">Descargas finalizadas</span>
       <span class="kpi-sub" id="kpiDescargasFinalizadasSub"></span>
     </div>
-    <div class="kpi"><span class="kpi-num" id="kpiPessoas">0</span><span class="kpi-rot">Pessoas ativas agora</span></div>
-    <div class="kpi"><span class="kpi-num" id="kpiHorasHomem">0h</span><span class="kpi-rot">Horas-homem hoje</span></div>
-    <div class="kpi"><span class="kpi-num" id="kpiTempoDescarga">—</span><span class="kpi-rot">Tempo médio descarga</span></div>
-    <div class="kpi">
-      <span class="kpi-num" id="kpiArmazem">0</span>
-      <span class="kpi-rot">No armazém (CT-e)</span>
-      <span class="kpi-sub" id="kpiArmazemSub"></span>
+    <div class="kpi" id="kpiCardProd">
+      <span class="kpi-ico">⚡</span>
+      <span class="kpi-num" id="kpiProdutividade">—</span>
+      <span class="kpi-rot">Produtividade</span>
+      <span class="kpi-sub">vol / hora-homem</span>
     </div>
-    <div class="kpi"><span class="kpi-num" id="kpiOcorrencias">0</span><span class="kpi-rot">Ocorrências hoje</span></div>
+    <div class="kpi" id="kpiCardPessoas">
+      <span class="kpi-ico">👥</span>
+      <span class="kpi-num" id="kpiPessoas">0</span>
+      <span class="kpi-rot">Pessoas ativas agora</span>
+      <span class="kpi-sub" id="kpiHorasHomem">0h · hoje</span>
+    </div>
+    <div class="kpi" id="kpiCardTempo">
+      <span class="kpi-ico">⏱</span>
+      <span class="kpi-num" id="kpiTempoDescarga">—</span>
+      <span class="kpi-rot">Tempo médio descarga</span>
+      <span class="kpi-sub">por veículo</span>
+    </div>
+    <div class="kpi" id="kpiCardOcorrencias">
+      <span class="kpi-ico">⚠️</span>
+      <span class="kpi-num" id="kpiOcorrencias">0</span>
+      <span class="kpi-rot">Ocorrências hoje</span>
+      <span class="kpi-sub" id="kpiOcorrenciasSub">avarias / divergências</span>
+    </div>
   </section>
 
-  <main class="secoes-grandes">
-    <section class="bloco-grande">
-      <div class="bloco-cab"><h2>Aguardando descarga</h2></div>
+  <!-- Ciclo do armazém, da esquerda pra direita: chegando → aguardando → descarregando →
+       no armazém (saldo) → separando → pra rua. Cada bloco tem semáforo de saúde. -->
+  <main class="ciclo">
+    <section class="bloco-grande g-chegando">
+      <div class="bloco-cab"><h2><span class="status-dot" id="stTransito"></span>Chegando (em trânsito)</h2><span class="contador" id="contTransito">0</span></div>
+      <div class="totais-linha">
+        <div class="total-item"><span class="total-num" id="chVeiculos">0</span><span class="total-rot">Veículos</span></div>
+        <div class="total-item"><span class="total-num" id="chVolumes">0</span><span class="total-rot">Volumes</span></div>
+        <div class="total-item"><span class="total-num" id="chPeso">0</span><span class="total-rot">Peso (kg)</span></div>
+      </div>
+      <div class="detalhe-compacto" id="chDetalhe"></div>
+    </section>
+
+    <section class="bloco-grande g-aguardando">
+      <div class="bloco-cab"><h2><span class="status-dot" id="stAguardando"></span>Aguardando descarga</h2><span class="contador" id="contAguardando">0</span></div>
       <div class="totais-linha">
         <div class="total-item"><span class="total-num" id="agdVeiculos">0</span><span class="total-rot">Veículos</span></div>
         <div class="total-item"><span class="total-num" id="agdVolumes">0</span><span class="total-rot">Volumes</span></div>
         <div class="total-item"><span class="total-num" id="agdPeso">0</span><span class="total-rot">Peso (kg)</span></div>
-        <div class="total-item destaque" id="agdEmAndamento"><span class="total-num">0</span><span class="total-rot">Descarregando agora</span></div>
       </div>
       <div class="detalhe-compacto" id="agdDetalhe"></div>
     </section>
 
-    <section class="bloco-grande">
-      <div class="bloco-cab"><h2>Aguardando separação</h2></div>
+    <section class="bloco-grande g-descarga">
+      <div class="bloco-cab"><h2><span class="status-dot" id="stDescarga"></span>Descarregando agora</h2><span class="contador" id="contDescarga">0</span></div>
       <div class="totais-linha">
-        <div class="total-item"><span class="total-num" id="agsVeiculos">0</span><span class="total-rot">Veículos</span></div>
-        <div class="total-item"><span class="total-num" id="agsVolumes">0</span><span class="total-rot">Volumes</span></div>
-        <div class="total-item"><span class="total-num" id="agsPeso">0</span><span class="total-rot">Peso (kg)</span></div>
-        <div class="total-item destaque" id="agsEmAndamento"><span class="total-num">0</span><span class="total-rot">Separações em andamento</span></div>
+        <div class="total-item destaque"><span class="total-num" id="dsAtivas">0</span><span class="total-rot">Em andamento</span></div>
+        <div class="total-item ok"><span class="total-num" id="dsPessoas">0</span><span class="total-rot">Pessoas</span></div>
       </div>
-      <div class="detalhe-compacto" id="agsDetalhe"></div>
+      <div class="detalhe-compacto" id="dsDetalhe"></div>
+    </section>
+
+    <section class="bloco-grande g-saldo">
+      <div class="bloco-cab"><h2><span class="status-dot ok"></span>No armazém (saldo)</h2></div>
+      <div class="totais-linha">
+        <div class="total-item ok"><span class="total-num" id="slCtes">0</span><span class="total-rot">CT-es</span></div>
+        <div class="total-item"><span class="total-num" id="slVolumes">0</span><span class="total-rot">Volumes</span></div>
+        <div class="total-item"><span class="total-num" id="slPeso">0</span><span class="total-rot">Peso (kg)</span></div>
+      </div>
+      <!-- Ocupação por etapa (barra empilhada, estilo WMS) -->
+      <div class="barra-saldo" id="barraSaldo"></div>
+      <div class="detalhe-compacto" id="slDetalhe"></div>
+    </section>
+
+    <section class="bloco-grande g-separacao">
+      <div class="bloco-cab"><h2><span class="status-dot" id="stSeparacao"></span>Separando agora</h2><span class="contador" id="contSeparacao">0</span></div>
+      <div class="totais-linha">
+        <div class="total-item destaque"><span class="total-num" id="spAtivas">0</span><span class="total-rot">Em andamento</span></div>
+        <div class="total-item ok"><span class="total-num" id="spPessoas">0</span><span class="total-rot">Pessoas</span></div>
+        <div class="total-item"><span class="total-num" id="spAguardando">0</span><span class="total-rot">Aguardando (CT-e)</span></div>
+      </div>
+      <div class="detalhe-compacto" id="spDetalhe"></div>
+    </section>
+
+    <section class="bloco-grande g-rua">
+      <div class="bloco-cab"><h2><span class="status-dot ok"></span>Pra rua (em entrega)</h2><span class="contador" id="contRua">0</span></div>
+      <div class="totais-linha">
+        <div class="total-item"><span class="total-num" id="ruVeiculos">0</span><span class="total-rot">Veículos</span></div>
+        <div class="total-item"><span class="total-num" id="ruVolumes">0</span><span class="total-rot">Volumes</span></div>
+        <div class="total-item"><span class="total-num" id="ruPeso">0</span><span class="total-rot">Peso (kg)</span></div>
+      </div>
+      <div class="detalhe-compacto" id="ruDetalhe"></div>
     </section>
   </main>
-
-  <!-- Só aparece se houver caminhões vindo de outra base (não ocupa espaço fixo quando vazia) -->
-  <section class="bloco-transito" id="blocoTransito" hidden>
-    <div class="bloco-cab"><h2>Em trânsito (chegando)</h2><span class="contador" id="contTransito">0</span></div>
-    <div class="detalhe-compacto" id="tbTransito"></div>
-  </section>
 
   <footer class="rodape">
     <span id="erro" class="erro" hidden></span>
@@ -86,6 +144,6 @@
     </span>
   </footer>
 
-  <script src="app.js?v=20260701-1"></script>
+  <script src="app.js?v=20260701-3"></script>
 </body>
 </html>
