@@ -1,6 +1,7 @@
 package br.com.salome.core.application.torre;
 
 import br.com.salome.core.domain.torre.CteDescarga;
+import br.com.salome.core.domain.torre.ConhecimentoDatas;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -27,5 +28,16 @@ public interface ConhecimentoLegadoRepository {
      */
     default Map<Long, LocalDate> emissaoPorConhecimento(Collection<Long> idsConhecimento) {
         return Map.of();
+    }
+
+    /**
+     * Datas por idConhecimento, em lote, para enriquecer a tela "Armazém atual".
+     * Inclui a baixa de transferência filtrada pela filial atual quando existir.
+     */
+    default Map<Long, ConhecimentoDatas> datasPorConhecimento(Collection<Long> idsConhecimento, int idFilial) {
+        return emissaoPorConhecimento(idsConhecimento).entrySet().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> new ConhecimentoDatas(e.getValue(), null, null)));
     }
 }

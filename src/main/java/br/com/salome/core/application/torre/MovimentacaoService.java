@@ -48,11 +48,17 @@ public class MovimentacaoService {
         return documentoRepository.listarPorStatus(idFilial, List.of(StatusDocumento.NO_ARMAZEM));
     }
 
-    /** Caminhões em descarga (ou descarregados hoje) — escolha do caminhão a separar. */
+    /**
+     * Caminhões em descarga (ou descarregados hoje) — escolha do caminhão a separar.
+     * Viagens cuja separação já foi concluída saem da lista: cada viagem se separa uma vez.
+     */
     @Transactional(value = "torreTransactionManager", readOnly = true)
     public List<CaminhaoEmDescarga> caminhoesParaSeparar(int idFilial) {
         var inicioDoDia = LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
-        return atividadeRepository.listarCaminhoesEmDescarga(idFilial, inicioDoDia);
+        var jaSeparadas = atividadeRepository.idsViagensComSeparacaoConcluida(idFilial);
+        return atividadeRepository.listarCaminhoesEmDescarga(idFilial, inicioDoDia).stream()
+                .filter(c -> c.idViagem() == null || !jaSeparadas.contains(c.idViagem()))
+                .toList();
     }
 
     /** CT-es separáveis de um caminhão: ainda saindo (EM_DESCARGA) ou no armazém (NO_ARMAZEM). */

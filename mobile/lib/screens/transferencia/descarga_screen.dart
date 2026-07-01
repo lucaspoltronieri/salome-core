@@ -32,6 +32,7 @@ class _DescargaScreenState extends State<DescargaScreen> {
   bool _carregando = true;
   bool _ocupado = false;
   String _filtro = '';
+  final TextEditingController _filtroCtrl = TextEditingController();
 
   int get _idAtividade => _atv.id;
 
@@ -40,6 +41,22 @@ class _DescargaScreenState extends State<DescargaScreen> {
     super.initState();
     _atv = widget.atividade;
     _carregar();
+  }
+
+  @override
+  void dispose() {
+    _filtroCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Limpa o filtro (texto + campo) para a lista do que falta reaparecer inteira
+  /// após direcionar — o TextField é controlado, então some o texto antigo também.
+  void _limparFiltro() {
+    if (_filtro.isEmpty && _filtroCtrl.text.isEmpty) return;
+    setState(() {
+      _filtro = '';
+      _filtroCtrl.clear();
+    });
   }
 
   Future<void> _participar() async {
@@ -86,6 +103,7 @@ class _DescargaScreenState extends State<DescargaScreen> {
     try {
       await session.api.registrarDescarga(_idAtividade, cte.idConhecimento, box.id);
       setState(() => _marcados.add(cte.idConhecimento));
+      _limparFiltro();
       if (mounted) mostrarMensagem(context, 'CT-e ${cte.cte ?? ''} → ${box.nome} (em descarga)');
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
@@ -109,6 +127,7 @@ class _DescargaScreenState extends State<DescargaScreen> {
         _modoSelecao = false;
       });
       await _carregar();
+      _limparFiltro();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
     } finally {
@@ -234,6 +253,7 @@ class _DescargaScreenState extends State<DescargaScreen> {
                       Text('$feitos de $total CT-es em descarga'),
                       const SizedBox(height: 8),
                       TextField(
+                        controller: _filtroCtrl,
                         decoration: const InputDecoration(
                           prefixIcon: Icon(Icons.search),
                           hintText: 'Filtrar por CT-e, NF, destino...',

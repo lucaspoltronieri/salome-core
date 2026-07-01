@@ -37,26 +37,61 @@ class _ScannerSheetState extends State<_ScannerSheet> {
   void initState() {
     super.initState();
     // mobile_scanner 5.x NÃO inicia a câmera sozinho: é preciso start() manual.
-    // Iniciar dentro de initState() chega cedo demais em alguns aparelhos
-    // (a platform view/superfície ainda não existe) e o start() falha calado,
-    // deixando a câmera preta. Iniciamos no 1º frame e tratamos o erro.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _iniciarCamera());
+    // Iniciar cedo demais (no 1º frame, com o bottom sheet ainda subindo) pega a
+    // platform view sem composição: o start() resolve "ok" mas não chegam frames
+    // e o preview fica preto. Por isso esperamos a animação do modal terminar.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _agendarInicio());
   }
 
-  Future<void> _iniciarCamera() async {
+  /// Só liga a câmera depois que o bottom sheet terminou de subir (evita preview preto).
+  void _agendarInicio() {
+    if (!mounted) return;
+    final anim = ModalRoute.of(context)?.animation;
+    if (anim == null || anim.status == AnimationStatus.completed) {
+      _iniciarCamera();
+      return;
+    }
+    void ouvinte(AnimationStatus s) {
+      if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
+        anim.removeStatusListener(ouvinte);
+        if (s == AnimationStatus.completed) _iniciarCamera();
+      }
+    }
+
+    anim.addStatusListener(ouvinte);
+  }
+
+  Future<void> _iniciarCamera({bool retentar = true}) async {
     if (!mounted || _iniciando) return;
     setState(() {
       _iniciando = true;
       _erro = null;
     });
+    Object? erro;
     try {
       await _controller.start();
-      if (mounted) setState(() => _erro = null);
     } catch (e) {
-      if (mounted) setState(() => _erro = _mensagemErro(e));
-    } finally {
-      if (mounted) setState(() => _iniciando = false);
+      erro = e;
     }
+    if (!mounted) return;
+    if (erro == null) {
+      setState(() {
+        _iniciando = false;
+        _erro = null;
+      });
+      return;
+    }
+    // Uma re-tentativa após curto intervalo cobre a superfície ainda não pronta;
+    // persistindo, mostra o fallback de digitação.
+    if (retentar) {
+      setState(() => _iniciando = false);
+      await Future.delayed(const Duration(milliseconds: 300));
+      return _iniciarCamera(retentar: false);
+    }
+    setState(() {
+      _iniciando = false;
+      _erro = _mensagemErro(erro!); // não-nulo: early-return acima cobre erro == null
+    });
   }
 
   String _mensagemErro(Object e) {

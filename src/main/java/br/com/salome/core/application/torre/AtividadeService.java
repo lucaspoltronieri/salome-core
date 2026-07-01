@@ -112,6 +112,22 @@ public class AtividadeService {
             throw new br.com.salome.core.domain.torre.erro.RegraViolada(
                     "Atividade 'Outras' exige um subtipo válido do catálogo.");
         }
+        // Separação por viagem é única: se já foi concluída, bloqueia (separa-se uma vez);
+        // se há uma aberta, o operador entra na mesma (colaboração) em vez de criar outra.
+        if (request.tipo() == br.com.salome.core.domain.torre.TipoAtividade.SEPARACAO
+                && request.idViagem() != null) {
+            if (atividadeRepository.idsViagensComSeparacaoConcluida(usuario.idFilial())
+                    .contains(request.idViagem())) {
+                throw new RegraViolada("Esta viagem já foi separada.");
+            }
+            var aberta = atividadeRepository
+                    .buscarSeparacaoAbertaDaViagem(usuario.idFilial(), request.idViagem());
+            if (aberta.isPresent()) {
+                long idExistente = aberta.get().id();
+                entrarInterno(idExistente, usuario.id(), request.funcao(), clock.instant());
+                return montarResumo(idExistente, usuario.idFilial());
+            }
+        }
         Instant agora = clock.instant();
         Atividade nova = new Atividade(
                 null, usuario.idFilial(), request.tipo(), request.subtipo(),

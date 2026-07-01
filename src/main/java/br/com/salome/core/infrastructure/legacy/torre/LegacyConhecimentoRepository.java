@@ -1,6 +1,7 @@
 package br.com.salome.core.infrastructure.legacy.torre;
 
 import br.com.salome.core.application.torre.ConhecimentoLegadoRepository;
+import br.com.salome.core.domain.torre.ConhecimentoDatas;
 import br.com.salome.core.domain.torre.CteDescarga;
 import java.math.BigDecimal;
 import java.sql.Date;
@@ -16,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -103,6 +105,45 @@ public class LegacyConhecimentoRepository implements ConhecimentoLegadoRepositor
         return emissoes;
     }
 
+    @Override
+    public Map<Long, ConhecimentoDatas> datasPorConhecimento(Collection<Long> idsConhecimento, int idFilial) {
+        if (idsConhecimento.isEmpty()) {
+            return Map.of();
+        }
+        String marcadores = String.join(",", java.util.Collections.nCopies(idsConhecimento.size(), "?"));
+        String sql = """
+                SELECT c.idConhecimento,
+                       c.cteEmissao,
+                       (
+                           SELECT vtBaixa.dataBaixa
+                             FROM viagemtransferenciaconhecimento vtcBaixa
+                             JOIN viagemtransferencia vtBaixa
+                               ON vtBaixa.idViagemTransferencia = vtcBaixa.idViagemTransferencia
+                            WHERE vtcBaixa.idConhecimento = c.idConhecimento
+                              AND vtBaixa.status = 'Baixado'
+                              AND vtBaixa.idFilialDestino = ?
+                              AND vtBaixa.dataBaixa IS NOT NULL
+                            ORDER BY vtBaixa.dataBaixa DESC, vtBaixa.horaBaixa DESC, vtBaixa.idViagemTransferencia DESC
+                            LIMIT 1
+                       ) AS dataChegada,
+                       c.dataPrevistaEntrega
+                  FROM conhecimento c
+                 WHERE c.idConhecimento IN (""" + marcadores + ")";
+        Object[] args = new Object[idsConhecimento.size() + 1];
+        args[0] = idFilial;
+        int i = 1;
+        for (Long id : idsConhecimento) {
+            args[i++] = id;
+        }
+        Map<Long, ConhecimentoDatas> datas = new HashMap<>();
+        jdbcTemplate.query(sql, (RowCallbackHandler) rs -> datas.put(rs.getLong("idConhecimento"),
+                new ConhecimentoDatas(
+                        toLocalDate(rs, "cteEmissao"),
+                        toLocalDate(rs, "dataChegada"),
+                        toLocalDate(rs, "dataPrevistaEntrega"))), args);
+        return datas;
+    }
+
     private CteDescarga map(ResultSet rs, int rowNum) throws SQLException {
         int cte = rs.getInt("cte");
         return new CteDescarga(
@@ -118,5 +159,10 @@ public class LegacyConhecimentoRepository implements ConhecimentoLegadoRepositor
 
     private BigDecimal zero(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
+    }
+
+    private LocalDate toLocalDate(ResultSet rs, String column) throws SQLException {
+        Date date = rs.getDate(column);
+        return date == null ? null : date.toLocalDate();
     }
 }

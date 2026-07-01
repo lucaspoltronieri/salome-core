@@ -12,6 +12,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,23 +51,28 @@ public class TorreDocumentoRepository implements DocumentoRepository {
             rs.getObject("id_local_atual", Long.class),
             rs.getTimestamp("atualizado_em").toInstant());
 
-    private static final RowMapper<DocumentoArmazenado> ARMAZENADO_MAPPER = (rs, n) -> new DocumentoArmazenado(
-            rs.getLong("id"),
-            rs.getObject("numero_cte", Integer.class),
-            rs.getBoolean("pre_cte"),
-            rs.getObject("volumes", Integer.class),
-            rs.getBigDecimal("peso"),
-            rs.getString("remetente"),
-            rs.getString("destinatario"),
-            rs.getString("cidade_destino"),
-            null, // dataEmissao: enriquecida do legado em ArmazemService
-            StatusDocumento.valueOf(rs.getString("status")),
-            rs.getObject("id_local_atual", Long.class),
-            rs.getString("local_codigo"),
-            rs.getString("local_nome"),
-            rs.getString("local_tipo"),
-            rs.getObject("id_conhecimento_legado", Long.class),
-            rs.getTimestamp("atualizado_em").toInstant());
+    private static final RowMapper<DocumentoArmazenado> ARMAZENADO_MAPPER = (rs, n) -> {
+        java.sql.Date dataChegadaColeta = rs.getObject("data_chegada_coleta", java.sql.Date.class);
+        return new DocumentoArmazenado(
+                rs.getLong("id"),
+                rs.getObject("numero_cte", Integer.class),
+                rs.getBoolean("pre_cte"),
+                rs.getObject("volumes", Integer.class),
+                rs.getBigDecimal("peso"),
+                rs.getString("remetente"),
+                rs.getString("destinatario"),
+                rs.getString("cidade_destino"),
+                null, // dataEmissao: enriquecida do legado em ArmazemService
+                toLocalDate(dataChegadaColeta),
+                null, // dataPrevistaEntrega: enriquecida do legado em ArmazemService
+                StatusDocumento.valueOf(rs.getString("status")),
+                rs.getObject("id_local_atual", Long.class),
+                rs.getString("local_codigo"),
+                rs.getString("local_nome"),
+                rs.getString("local_tipo"),
+                rs.getObject("id_conhecimento_legado", Long.class),
+                rs.getTimestamp("atualizado_em").toInstant());
+    };
 
     private static final RowMapper<DocumentoComLocal> COM_LOCAL_MAPPER = (rs, n) -> new DocumentoComLocal(
             rs.getLong("id"),
@@ -210,7 +216,17 @@ public class TorreDocumentoRepository implements DocumentoRepository {
         return jdbc.query("""
                 SELECT d.id, d.numero_cte, d.pre_cte, d.volumes, d.peso, d.remetente, d.destinatario,
                        d.cidade_destino, d.status, d.id_local_atual, d.id_conhecimento_legado, d.atualizado_em,
-                       l.codigo AS local_codigo, l.nome AS local_nome, l.tipo AS local_tipo
+                       l.codigo AS local_codigo, l.nome AS local_nome, l.tipo AS local_tipo,
+                       (
+                           SELECT DATE(ad.registrado_em)
+                             FROM atividade_documento ad
+                             JOIN atividade_armazem a ON a.id = ad.id_atividade
+                            WHERE ad.id_documento = d.id
+                              AND ad.papel = 'DESCARREGADO'
+                              AND a.tipo = 'DESCARGA_COLETA'
+                            ORDER BY ad.registrado_em DESC, ad.id DESC
+                            LIMIT 1
+                       ) AS data_chegada_coleta
                   FROM documento_operacional d
                   LEFT JOIN local_armazem l ON l.id = d.id_local_atual
                  WHERE d.id_filial = ?
@@ -297,5 +313,9 @@ public class TorreDocumentoRepository implements DocumentoRepository {
 
     private static void setLong(PreparedStatement ps, int i, Long v) throws java.sql.SQLException {
         if (v == null) ps.setNull(i, Types.BIGINT); else ps.setLong(i, v);
+    }
+
+    private static LocalDate toLocalDate(java.sql.Date date) {
+        return date == null ? null : date.toLocalDate();
     }
 }

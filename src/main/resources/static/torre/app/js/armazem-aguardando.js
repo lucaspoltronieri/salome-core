@@ -26,21 +26,52 @@
       ${lista.length ? "" : '<p class="vazio">Nada aqui agora.</p>'}`);
   }
 
+  // Vários idViagemTransferencia (manifestos) do mesmo idViagem chegam no mesmo
+  // caminhão: agrupamos por idViagem (fallback idViagemTransferencia quando nulo),
+  // igual ao painel TV, para virar uma linha só com selo ×N. Veja painel/app.js.
+  function agruparAguardando(viagens) {
+    const grupos = new Map();
+    for (const v of viagens || []) {
+      const chave = v.idViagem != null ? "g" + v.idViagem : "t" + v.idViagemTransferencia;
+      let g = grupos.get(chave);
+      if (!g) {
+        g = { placa: v.placa, origem: v.origem, dataBaixa: v.dataBaixa, horaBaixa: v.horaBaixa,
+              qtdCtes: 0, volumes: 0, peso: 0, manifestos: 0 };
+        grupos.set(chave, g);
+      }
+      g.qtdCtes += v.qtdCtes || 0;
+      g.volumes += Number(v.volumes ?? 0);
+      g.peso += Number(v.peso ?? 0);
+      g.manifestos += 1;
+      // mantém a baixa mais recente do grupo
+      if (`${v.dataBaixa} ${v.horaBaixa ?? ""}` > `${g.dataBaixa} ${g.horaBaixa ?? ""}`) {
+        g.dataBaixa = v.dataBaixa; g.horaBaixa = v.horaBaixa;
+      }
+    }
+    return [...grupos.values()];
+  }
+
   function blocoAguardando(titulo, viagens) {
-    const linhas = (viagens || []).map(v => `<tr>
-      <td class="placa">${T.escapar(v.placa) || "—"}</td>
-      <td>${T.escapar(T.limparOrigem(v.origem))}</td>
-      <td>${T.dataHora(v.dataBaixa, v.horaBaixa)}</td>
-      <td class="num">${T.fmtInt.format(v.qtdCtes || 0)}</td>
-      <td class="num">${T.fmtInt.format(+v.volumes || 0)}</td>
-      <td class="num">${T.fmtPeso.format(+v.peso || 0)}</td>
-    </tr>`).join("");
-    return painel(titulo, viagens.length, `
+    const grupos = agruparAguardando(viagens);
+    const linhas = grupos.map(g => {
+      const selo = g.manifestos > 1
+        ? ` <span class="badge-grupo" title="${g.manifestos} manifestos na mesma viagem">×${g.manifestos}</span>`
+        : "";
+      return `<tr>
+      <td class="placa">${T.escapar(g.placa) || "—"}${selo}</td>
+      <td>${T.escapar(T.limparOrigem(g.origem))}</td>
+      <td>${T.dataHora(g.dataBaixa, g.horaBaixa)}</td>
+      <td class="num">${T.fmtInt.format(g.qtdCtes || 0)}</td>
+      <td class="num">${T.fmtInt.format(+g.volumes || 0)}</td>
+      <td class="num">${T.fmtPeso.format(+g.peso || 0)}</td>
+    </tr>`;
+    }).join("");
+    return painel(titulo, grupos.length, `
       <table class="tabela"><thead><tr>
         <th>Placa</th><th>Origem</th><th>Baixa</th>
         <th class="num">CT-es</th><th class="num">Volumes</th><th class="num">Peso (kg)</th>
       </tr></thead><tbody>${linhas}</tbody></table>
-      ${viagens.length ? "" : '<p class="vazio">Nenhum caminhão aguardando descarga.</p>'}`);
+      ${grupos.length ? "" : '<p class="vazio">Nenhum caminhão aguardando descarga.</p>'}`);
   }
 
   function blocoDescarregando(titulo, atividades) {

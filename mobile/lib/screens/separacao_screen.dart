@@ -34,6 +34,7 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
   bool _ocupado = false;
   bool _carregando = true;
   String _filtro = '';
+  final TextEditingController _filtroCtrl = TextEditingController();
   String? _erro;
 
   @override
@@ -45,6 +46,22 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
     } else {
       _carregarDocs();
     }
+  }
+
+  @override
+  void dispose() {
+    _filtroCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Limpa o filtro (texto + campo) para a lista do que falta separar reaparecer
+  /// inteira após marcar — o TextField é controlado, então some o texto antigo.
+  void _limparFiltro() {
+    if (_filtro.isEmpty && _filtroCtrl.text.isEmpty) return;
+    setState(() {
+      _filtro = '';
+      _filtroCtrl.clear();
+    });
   }
 
   // ---- Passo 1: escolher o caminhão ----------------------------------
@@ -141,6 +158,7 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
       await session.api.separar(_atv!.id, d.id!, local.id);
       if (mounted) mostrarMensagem(context, 'CT-e ${d.numeroCte ?? d.id} → ${local.nome}');
       await _carregarDocs();
+      _limparFiltro();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
     }
@@ -164,6 +182,7 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
         _modoSelecao = false;
       });
       await _carregarDocs();
+      _limparFiltro();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
     } finally {
@@ -219,6 +238,41 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
 
   Future<void> _concluir() async {
     if (_atv == null) return;
+    // O restante que ainda não foi marcado é considerado separado neste momento
+    // (pode ser só visual — o físico já está separado). Marca tudo em lote e finaliza.
+    final pendentes = List<DocumentoOperacional>.from(_docs);
+    if (pendentes.isNotEmpty) {
+      if (!await confirmar(context, 'Concluir separação',
+          'Concluir a separação? Os ${pendentes.length} CT-e(s) restantes serão considerados separados.')) {
+        return;
+      }
+      final local = _boxDistribuicao();
+      if (local == null) {
+        if (mounted) {
+          mostrarMensagem(context,
+              'Box de Distribuição (DIST) não encontrado ou inativo para esta filial.',
+              erro: true);
+        }
+        return;
+      }
+      setState(() => _ocupado = true);
+      try {
+        await session.api
+            .separarLote(_atv!.id, pendentes.map((d) => d.id!).toList(), local.id);
+      } on ApiException catch (e) {
+        if (mounted) {
+          setState(() => _ocupado = false);
+          mostrarMensagem(context, e.message, erro: true);
+        }
+        return;
+      }
+      if (mounted) setState(() => _ocupado = false);
+    } else {
+      if (!await confirmar(
+          context, 'Concluir separação', 'Concluir a separação deste caminhão?')) {
+        return;
+      }
+    }
     await finalizarAtividade(context, _atv!.id, aoMudar: () {
       if (mounted) Navigator.pop(context);
     });
@@ -285,6 +339,8 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
   Widget _telaSeparacao() {
     final souParticipante = _atv!.souParticipanteAtivo(session.usuario?.id);
     final docs = _filtrados;
+    final feitos = _separados.length;
+    final total = _docs.length + _separados.length;
     final toggle = <Widget>[
       if (_docs.isNotEmpty)
         IconButton(
@@ -358,14 +414,24 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(12),
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            hintText: 'Filtrar por CT-e, remetente, destino...',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          onChanged: (v) => setState(() => _filtro = v),
+                        child: Column(
+                          children: [
+                            LinearProgressIndicator(
+                                value: total == 0 ? 0 : feitos / total),
+                            const SizedBox(height: 6),
+                            Text('$feitos de $total separados'),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _filtroCtrl,
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.search),
+                                hintText: 'Filtrar por CT-e, remetente, destino...',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              onChanged: (v) => setState(() => _filtro = v),
+                            ),
+                          ],
                         ),
                       ),
                       Expanded(
