@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Abre a câmera num bottom sheet e retorna o primeiro código lido (raw value),
 /// ou null se o usuário fechar. Se a câmera falhar (permissão negada, device sem
@@ -32,6 +33,8 @@ class _ScannerSheetState extends State<_ScannerSheet> {
   bool _iniciando = false;
   // Mensagem de erro quando a câmera não sobe (mostra fallback de digitação).
   String? _erro;
+  // Permissão negada "para sempre" → oferece abrir as configurações do app.
+  bool _negadaPermanente = false;
 
   @override
   void initState() {
@@ -66,7 +69,24 @@ class _ScannerSheetState extends State<_ScannerSheet> {
     setState(() {
       _iniciando = true;
       _erro = null;
+      _negadaPermanente = false;
     });
+    // Android 6+ exige pedir a permissão de câmera em runtime — sem isso o start()
+    // falha com erro genérico e a câmera nunca abre.
+    final permissao = await Permission.camera.request();
+    if (!mounted) return;
+    if (!permissao.isGranted) {
+      setState(() {
+        _iniciando = false;
+        _negadaPermanente = permissao.isPermanentlyDenied;
+        _erro = permissao.isPermanentlyDenied
+            ? 'Permissão de câmera negada. Toque em "Abrir configurações" para liberar, '
+                'ou digite o código manualmente.'
+            : 'Precisamos da câmera pra bipar. Toque em "Tentar de novo" e permita o acesso, '
+                'ou digite o código manualmente.';
+      });
+      return;
+    }
     Object? erro;
     try {
       await _controller.start();
@@ -199,6 +219,7 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                       mensagem: _erro!,
                       aoDigitar: _digitarManual,
                       aoTentar: _iniciarCamera,
+                      aoAbrirConfig: _negadaPermanente ? () => openAppSettings() : null,
                     ),
                   )
                 else if (_iniciando)
@@ -234,10 +255,13 @@ class _ErroCamera extends StatelessWidget {
   final String mensagem;
   final VoidCallback aoDigitar;
   final Future<void> Function() aoTentar;
+  /// Só preenchido quando a permissão foi negada "para sempre": abre as configurações do app.
+  final VoidCallback? aoAbrirConfig;
   const _ErroCamera({
     required this.mensagem,
     required this.aoDigitar,
     required this.aoTentar,
+    this.aoAbrirConfig,
   });
 
   @override
@@ -254,11 +278,18 @@ class _ErroCamera extends StatelessWidget {
           Wrap(
             spacing: 8,
             children: [
-              OutlinedButton.icon(
-                onPressed: () => aoTentar(),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Tentar de novo'),
-              ),
+              if (aoAbrirConfig != null)
+                OutlinedButton.icon(
+                  onPressed: aoAbrirConfig,
+                  icon: const Icon(Icons.settings),
+                  label: const Text('Abrir configurações'),
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: () => aoTentar(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Tentar de novo'),
+                ),
               ElevatedButton.icon(
                 onPressed: aoDigitar,
                 icon: const Icon(Icons.keyboard),
