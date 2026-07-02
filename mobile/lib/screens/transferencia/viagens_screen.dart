@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../formatters/date_formatters.dart';
 import '../../main.dart';
 import '../../models/models.dart';
 import '../../widgets/dialogos.dart';
@@ -90,7 +91,7 @@ class _ViagensScreenState extends State<ViagensScreen> {
                       if (g.origem != null) g.origem!,
                       if (g.motorista != null) g.motorista!,
                       '${g.qtdCtes} CT-es · ${g.volumes.toStringAsFixed(0)} vol · ${g.peso.toStringAsFixed(0)} kg',
-                      if (g.dataBaixa != null) 'Chegada: ${g.dataBaixa} ${g.horaBaixa ?? ''}',
+                      if (g.dataBaixa != null) 'Chegada: ${fmtDataHoraBr(g.dataBaixa, g.horaBaixa)}',
                       if (g.idsManifesto.isNotEmpty)
                         'Manifesto: ${(g.idsManifesto.toList()..sort()).join(', ')}',
                     ].join('\n')),

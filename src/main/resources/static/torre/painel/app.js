@@ -36,6 +36,15 @@ function fmtDuracao(seg) {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m} min`;
 }
 
+function fmtData(d) {
+  const partes = (d || "").split("-");
+  return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : (d || "");
+}
+
+function fmtDataHora(d, h) {
+  return [fmtData(d), h || ""].filter(Boolean).join(" ");
+}
+
 function setNum(id, n) { document.getElementById(id).textContent = fmtInt.format(n || 0); }
 function setPeso(id, n) { document.getElementById(id).textContent = fmtPeso.format(n || 0); }
 function setTexto(id, s) { const el = document.getElementById(id); if (el) el.textContent = s; }
@@ -124,7 +133,7 @@ function renderChegando(lista) {
   document.getElementById("chDetalhe").innerHTML = lista.slice(0, 6).map(c => `
     <div class="linha">
       <span class="placa">${escapar(c.placa) || "—"}</span>
-      <span>${escapar(limparOrigem(c.origem))} · ${escapar(c.dataPrevisaoChegada || "")} ${escapar(c.horaPrevisaoChegada || "")}</span>
+      <span>${escapar(limparOrigem(c.origem))} · ${escapar(fmtDataHora(c.dataPrevisaoChegada, c.horaPrevisaoChegada))}</span>
       <span class="num">${fmtInt.format(Number(c.volumes || 0))} vol</span>
     </div>`).join("") || '<p class="vazio">Nenhum caminhão a caminho.</p>';
 }
@@ -143,7 +152,7 @@ function renderAguardandoDescarga(viagens) {
       : "";
     return `<div class="linha ${fresca}">
       <span class="placa">${escapar(g.placa) || "—"}${badge}</span>
-      <span>${escapar(limparOrigem(g.origem))} · ${escapar(g.dataBaixa)} ${escapar(g.horaBaixa) || ""}</span>
+      <span>${escapar(limparOrigem(g.origem))} · ${escapar(fmtDataHora(g.dataBaixa, g.horaBaixa))}</span>
     </div>`;
   }).join("") || '<p class="vazio">Nenhuma viagem aguardando.</p>';
   vistas = new Set(grupos.map(g => g.chave));

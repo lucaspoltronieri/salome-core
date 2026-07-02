@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:flutter_zxing/flutter_zxing.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Abre a câmera num bottom sheet e retorna o primeiro código lido (raw value),
 /// ou null se o usuário fechar. Se a câmera falhar (permissão negada, device sem
 /// câmera, etc.) o operador ainda consegue digitar o código manualmente — o valor
 /// digitado também volta por aqui, então o chamador não precisa de outro caminho.
+///
+/// Motor de leitura: **ZXing** (via flutter_zxing) — usa o plugin `camera` (camera2)
+/// e não depende de ML Kit / CameraX, que falhavam no `start()` em alguns aparelhos.
 Future<String?> abrirScanner(BuildContext context,
     {String titulo = 'Bipar com a câmera'}) {
   return showModalBottomSheet<String>(
@@ -26,123 +29,57 @@ class _ScannerSheet extends StatefulWidget {
 }
 
 class _ScannerSheetState extends State<_ScannerSheet> {
-  final MobileScannerController _controller = MobileScannerController(
-    autoStart: false,
-  );
   bool _capturado = false;
-  bool _iniciando = false;
-  // Mensagem de erro quando a câmera não sobe (mostra fallback de digitação).
-  String? _erro;
-  // Permissão negada "para sempre" → oferece abrir as configurações do app.
+  bool _verificando = true; // ainda checando a permissão de câmera
+  bool _permitido = false;
   bool _negadaPermanente = false;
 
   @override
   void initState() {
     super.initState();
-    // mobile_scanner 5.x NÃO inicia a câmera sozinho: é preciso start() manual.
-    // Iniciar cedo demais (no 1º frame, com o bottom sheet ainda subindo) pega a
-    // platform view sem composição: o start() resolve "ok" mas não chegam frames
-    // e o preview fica preto. Por isso esperamos a animação do modal terminar.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _agendarInicio());
+    _pedirPermissao();
   }
 
-  /// Só liga a câmera depois que o bottom sheet terminou de subir (evita preview preto).
-  void _agendarInicio() {
+  /// Android 6+ exige permissão de câmera em runtime — o ReaderWidget só sobe depois de OK.
+  Future<void> _pedirPermissao() async {
     if (!mounted) return;
-    final anim = ModalRoute.of(context)?.animation;
-    if (anim == null || anim.status == AnimationStatus.completed) {
-      _iniciarCamera();
-      return;
-    }
-    void ouvinte(AnimationStatus s) {
-      if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
-        anim.removeStatusListener(ouvinte);
-        if (s == AnimationStatus.completed) _iniciarCamera();
-      }
-    }
-
-    anim.addStatusListener(ouvinte);
-  }
-
-  Future<void> _iniciarCamera({bool retentar = true}) async {
-    if (!mounted || _iniciando) return;
+    setState(() => _verificando = true);
+    final status = await Permission.camera.request();
+    if (!mounted) return;
     setState(() {
-      _iniciando = true;
-      _erro = null;
-      _negadaPermanente = false;
-    });
-    // Android 6+ exige pedir a permissão de câmera em runtime — sem isso o start()
-    // falha com erro genérico e a câmera nunca abre.
-    final permissao = await Permission.camera.request();
-    if (!mounted) return;
-    if (!permissao.isGranted) {
-      setState(() {
-        _iniciando = false;
-        _negadaPermanente = permissao.isPermanentlyDenied;
-        _erro = permissao.isPermanentlyDenied
-            ? 'Permissão de câmera negada. Toque em "Abrir configurações" para liberar, '
-                'ou digite o código manualmente.'
-            : 'Precisamos da câmera pra bipar. Toque em "Tentar de novo" e permita o acesso, '
-                'ou digite o código manualmente.';
-      });
-      return;
-    }
-    Object? erro;
-    try {
-      await _controller.start();
-    } catch (e) {
-      erro = e;
-    }
-    if (!mounted) return;
-    if (erro == null) {
-      setState(() {
-        _iniciando = false;
-        _erro = null;
-      });
-      return;
-    }
-    // Uma re-tentativa após curto intervalo cobre a superfície ainda não pronta;
-    // persistindo, mostra o fallback de digitação.
-    if (retentar) {
-      setState(() => _iniciando = false);
-      await Future.delayed(const Duration(milliseconds: 300));
-      return _iniciarCamera(retentar: false);
-    }
-    setState(() {
-      _iniciando = false;
-      _erro = _mensagemErro(erro!); // não-nulo: early-return acima cobre erro == null
+      _verificando = false;
+      _permitido = status.isGranted;
+      _negadaPermanente = status.isPermanentlyDenied;
     });
   }
 
-  String _mensagemErro(Object e) {
-    if (e is MobileScannerException &&
-        e.errorCode == MobileScannerErrorCode.permissionDenied) {
-      return 'Permissão de câmera negada — libere nas configurações do aparelho '
-          'e tente de novo, ou digite o código manualmente.';
-    }
-    // Diagnóstico: expõe o erro real da câmera pra identificar a causa (a permissão já
-    // está concedida, então start() falha por outro motivo).
-    final det = e is MobileScannerException
-        ? 'code=${e.errorCode}; ${e.errorDetails?.message ?? ''}'
-        : e.toString();
-    return 'Não foi possível abrir a câmera. Digite o código manualmente.\n\n[$det]';
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onDetect(BarcodeCapture capture) {
+  void _onScan(Code code) {
     if (_capturado) return;
-    for (final b in capture.barcodes) {
-      final raw = b.rawValue;
-      if (raw != null && raw.isNotEmpty) {
-        _capturado = true;
-        Navigator.of(context).pop(raw);
-        return;
+    final txt = code.text;
+    if (code.isValid && txt != null && txt.isNotEmpty) {
+      _capturado = true;
+      Navigator.of(context).pop(txt);
+    }
+  }
+
+  void _onMultiScan(Codes codes) {
+    if (_capturado) return;
+    String? fallback;
+    for (final code in codes.codes) {
+      final txt = code.text;
+      if (code.isValid && txt != null && txt.isNotEmpty) {
+        fallback ??= txt;
+        final chave = RegExp(r'(?:^|\D)\d{44}(?:\D|$)').hasMatch(txt);
+        if (chave) {
+          _capturado = true;
+          Navigator.of(context).pop(txt);
+          return;
+        }
       }
+    }
+    if (fallback != null) {
+      _capturado = true;
+      Navigator.of(context).pop(fallback);
     }
   }
 
@@ -193,49 +130,12 @@ class _ScannerSheetState extends State<_ScannerSheet> {
             automaticallyImplyLeading: false,
             actions: [
               IconButton(
-                icon: const Icon(Icons.flip_camera_ios),
-                onPressed: (_erro == null && !_iniciando)
-                    ? () => _controller.switchCamera()
-                    : null,
-              ),
-              IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
-          Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                MobileScanner(
-                  controller: _controller,
-                  onDetect: _onDetect,
-                  // v7: errorBuilder passou a receber apenas (context, error).
-                  errorBuilder: (context, error) => _ErroCamera(
-                    mensagem: _mensagemErro(error),
-                    aoDigitar: _digitarManual,
-                    aoTentar: _iniciarCamera,
-                  ),
-                ),
-                if (_erro != null)
-                  ColoredBox(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    child: _ErroCamera(
-                      mensagem: _erro!,
-                      aoDigitar: _digitarManual,
-                      aoTentar: _iniciarCamera,
-                      aoAbrirConfig: _negadaPermanente ? () => openAppSettings() : null,
-                    ),
-                  )
-                else if (_iniciando)
-                  const ColoredBox(
-                    color: Colors.black,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-              ],
-            ),
-          ),
+          Expanded(child: _corpo()),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -253,6 +153,42 @@ class _ScannerSheetState extends State<_ScannerSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _corpo() {
+    if (_verificando) {
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (!_permitido) {
+      return ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: _ErroCamera(
+          mensagem: _negadaPermanente
+              ? 'Permissão de câmera negada. Toque em "Abrir configurações" para '
+                  'liberar, ou digite o código manualmente.'
+              : 'Precisamos da câmera pra bipar. Toque em "Tentar de novo" e permita '
+                  'o acesso, ou digite o código manualmente.',
+          aoDigitar: _digitarManual,
+          aoTentar: _pedirPermissao,
+          aoAbrirConfig: _negadaPermanente ? () => openAppSettings() : null,
+        ),
+      );
+    }
+    // Multi-scan evita perder a leitura quando QR e código de barras aparecem juntos no documento.
+    return ReaderWidget(
+      onScan: _onScan,
+      onMultiScan: _onMultiScan,
+      isMultiScan: true,
+      codeFormat: Format.any,
+      tryHarder: true,
+      tryInverted: true,
+      tryDownscale: true,
+      scanDelay: const Duration(milliseconds: 250),
+      scanDelaySuccess: const Duration(milliseconds: 300),
     );
   }
 }

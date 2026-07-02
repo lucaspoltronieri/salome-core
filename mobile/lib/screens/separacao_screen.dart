@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../chave/chave_parser.dart';
+import '../formatters/date_formatters.dart';
 import '../main.dart';
 import '../models/box_destino.dart';
 import '../models/models.dart';
@@ -335,7 +336,7 @@ class _SeparacaoScreenState extends State<SeparacaoScreen> {
                                       Text(
                                           '${c.qtdCtes} CT-es · ${c.volumes.toStringAsFixed(0)} vol · ${c.peso.toStringAsFixed(0)} kg'),
                                     if (c.dataBaixa != null)
-                                      Text('Chegada: ${c.dataBaixa} ${c.horaBaixa ?? ''}'),
+                                      Text('Chegada: ${fmtDataHoraBr(c.dataBaixa, c.horaBaixa)}'),
                                     if (c.idsManifesto.isNotEmpty)
                                       Text('Manifesto: ${c.idsManifesto.join(', ')}'),
                                     Row(children: [
