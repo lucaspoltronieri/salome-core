@@ -6,6 +6,7 @@ import br.com.salome.core.domain.torre.IndicadoresDia;
 import br.com.salome.core.domain.torre.MapaArmazemSnapshot;
 import br.com.salome.core.domain.torre.MapaCaminhao;
 import br.com.salome.core.domain.torre.PainelSnapshot;
+import br.com.salome.core.domain.torre.ResumoViagemLegado;
 import br.com.salome.core.domain.torre.SaldoArmazem;
 import br.com.salome.core.domain.torre.StatusDocumento;
 import br.com.salome.core.domain.torre.TipoAtividade;
@@ -14,6 +15,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +33,7 @@ public class PainelService {
 
     private final ViagemAguardandoService viagemAguardandoService;
     private final AtividadeService atividadeService;
+    private final ViagemLegadoRepository viagemLegadoRepository;
     private final DocumentoRepository documentoRepository;
     private final OcorrenciaService ocorrenciaService;
     private final IndicadoresRepository indicadoresRepository;
@@ -38,6 +42,7 @@ public class PainelService {
 
     public PainelService(ViagemAguardandoService viagemAguardandoService,
                          AtividadeService atividadeService,
+                         ViagemLegadoRepository viagemLegadoRepository,
                          DocumentoRepository documentoRepository,
                          OcorrenciaService ocorrenciaService,
                          IndicadoresRepository indicadoresRepository,
@@ -45,6 +50,7 @@ public class PainelService {
                          Clock clock) {
         this.viagemAguardandoService = viagemAguardandoService;
         this.atividadeService = atividadeService;
+        this.viagemLegadoRepository = viagemLegadoRepository;
         this.documentoRepository = documentoRepository;
         this.ocorrenciaService = ocorrenciaService;
         this.indicadoresRepository = indicadoresRepository;
@@ -82,8 +88,8 @@ public class PainelService {
                 clock.instant(),
                 indicadores,
                 viagens,
-                porTipo(abertas, TipoAtividade.DESCARGA_TRANSFERENCIA, TipoAtividade.DESCARGA_COLETA),
-                porTipo(abertas, TipoAtividade.SEPARACAO),
+                enriquecerPorViagem(porTipo(abertas, TipoAtividade.DESCARGA_TRANSFERENCIA, TipoAtividade.DESCARGA_COLETA)),
+                enriquecerPorViagem(porTipo(abertas, TipoAtividade.SEPARACAO)),
                 porTipo(abertas, TipoAtividade.CARREGAMENTO),
                 porTipo(abertas, TipoAtividade.OUTRAS),
                 documentoRepository.listarPorStatus(idFilial, List.of(StatusDocumento.NO_ARMAZEM)),
@@ -103,5 +109,24 @@ public class PainelService {
             set.add(t);
         }
         return abertas.stream().filter(a -> set.contains(a.tipo())).toList();
+    }
+
+    private List<AtividadeResumo> enriquecerPorViagem(List<AtividadeResumo> atividades) {
+        List<Long> idsViagem = atividades.stream()
+                .map(AtividadeResumo::idViagemLegado)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, ResumoViagemLegado> resumos = viagemLegadoRepository.buscarResumoPorViagens(idsViagem);
+        return atividades.stream().map(a -> {
+            ResumoViagemLegado r = a.idViagemLegado() == null ? null : resumos.get(a.idViagemLegado());
+            if (r == null) {
+                return a;
+            }
+            String placa = a.placaVeiculo() != null ? a.placaVeiculo() : r.placa();
+            return new AtividadeResumo(a.id(), a.idFilial(), a.tipo(), a.subtipo(), a.status(),
+                    a.idViagemLegado(), placa, a.iniciadaEm(), a.finalizadaEm(),
+                    a.participantes(), r.qtdCtes(), r.volumes(), r.peso());
+        }).toList();
     }
 }

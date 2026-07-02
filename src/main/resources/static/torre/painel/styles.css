@@ -171,6 +171,30 @@ body {
   display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
 }
 .detalhe-compacto .linha:last-child { border-bottom: none; }
+#agdDetalhe .linha {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.3fr) .9fr .9fr 1fr;
+  align-items: baseline;
+}
+#agdDetalhe .placa { min-width: 0; }
+#dsDetalhe .linha {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.25fr) .8fr 1fr .8fr .7fr;
+  align-items: baseline;
+}
+#dsDetalhe .tempo { text-align: right; }
+#spDetalhe .linha {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.25fr) .8fr 1fr .8fr .7fr;
+  align-items: baseline;
+}
+#spDetalhe .tempo { text-align: right; }
+#ruDetalhe .linha {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.3fr) .9fr .9fr 1fr;
+  align-items: baseline;
+}
+#ruDetalhe .linha span:nth-child(2) { text-align: right; }
 
 .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--suave); }
 .placa { font-weight: 800; letter-spacing: 1px; color: var(--azul-claro); }

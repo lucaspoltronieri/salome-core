@@ -274,9 +274,10 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
   /// CT-es visíveis agora (respeita tipo, filtro e o toggle "Outras") — base do "marcar todos".
   List<DocumentoOperacional> get _visiveis {
     if (_transferencia) return _filtrar(_carregaveis);
-    final dist = _filtrar(_carregaveis.where((d) => d.status == 'SEPARADO_BOX'));
-    if (!_mostrarOutras) return dist;
-    return [...dist, ..._filtrar(_outras)];
+    final docs = _mostrarOutras
+        ? _carregaveis
+        : _carregaveis.where((d) => d.status == 'SEPARADO_BOX');
+    return _filtrar(docs);
   }
 
   List<Widget> _secoes() {
@@ -285,31 +286,11 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
       widgets.addAll(_secao('Box Transferência', Icons.swap_horiz, Colors.blue,
           _filtrar(_carregaveis)));
     } else {
+      final docsEntrega = _mostrarOutras
+          ? _carregaveis
+          : _carregaveis.where((d) => d.status == 'SEPARADO_BOX');
       widgets.addAll(_secao('Box Distribuição', Icons.inventory_2, Colors.green,
-          _filtrar(_carregaveis.where((d) => d.status == 'SEPARADO_BOX'))));
-      // "Outras": revela (pra seleção) os CT-es em separação / no caminhão — só aparece
-      // quando existe algo por trás dele.
-      if (_outras.isNotEmpty) {
-        widgets.add(CheckboxListTile(
-          value: _mostrarOutras,
-          dense: true,
-          controlAffinity: ListTileControlAffinity.leading,
-          title: const Text('Outras — em separação e no caminhão'),
-          onChanged: (v) => setState(() {
-            _mostrarOutras = v ?? false;
-            if (!_mostrarOutras) {
-              // Some da tela → sai da seleção pra não carregar sem querer.
-              _selecionados.removeAll(_outras.map((d) => d.id).whereType<int>().toSet());
-            }
-          }),
-        ));
-        if (_mostrarOutras) {
-          widgets.addAll(_secao('Box Separação (sem separar)', Icons.call_split, Colors.orange,
-              _filtrar(_carregaveis.where((d) => d.status == 'NO_ARMAZEM'))));
-          widgets.addAll(_secao('No caminhão (crossdock direto)', Icons.local_shipping, Colors.purple,
-              _filtrar(_carregaveis.where((d) => d.status == 'EM_DESCARGA'))));
-        }
-      }
+          _filtrar(docsEntrega), trailing: _toggleOutras()));
     }
     if (_marcados.isNotEmpty) widgets.add(_secaoMarcados());
     if (widgets.isEmpty) {
@@ -344,8 +325,47 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
     );
   }
 
-  List<Widget> _secao(String titulo, IconData icone, Color cor, List<DocumentoOperacional> docs) {
-    if (docs.isEmpty) return const [];
+  Widget? _toggleOutras() {
+    if (_outras.isEmpty) return null;
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: () => _alternarOutras(!_mostrarOutras),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Checkbox(
+            value: _mostrarOutras,
+            visualDensity: VisualDensity.compact,
+            activeColor: Colors.red.shade700,
+            checkColor: Colors.white,
+            side: BorderSide(color: Colors.red.shade700, width: 2),
+            onChanged: (v) => _alternarOutras(v ?? false),
+          ),
+          Text(
+            'Outras (${_outras.length})',
+            style: TextStyle(
+              color: Colors.red.shade700,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _alternarOutras(bool valor) {
+    setState(() {
+      _mostrarOutras = valor;
+      if (!_mostrarOutras) {
+        // Some da tela -> sai da seleção pra não carregar sem querer.
+        _selecionados.removeAll(_outras.map((d) => d.id).whereType<int>().toSet());
+      }
+    });
+  }
+
+  List<Widget> _secao(String titulo, IconData icone, Color cor, List<DocumentoOperacional> docs,
+      {Widget? trailing}) {
+    if (docs.isEmpty && trailing == null) return const [];
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -354,6 +374,10 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
           const SizedBox(width: 8),
           Text('$titulo (${docs.length})',
               style: TextStyle(fontWeight: FontWeight.bold, color: cor)),
+          if (trailing != null) ...[
+            const Spacer(),
+            trailing,
+          ],
         ]),
       ),
       ...docs.map(_linha),

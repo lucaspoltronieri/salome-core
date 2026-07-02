@@ -152,7 +152,9 @@ function renderAguardandoDescarga(viagens) {
       : "";
     return `<div class="linha ${fresca}">
       <span class="placa">${escapar(g.placa) || "—"}${badge}</span>
-      <span>${escapar(limparOrigem(g.origem))} · ${escapar(fmtDataHora(g.dataBaixa, g.horaBaixa))}</span>
+      <span class="num">${fmtInt.format(g.qtdCtes || 0)} CT-e</span>
+      <span class="num">${fmtInt.format(g.volumes || 0)} vol</span>
+      <span class="num">${fmtPeso.format(g.peso || 0)} kg</span>
     </div>`;
   }).join("") || '<p class="vazio">Nenhuma viagem aguardando.</p>';
   vistas = new Set(grupos.map(g => g.chave));
@@ -169,6 +171,8 @@ function renderDescarregandoAgora(descargas) {
     const gente = pessoasAtivas(a);
     return `<div class="linha">
       <span class="placa">${escapar(a.placaVeiculo) || (a.idViagemLegado ? "Viagem " + escapar(a.idViagemLegado) : "—")}</span>
+      <span class="num">${fmtInt.format(Number(a.volumes || 0))} vol</span>
+      <span class="num">${fmtPeso.format(Number(a.peso || 0))} kg</span>
       <span class="tempo">${escapar(tempoDecorrido(a.iniciadaEm))}</span>
       <span class="gente num">${fmtInt.format(gente)} 👤</span>
     </div>`;
@@ -228,7 +232,9 @@ function renderSeparandoAgora(separacoes, aguardandoAgregado) {
   document.getElementById("spDetalhe").innerHTML = separacoes.slice(0, 6).map(a => {
     const gente = pessoasAtivas(a);
     return `<div class="linha">
-      <span class="placa">${a.idViagemLegado ? "Viagem " + escapar(a.idViagemLegado) : escapar(a.placaVeiculo) || "—"}</span>
+      <span class="placa">${escapar(a.placaVeiculo) || (a.idViagemLegado ? "Viagem " + escapar(a.idViagemLegado) : "—")}</span>
+      <span class="num">${fmtInt.format(Number(a.volumes || 0))} vol</span>
+      <span class="num">${fmtPeso.format(Number(a.peso || 0))} kg</span>
       <span class="tempo">${escapar(tempoDecorrido(a.iniciadaEm))}</span>
       <span class="gente num">${fmtInt.format(gente)} 👤</span>
     </div>`;
@@ -248,6 +254,7 @@ function renderPraRua(lista) {
       <span class="placa">${escapar(c.placa) || "—"}</span>
       <span>${fmtInt.format(c.qtdCtes || 0)} CT-es</span>
       <span class="num">${fmtInt.format(Number(c.volumes || 0))} vol</span>
+      <span class="num">${fmtPeso.format(Number(c.peso || 0))} kg</span>
     </div>`).join("") || '<p class="vazio">Nenhum veículo em rota.</p>';
 }
 
