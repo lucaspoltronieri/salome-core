@@ -99,7 +99,7 @@ existentes (mapa, viagens, atividades, admin) + os dois snapshots novos abaixo. 
 
 `DashboardSnapshot`: `{indicadores, totalNoArmazem, aguardandoSeparacao, emSeparacao, prontos, emCarregamento, avarias, boxes, caminhoesEmTransito, caminhoesAguardando, coletasEmTransito, descargasEmAndamento, proximaChegadaData, proximaChegadaHora}` (percentuais por estágio o front deriva das contagens).
 
-`DocumentoArmazenado`: `{id, numeroCte, preCte, volumes, peso, remetente, destinatario, cidadeDestino, dataEmissao, status, idLocal, codigoLocal, nomeLocal, tipoLocal, idConhecimentoLegado, atualizadoEm}`. `dataEmissao` vem do legado (`conhecimento.cteEmissao`), enriquecida por filial; nula em pré-CTes sem CT-e casado.
+`DocumentoArmazenado`: `{id, numeroCte, preCte, volumes, peso, remetente, destinatario, cidadeDestino, dataEmissao, dataChegada, dataPrevistaEntrega, status, idLocal, codigoLocal, nomeLocal, tipoLocal, idConhecimentoLegado, atualizadoEm}`. `dataEmissao` e `dataPrevistaEntrega` vêm do legado (`conhecimento.cteEmissao`, `conhecimento.dataPrevistaEntrega`); `dataChegada` vem da baixa do manifesto de transferência no legado ou da data de registro da descarga de coleta na Torre. Datas ficam nulas em pré-CTes sem CT-e casado quando não houver origem correspondente.
 
 **Atividades & operadores** (correção pela web): reaproveita `GET /api/torre/atividades/abertas`
 (participantes ativos = quem está logado/trabalhando no celular) + `POST .../{id}/cancelar`

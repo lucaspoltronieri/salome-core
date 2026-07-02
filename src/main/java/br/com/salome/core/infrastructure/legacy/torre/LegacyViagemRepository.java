@@ -1,13 +1,20 @@
 package br.com.salome.core.infrastructure.legacy.torre;
 
 import br.com.salome.core.application.torre.ViagemLegadoRepository;
+import br.com.salome.core.domain.torre.ResumoViagemLegado;
 import br.com.salome.core.domain.torre.ViagemAguardando;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -112,6 +119,72 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
                     zero(rs.getBigDecimal("volumes")),
                     zero(rs.getBigDecimal("peso")));
         }, idFilial, dataCorte, limite);
+    }
+
+    @Override
+    public Map<Long, ResumoViagemLegado> buscarResumoPorViagens(Collection<Long> idsViagem) {
+        if (idsViagem.isEmpty()) {
+            return Map.of();
+        }
+        String marcadores = String.join(",", Collections.nCopies(idsViagem.size(), "?"));
+        String sql = """
+                SELECT vt.idViagem                                                        AS idViagem,
+                       MAX(veiculo.placa)                                                  AS placa,
+                       MAX(fornecedorMotorista.razaoSocial)                                AS motorista,
+                       MAX(CONCAT(filialOrigem.descricao, ' - ', COALESCE(cidadeOrigem.descricao, ''))) AS origem,
+                       COUNT(DISTINCT c.idConhecimento)                                    AS qtdCtes,
+                       COALESCE(SUM(IFNULL(cnf.quantidadeVolumes, 0)), 0)                  AS volumes,
+                       COALESCE(SUM(IFNULL(cnf.pesoNf, 0)), 0)                             AS peso,
+                       MAX(vt.dataBaixa)                                                   AS dataBaixa,
+                       (SELECT vt2.horaBaixa FROM viagemtransferencia vt2
+                         WHERE vt2.idViagem = vt.idViagem AND vt2.dataBaixa IS NOT NULL
+                         ORDER BY vt2.dataBaixa DESC, vt2.horaBaixa DESC LIMIT 1)           AS horaBaixa,
+                       COUNT(DISTINCT vt.idViagemTransferencia)                            AS qtdManifestos,
+                       GROUP_CONCAT(DISTINCT vt.idViagemTransferencia
+                                    ORDER BY vt.idViagemTransferencia)                      AS idsManifesto
+                  FROM viagemtransferencia vt
+                  INNER JOIN viagem v ON v.idViagem = vt.idViagem
+                  INNER JOIN filial filialOrigem ON filialOrigem.idFilial = vt.idFilialOrigem
+                  LEFT JOIN cidade cidadeOrigem ON cidadeOrigem.idCidade = filialOrigem.idCidade
+                  LEFT JOIN veiculo ON veiculo.idVeiculo = v.idVeiculo
+                  LEFT JOIN motorista ON motorista.idMotorista = v.idMotorista
+                  LEFT JOIN fornecedor fornecedorMotorista ON fornecedorMotorista.idFornecedor = motorista.idFornecedor
+                  LEFT JOIN viagemtransferenciaconhecimento vtc ON vtc.idViagemTransferencia = vt.idViagemTransferencia
+                  LEFT JOIN conhecimento c ON c.idConhecimento = vtc.idConhecimento
+                  LEFT JOIN conhecimentonotasfiscais cnf ON cnf.idConhecimento = c.idConhecimento
+                 WHERE vt.idViagem IN (""" + marcadores + """
+                )
+                 GROUP BY vt.idViagem
+                """;
+        Map<Long, ResumoViagemLegado> resumos = new HashMap<>();
+        jdbcTemplate.query(sql, (RowCallbackHandler) rs -> resumos.put(rs.getLong("idViagem"),
+                new ResumoViagemLegado(
+                        rs.getString("placa"),
+                        rs.getString("motorista"),
+                        rs.getString("origem"),
+                        rs.getInt("qtdCtes"),
+                        zero(rs.getBigDecimal("volumes")),
+                        zero(rs.getBigDecimal("peso")),
+                        rs.getDate("dataBaixa") == null ? null : rs.getDate("dataBaixa").toLocalDate(),
+                        rs.getString("horaBaixa"),
+                        rs.getInt("qtdManifestos"),
+                        parseIds(rs.getString("idsManifesto")))), idsViagem.toArray());
+        return resumos;
+    }
+
+    /** Converte o GROUP_CONCAT "1,2,3" em lista de ids (vazia quando nulo/branco). */
+    private static List<Long> parseIds(String csv) {
+        if (csv == null || csv.isBlank()) {
+            return List.of();
+        }
+        List<Long> ids = new ArrayList<>();
+        for (String parte : csv.split(",")) {
+            String s = parte.trim();
+            if (!s.isEmpty()) {
+                ids.add(Long.parseLong(s));
+            }
+        }
+        return ids;
     }
 
     private static BigDecimal zero(BigDecimal v) {

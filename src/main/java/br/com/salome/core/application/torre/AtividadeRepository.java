@@ -30,4 +30,30 @@ public interface AtividadeRepository {
     default List<CaminhaoEmDescarga> listarCaminhoesEmDescarga(int idFilial, Instant finalizadaDesde) {
         return List.of();
     }
+
+    /**
+     * Ids de viagens (legado) cuja separação já foi concluída (FINALIZADA) na filial — ou seja,
+     * já foram separadas uma vez e não devem reaparecer na lista de caminhões a separar.
+     * Default vazio para fakes de teste.
+     */
+    default Set<Long> idsViagensComSeparacaoConcluida(int idFilial) {
+        return Set.of();
+    }
+
+    /**
+     * Ids de viagens (legado) que já têm uma separação ABERTA na filial — o caminhão sai da
+     * lista "para separar" enquanto a separação está em andamento (quem for ajudar entra pelo
+     * aviso de atividade ativa, não abrindo outra). Default vazio para fakes de teste.
+     */
+    default Set<Long> idsViagensComSeparacaoAberta(int idFilial) {
+        return Set.of();
+    }
+
+    /**
+     * Separação ABERTA daquela viagem na filial, se houver — para reaproveitar a atividade
+     * (2º operador entra na mesma) em vez de criar outra. Default vazio para fakes de teste.
+     */
+    default Optional<Atividade> buscarSeparacaoAbertaDaViagem(int idFilial, long idViagem) {
+        return Optional.empty();
+    }
 }

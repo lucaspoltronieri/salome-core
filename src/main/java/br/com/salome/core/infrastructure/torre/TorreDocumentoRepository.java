@@ -1,6 +1,7 @@
 package br.com.salome.core.infrastructure.torre;
 
 import br.com.salome.core.application.torre.DocumentoRepository;
+import br.com.salome.core.domain.torre.AgregadoOperacional;
 import br.com.salome.core.domain.torre.DocumentoArmazenado;
 import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
@@ -12,6 +13,8 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,23 +53,28 @@ public class TorreDocumentoRepository implements DocumentoRepository {
             rs.getObject("id_local_atual", Long.class),
             rs.getTimestamp("atualizado_em").toInstant());
 
-    private static final RowMapper<DocumentoArmazenado> ARMAZENADO_MAPPER = (rs, n) -> new DocumentoArmazenado(
-            rs.getLong("id"),
-            rs.getObject("numero_cte", Integer.class),
-            rs.getBoolean("pre_cte"),
-            rs.getObject("volumes", Integer.class),
-            rs.getBigDecimal("peso"),
-            rs.getString("remetente"),
-            rs.getString("destinatario"),
-            rs.getString("cidade_destino"),
-            null, // dataEmissao: enriquecida do legado em ArmazemService
-            StatusDocumento.valueOf(rs.getString("status")),
-            rs.getObject("id_local_atual", Long.class),
-            rs.getString("local_codigo"),
-            rs.getString("local_nome"),
-            rs.getString("local_tipo"),
-            rs.getObject("id_conhecimento_legado", Long.class),
-            rs.getTimestamp("atualizado_em").toInstant());
+    private static final RowMapper<DocumentoArmazenado> ARMAZENADO_MAPPER = (rs, n) -> {
+        java.sql.Date dataChegadaColeta = rs.getObject("data_chegada_coleta", java.sql.Date.class);
+        return new DocumentoArmazenado(
+                rs.getLong("id"),
+                rs.getObject("numero_cte", Integer.class),
+                rs.getBoolean("pre_cte"),
+                rs.getObject("volumes", Integer.class),
+                rs.getBigDecimal("peso"),
+                rs.getString("remetente"),
+                rs.getString("destinatario"),
+                rs.getString("cidade_destino"),
+                null, // dataEmissao: enriquecida do legado em ArmazemService
+                toLocalDate(dataChegadaColeta),
+                null, // dataPrevistaEntrega: enriquecida do legado em ArmazemService
+                StatusDocumento.valueOf(rs.getString("status")),
+                rs.getObject("id_local_atual", Long.class),
+                rs.getString("local_codigo"),
+                rs.getString("local_nome"),
+                rs.getString("local_tipo"),
+                rs.getObject("id_conhecimento_legado", Long.class),
+                rs.getTimestamp("atualizado_em").toInstant());
+    };
 
     private static final RowMapper<DocumentoComLocal> COM_LOCAL_MAPPER = (rs, n) -> new DocumentoComLocal(
             rs.getLong("id"),
@@ -210,7 +218,17 @@ public class TorreDocumentoRepository implements DocumentoRepository {
         return jdbc.query("""
                 SELECT d.id, d.numero_cte, d.pre_cte, d.volumes, d.peso, d.remetente, d.destinatario,
                        d.cidade_destino, d.status, d.id_local_atual, d.id_conhecimento_legado, d.atualizado_em,
-                       l.codigo AS local_codigo, l.nome AS local_nome, l.tipo AS local_tipo
+                       l.codigo AS local_codigo, l.nome AS local_nome, l.tipo AS local_tipo,
+                       (
+                           SELECT DATE(ad.registrado_em)
+                             FROM atividade_documento ad
+                             JOIN atividade_armazem a ON a.id = ad.id_atividade
+                            WHERE ad.id_documento = d.id
+                              AND ad.papel = 'DESCARREGADO'
+                              AND a.tipo = 'DESCARGA_COLETA'
+                            ORDER BY ad.registrado_em DESC, ad.id DESC
+                            LIMIT 1
+                       ) AS data_chegada_coleta
                   FROM documento_operacional d
                   LEFT JOIN local_armazem l ON l.id = d.id_local_atual
                  WHERE d.id_filial = ?
@@ -291,11 +309,51 @@ public class TorreDocumentoRepository implements DocumentoRepository {
                 """, numeroCte, idConhecimentoLegado, remetente, destinatario, cidadeDestino, idDocumento);
     }
 
+    @Override
+    public AgregadoOperacional agregarPorStatus(int idFilial, StatusDocumento status) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(DISTINCT id_viagem_legado) AS qtd,
+                       COALESCE(SUM(volumes), 0)        AS volumes,
+                       COALESCE(SUM(peso), 0)            AS peso
+                  FROM documento_operacional
+                 WHERE id_filial = ? AND status = ?
+                """, AGREGADO_MAPPER, idFilial, status.name());
+    }
+
+    @Override
+    public AgregadoOperacional agregarPorStatus(int idFilial, List<StatusDocumento> status) {
+        if (status.isEmpty()) {
+            return AgregadoOperacional.vazio();
+        }
+        String marcadores = String.join(",", Collections.nCopies(status.size(), "?"));
+        String sql = """
+                SELECT COUNT(*)                   AS qtd,
+                       COALESCE(SUM(volumes), 0)  AS volumes,
+                       COALESCE(SUM(peso), 0)      AS peso
+                  FROM documento_operacional
+                 WHERE id_filial = ? AND status IN (""" + marcadores + ")";
+        Object[] args = new Object[status.size() + 1];
+        args[0] = idFilial;
+        int i = 1;
+        for (StatusDocumento s : status) {
+            args[i++] = s.name();
+        }
+        return jdbc.queryForObject(sql, AGREGADO_MAPPER, args);
+    }
+
+    private static final RowMapper<AgregadoOperacional> AGREGADO_MAPPER = (rs, n) -> new AgregadoOperacional(
+            rs.getInt("qtd"), rs.getInt("volumes"),
+            rs.getBigDecimal("peso") == null ? BigDecimal.ZERO : rs.getBigDecimal("peso"));
+
     private static void setInt(PreparedStatement ps, int i, Integer v) throws java.sql.SQLException {
         if (v == null) ps.setNull(i, Types.INTEGER); else ps.setInt(i, v);
     }
 
     private static void setLong(PreparedStatement ps, int i, Long v) throws java.sql.SQLException {
         if (v == null) ps.setNull(i, Types.BIGINT); else ps.setLong(i, v);
+    }
+
+    private static LocalDate toLocalDate(java.sql.Date date) {
+        return date == null ? null : date.toLocalDate();
     }
 }

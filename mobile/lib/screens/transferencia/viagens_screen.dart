@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../formatters/date_formatters.dart';
 import '../../main.dart';
 import '../../models/models.dart';
 import '../../widgets/dialogos.dart';
@@ -45,7 +46,8 @@ class _ViagensScreenState extends State<ViagensScreen> {
       );
       if (!mounted) return;
       await Navigator.push(
-          context, MaterialPageRoute(builder: (_) => DescargaScreen(atividade: atv)));
+          context,
+          MaterialPageRoute(builder: (_) => DescargaScreen(atividade: atv)));
       _recarregar();
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.message, erro: true);
@@ -89,6 +91,9 @@ class _ViagensScreenState extends State<ViagensScreen> {
                       if (g.origem != null) g.origem!,
                       if (g.motorista != null) g.motorista!,
                       '${g.qtdCtes} CT-es · ${g.volumes.toStringAsFixed(0)} vol · ${g.peso.toStringAsFixed(0)} kg',
+                      if (g.dataBaixa != null) 'Chegada: ${fmtDataHoraBr(g.dataBaixa, g.horaBaixa)}',
+                      if (g.idsManifesto.isNotEmpty)
+                        'Manifesto: ${(g.idsManifesto.toList()..sort()).join(', ')}',
                     ].join('\n')),
                     isThreeLine: true,
                     trailing: const Icon(Icons.chevron_right),
@@ -113,6 +118,9 @@ class _ViagemGrupo {
   int qtdCtes = 0;
   double volumes = 0;
   double peso = 0;
+  String? dataBaixa;
+  String? horaBaixa;
+  final List<int> idsManifesto = [];
   _ViagemGrupo(this.chave, this.idViagem, this.placa, this.motorista, this.origem);
 }
 
@@ -125,6 +133,14 @@ List<_ViagemGrupo> _agrupar(List<ViagemAguardando> viagens) {
     g.qtdCtes += v.qtdCtes;
     g.volumes += v.volumes;
     g.peso += v.peso;
+    g.idsManifesto.add(v.idViagemTransferencia);
+    // mantém a baixa mais recente do grupo (mesmo critério do painel TV: agruparViagens()).
+    final chaveOrd = '${v.dataBaixa} ${v.horaBaixa ?? ''}';
+    final chaveAtual = '${g.dataBaixa} ${g.horaBaixa ?? ''}';
+    if (g.dataBaixa == null || chaveOrd.compareTo(chaveAtual) > 0) {
+      g.dataBaixa = v.dataBaixa;
+      g.horaBaixa = v.horaBaixa;
+    }
   }
   return mapa.values.toList();
 }

@@ -146,6 +146,18 @@ class AtividadeResumo {
   bool souParticipanteAtivo(int? meuId) =>
       meuId != null && participantes.any((p) => p.idUsuario == meuId && p.ativo);
 
+  /// Entrada da sessão ativa do usuário [meuId] (ISO), ou null se ele não está ativo.
+  /// Base do cronômetro: conta o tempo da sessão atual do operador, não da atividade.
+  String? minhaEntradaAtiva(int? meuId) {
+    if (meuId == null) return null;
+    for (final p in participantes) {
+      if (p.idUsuario == meuId && p.ativo) return p.entradaEm;
+    }
+    return null;
+  }
+
+  String get rotuloTipo => rotuloTipoAtividade(tipo);
+
   factory AtividadeResumo.fromJson(Map<String, dynamic> j) => AtividadeResumo(
         id: (j['id'] as num).toInt(),
         idFilial: (j['idFilial'] as num).toInt(),
@@ -160,6 +172,23 @@ class AtividadeResumo {
             .map((e) => Participante.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+}
+
+/// Rótulo legível do tipo de atividade — usado na lista da Home e na faixa
+/// "você está numa atividade".
+String rotuloTipoAtividade(String tipo) {
+  switch (tipo) {
+    case 'DESCARGA_TRANSFERENCIA':
+      return 'Descarga transferência';
+    case 'DESCARGA_COLETA':
+      return 'Descarga coleta';
+    case 'SEPARACAO':
+      return 'Separação';
+    case 'CARREGAMENTO':
+      return 'Carregamento';
+    default:
+      return 'Outras';
+  }
 }
 
 class CteDescarga {
@@ -298,13 +327,46 @@ class CaminhaoEmDescarga {
   final int? idViagem;
   final String? placa;
   final bool descargaAberta;
+  final String? origem;
+  final String? motorista;
+  final int qtdCtes;
+  final double volumes;
+  final double peso;
+  final String? dataBaixa;
+  final String? horaBaixa;
+  final int qtdManifestos;
+  final List<int> idsManifesto;
 
-  CaminhaoEmDescarga({this.idViagem, this.placa, required this.descargaAberta});
+  CaminhaoEmDescarga({
+    this.idViagem,
+    this.placa,
+    required this.descargaAberta,
+    this.origem,
+    this.motorista,
+    this.qtdCtes = 0,
+    this.volumes = 0,
+    this.peso = 0,
+    this.dataBaixa,
+    this.horaBaixa,
+    this.qtdManifestos = 1,
+    this.idsManifesto = const [],
+  });
 
   factory CaminhaoEmDescarga.fromJson(Map<String, dynamic> j) => CaminhaoEmDescarga(
         idViagem: _asInt(j['idViagem']),
         placa: j['placa'],
         descargaAberta: j['descargaAberta'] ?? false,
+        origem: j['origem'],
+        motorista: j['motorista'],
+        qtdCtes: _asInt(j['qtdCtes']) ?? 0,
+        volumes: _asDouble(j['volumes']) ?? 0,
+        peso: _asDouble(j['peso']) ?? 0,
+        dataBaixa: j['dataBaixa']?.toString(),
+        horaBaixa: j['horaBaixa'],
+        qtdManifestos: _asInt(j['qtdManifestos']) ?? 1,
+        idsManifesto: ((j['idsManifesto'] as List?) ?? const [])
+            .map((e) => (e as num).toInt())
+            .toList(),
       );
 }
 

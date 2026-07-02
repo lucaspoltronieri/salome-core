@@ -32,8 +32,8 @@
           <div class="tabela-wrap">
             <table class="tabela">
               <thead><tr>
-                <th>Data emissão</th><th>CT-e</th><th>Destinatário</th><th>Cidade</th>
-                <th class="num">Volumes</th><th class="num">Peso (kg)</th><th>Box</th><th>Situação</th>
+                <th>CT-e</th><th>Data emissão</th><th>Data chegada</th><th>Destinatário</th><th>Cidade</th>
+                <th class="num">Volumes</th><th class="num">Peso (kg)</th><th>Box</th><th>Situação</th><th>Data previsão entrega</th>
               </tr></thead>
               <tbody id="aaBody"></tbody>
             </table>
@@ -75,14 +75,16 @@
         if (boxSel) docs = docs.filter(d => boxId(d) === boxSel);
         const body = document.getElementById("aaBody");
         body.innerHTML = docs.map(d => `<tr>
-          <td>${T.fmtData(d.dataEmissao) || "—"}</td>
           <td>${d.numeroCte ? T.escapar(d.numeroCte) : `<span class="pre">NF (pré-CT-e)</span>`}</td>
+          <td>${T.fmtData(d.dataEmissao) || "—"}</td>
+          <td>${T.fmtData(d.dataChegada) || "—"}</td>
           <td>${T.escapar(d.destinatario)}</td>
           <td>${T.escapar(d.cidadeDestino)}</td>
           <td class="num">${T.fmtInt.format(d.volumes || 0)}</td>
           <td class="num">${T.fmtPeso.format(+d.peso || 0)}</td>
           <td>${T.escapar(d.codigoLocal || d.nomeLocal || "—")}</td>
           <td>${badge(d.status)}</td>
+          <td>${T.fmtData(d.dataPrevistaEntrega) || "—"}</td>
         </tr>`).join("");
         document.getElementById("aaVazio").hidden = docs.length > 0;
         document.getElementById("aaInfo").textContent = `${docs.length} documento(s)`;

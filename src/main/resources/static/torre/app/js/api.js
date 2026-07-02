@@ -104,12 +104,28 @@ window.Torre = (() => {
     });
   }
 
+  // PATCH autenticado; devolve a resposta crua p/ tratar status.
+  async function patch(path, body) {
+    return fetch(path, {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: body == null ? undefined : JSON.stringify(body),
+    });
+  }
+
+  // Carrega uma imagem protegida (bearer) e devolve um objectURL pra usar em <img src>.
+  async function imagem(path) {
+    const r = await fetch(path, { headers: authHeaders() });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return URL.createObjectURL(await r.blob());
+  }
+
   function isAdmin() { return state.usuario && state.usuario.perfil === "ADMIN"; }
 
   return {
     state, isAdmin,
     fmtInt, fmtPeso, escapar, fmtData, dataHora, fmtDuracao, tempoDesde, limparOrigem, pct,
     getToken, authHeaders, autenticar, limparSessao, salvarCred, lerCred, limparCred,
-    comFilial, api, post, aoPerderSessao,
+    comFilial, api, post, patch, imagem, aoPerderSessao,
   };
 })();

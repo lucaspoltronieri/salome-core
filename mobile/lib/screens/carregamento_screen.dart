@@ -31,7 +31,7 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
   final Set<int> _selecionados = {};
   bool _carregando = false;
   bool _ocupado = false;
-  bool _preSelecionado = false;
+  bool _mostrarOutras = false; // Entrega: revela CT-es em separação / no caminhão
   String _filtro = '';
   String? _erro;
 
@@ -76,12 +76,6 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
       setState(() {
         _carregaveis = docs;
         _marcados = marcados;
-        // Entrega: Box Distribuição já vem marcado por padrão (crossdock direto padrão).
-        if (!_preSelecionado && !_transferencia) {
-          _selecionados.addAll(
-              docs.where((d) => d.status == 'SEPARADO_BOX').map((d) => d.id!).whereType<int>());
-          _preSelecionado = true;
-        }
         _erro = null;
         _carregando = false;
       });
@@ -240,6 +234,7 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
                           onChanged: (v) => setState(() => _filtro = v),
                         ),
                       ),
+                      if (souParticipante) _barraSelecao(),
                       Expanded(
                         child: RefreshIndicator(
                           onRefresh: _carregar,
@@ -272,6 +267,18 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
     return null;
   }
 
+  /// CT-es "Outras" (fora do Box Distribuição): ainda em separação ou dentro do caminhão.
+  Iterable<DocumentoOperacional> get _outras =>
+      _carregaveis.where((d) => d.status == 'NO_ARMAZEM' || d.status == 'EM_DESCARGA');
+
+  /// CT-es visíveis agora (respeita tipo, filtro e o toggle "Outras") — base do "marcar todos".
+  List<DocumentoOperacional> get _visiveis {
+    if (_transferencia) return _filtrar(_carregaveis);
+    final dist = _filtrar(_carregaveis.where((d) => d.status == 'SEPARADO_BOX'));
+    if (!_mostrarOutras) return dist;
+    return [...dist, ..._filtrar(_outras)];
+  }
+
   List<Widget> _secoes() {
     final widgets = <Widget>[];
     if (_transferencia) {
@@ -280,10 +287,29 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
     } else {
       widgets.addAll(_secao('Box Distribuição', Icons.inventory_2, Colors.green,
           _filtrar(_carregaveis.where((d) => d.status == 'SEPARADO_BOX'))));
-      widgets.addAll(_secao('Box Separação (sem separar)', Icons.call_split, Colors.orange,
-          _filtrar(_carregaveis.where((d) => d.status == 'NO_ARMAZEM'))));
-      widgets.addAll(_secao('No caminhão (crossdock direto)', Icons.local_shipping, Colors.purple,
-          _filtrar(_carregaveis.where((d) => d.status == 'EM_DESCARGA'))));
+      // "Outras": revela (pra seleção) os CT-es em separação / no caminhão — só aparece
+      // quando existe algo por trás dele.
+      if (_outras.isNotEmpty) {
+        widgets.add(CheckboxListTile(
+          value: _mostrarOutras,
+          dense: true,
+          controlAffinity: ListTileControlAffinity.leading,
+          title: const Text('Outras — em separação e no caminhão'),
+          onChanged: (v) => setState(() {
+            _mostrarOutras = v ?? false;
+            if (!_mostrarOutras) {
+              // Some da tela → sai da seleção pra não carregar sem querer.
+              _selecionados.removeAll(_outras.map((d) => d.id).whereType<int>().toSet());
+            }
+          }),
+        ));
+        if (_mostrarOutras) {
+          widgets.addAll(_secao('Box Separação (sem separar)', Icons.call_split, Colors.orange,
+              _filtrar(_carregaveis.where((d) => d.status == 'NO_ARMAZEM'))));
+          widgets.addAll(_secao('No caminhão (crossdock direto)', Icons.local_shipping, Colors.purple,
+              _filtrar(_carregaveis.where((d) => d.status == 'EM_DESCARGA'))));
+        }
+      }
     }
     if (_marcados.isNotEmpty) widgets.add(_secaoMarcados());
     if (widgets.isEmpty) {
@@ -291,6 +317,31 @@ class _CarregamentoScreenState extends State<CarregamentoScreen> {
           padding: EdgeInsets.all(24), child: Center(child: Text('Nada para carregar.'))));
     }
     return widgets;
+  }
+
+  /// Barra "Marcar todos / Limpar" — age sobre os CT-es visíveis agora (padrão da descarga).
+  Widget _barraSelecao() {
+    final ids = _visiveis.map((d) => d.id).whereType<int>().toSet();
+    if (ids.isEmpty) return const SizedBox.shrink();
+    final todosSel = ids.every(_selecionados.contains);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
+      child: Row(children: [
+        Text('${_selecionados.length} selecionado(s)'),
+        const Spacer(),
+        TextButton.icon(
+          icon: Icon(todosSel ? Icons.deselect : Icons.select_all),
+          label: Text(todosSel ? 'Limpar' : 'Selecionar todos'),
+          onPressed: () => setState(() {
+            if (todosSel) {
+              _selecionados.removeAll(ids);
+            } else {
+              _selecionados.addAll(ids);
+            }
+          }),
+        ),
+      ]),
+    );
   }
 
   List<Widget> _secao(String titulo, IconData icone, Color cor, List<DocumentoOperacional> docs) {

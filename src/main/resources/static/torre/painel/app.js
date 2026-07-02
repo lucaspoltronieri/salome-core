@@ -12,6 +12,7 @@ const fmtPeso = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 0, maxim
 let vistas = new Set();
 
 function tempoDecorrido(isoInicio) {
+  if (!isoInicio) return "";
   const seg = Math.max(0, Math.floor((Date.now() - new Date(isoInicio).getTime()) / 1000));
   const h = Math.floor(seg / 3600);
   const m = Math.floor((seg % 3600) / 60);
@@ -35,15 +36,50 @@ function fmtDuracao(seg) {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m} min`;
 }
 
-function renderIndicadores(ind) {
+function fmtData(d) {
+  const partes = (d || "").split("-");
+  return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : (d || "");
+}
+
+function fmtDataHora(d, h) {
+  return [fmtData(d), h || ""].filter(Boolean).join(" ");
+}
+
+function setNum(id, n) { document.getElementById(id).textContent = fmtInt.format(n || 0); }
+function setPeso(id, n) { document.getElementById(id).textContent = fmtPeso.format(n || 0); }
+function setTexto(id, s) { const el = document.getElementById(id); if (el) el.textContent = s; }
+
+// Pessoas ainda ativas numa atividade (participantes sem saída registrada).
+function pessoasAtivas(atv) {
+  return (atv.participantes || []).filter(p => !p.saidaEm).length;
+}
+
+function setHealth(cardId, cls) {
+  const el = document.getElementById(cardId);
+  if (!el) return;
+  el.classList.remove("ok", "warn", "bad");
+  if (cls) el.classList.add(cls);
+}
+
+function renderIndicadores(ind, agregDescargas) {
   ind = ind || {};
-  document.getElementById("kpiFinalizadas").textContent = fmtInt.format(ind.atividadesFinalizadasHoje || 0);
-  document.getElementById("kpiPessoas").textContent = fmtInt.format(ind.pessoasAtivasAgora || 0);
-  document.getElementById("kpiHorasHomem").textContent = fmtDuracao(ind.horasHomemHojeSeg);
-  document.getElementById("kpiTempoDescarga").textContent =
-    ind.tempoMedioDescargaSeg ? fmtDuracao(ind.tempoMedioDescargaSeg) : "—";
-  document.getElementById("kpiArmazem").textContent = fmtInt.format(ind.documentosNoArmazem || 0);
-  document.getElementById("kpiOcorrencias").textContent = fmtInt.format(ind.ocorrenciasHoje || 0);
+  const volumesHoje = agregDescargas?.volumes || 0;
+  setTexto("kpiVolumes", fmtInt.format(volumesHoje));
+  setTexto("kpiDescargasFinalizadas", fmtInt.format(agregDescargas?.qtd || 0));
+  setTexto("kpiDescargasFinalizadasSub",
+    `${fmtInt.format(volumesHoje)} vol · ${fmtPeso.format(agregDescargas?.peso || 0)} kg`);
+
+  // Produtividade = volumes movimentados hoje ÷ horas-homem trabalhadas hoje.
+  const horas = (ind.horasHomemHojeSeg || 0) / 3600;
+  setTexto("kpiProdutividade", horas > 0 ? fmtInt.format(Math.round(volumesHoje / horas)) : "—");
+
+  setTexto("kpiPessoas", fmtInt.format(ind.pessoasAtivasAgora || 0));
+  setTexto("kpiHorasHomem", fmtDuracao(ind.horasHomemHojeSeg) + " · hoje");
+  setTexto("kpiTempoDescarga", ind.tempoMedioDescargaSeg ? fmtDuracao(ind.tempoMedioDescargaSeg) : "—");
+
+  const ocorr = ind.ocorrenciasHoje || 0;
+  setTexto("kpiOcorrencias", fmtInt.format(ocorr));
+  setHealth("kpiCardOcorrencias", ocorr === 0 ? "ok" : (ocorr >= 5 ? "bad" : "warn"));
 }
 
 // Origem vem como "EXPRESSO SALOME - OSASCO"; mostra só a cidade (último trecho).
@@ -70,7 +106,6 @@ function agruparViagens(viagens) {
     g.volumes += Number(v.volumes ?? 0);
     g.peso += Number(v.peso ?? 0);
     g.manifestos += 1;
-    // mantém a baixa mais recente do grupo
     if (`${v.dataBaixa} ${v.horaBaixa ?? ""}` > `${g.dataBaixa} ${g.horaBaixa ?? ""}`) {
       g.dataBaixa = v.dataBaixa; g.horaBaixa = v.horaBaixa;
     }
@@ -78,80 +113,142 @@ function agruparViagens(viagens) {
   return [...grupos.values()];
 }
 
-function renderViagens(viagens) {
-  const grupos = agruparViagens(viagens);
-  document.getElementById("contViagens").textContent = grupos.length;
-  document.getElementById("vazioViagens").hidden = grupos.length > 0;
-  document.getElementById("tbViagens").innerHTML = grupos.map(g => {
+// Somatório de volumes/peso de uma lista de caminhões (MapaCaminhao) do mapa.
+function somarCaminhoes(lista) {
+  return (lista || []).reduce((s, c) => {
+    s.volumes += Number(c.volumes ?? 0);
+    s.peso += Number(c.peso ?? 0);
+    return s;
+  }, { volumes: 0, peso: 0 });
+}
+
+// Chegando (em trânsito): caminhões vindo de outra base, com previsão de chegada.
+function renderChegando(lista) {
+  lista = lista || [];
+  setTexto("contTransito", fmtInt.format(lista.length));
+  setNum("chVeiculos", lista.length);
+  const tot = somarCaminhoes(lista);
+  setNum("chVolumes", tot.volumes);
+  setPeso("chPeso", tot.peso);
+  document.getElementById("chDetalhe").innerHTML = lista.slice(0, 6).map(c => `
+    <div class="linha">
+      <span class="placa">${escapar(c.placa) || "—"}</span>
+      <span>${escapar(limparOrigem(c.origem))} · ${escapar(fmtDataHora(c.dataPrevisaoChegada, c.horaPrevisaoChegada))}</span>
+      <span class="num">${fmtInt.format(Number(c.volumes || 0))} vol</span>
+    </div>`).join("") || '<p class="vazio">Nenhum caminhão a caminho.</p>';
+}
+
+// Aguardando descarga: totais grandes + detalhe compacto por caminhão.
+function renderAguardandoDescarga(viagens) {
+  const grupos = agruparViagens(viagens || []);
+  setTexto("contAguardando", fmtInt.format(grupos.length));
+  setNum("agdVeiculos", grupos.length);
+  setNum("agdVolumes", grupos.reduce((s, g) => s + g.volumes, 0));
+  setPeso("agdPeso", grupos.reduce((s, g) => s + g.peso, 0));
+  document.getElementById("agdDetalhe").innerHTML = grupos.slice(0, 6).map(g => {
     const fresca = vistas.size && !vistas.has(g.chave) ? "fresca" : "";
     const badge = g.manifestos > 1
       ? ` <span class="badge-grupo" title="${g.manifestos} manifestos na mesma viagem">×${g.manifestos}</span>`
       : "";
-    return `<tr class="${fresca}">
-      <td class="placa">${escapar(g.placa) || "—"}${badge}</td>
-      <td>${escapar(limparOrigem(g.origem))}</td>
-      <td>${escapar(g.dataBaixa)} ${escapar(g.horaBaixa) || ""}</td>
-      <td class="num">${fmtInt.format(g.qtdCtes)}</td>
-      <td class="num">${fmtInt.format(g.volumes)}</td>
-      <td class="num">${fmtPeso.format(g.peso)}</td>
-    </tr>`;
-  }).join("");
+    return `<div class="linha ${fresca}">
+      <span class="placa">${escapar(g.placa) || "—"}${badge}</span>
+      <span>${escapar(limparOrigem(g.origem))} · ${escapar(fmtDataHora(g.dataBaixa, g.horaBaixa))}</span>
+    </div>`;
+  }).join("") || '<p class="vazio">Nenhuma viagem aguardando.</p>';
   vistas = new Set(grupos.map(g => g.chave));
 }
 
-function renderDescargas(descargas) {
-  document.getElementById("contDescargas").textContent = descargas.length;
-  document.getElementById("vazioDescargas").hidden = descargas.length > 0;
-  document.getElementById("tbDescargas").innerHTML = descargas.map(d => `
-    <tr>
-      <td>${d.idViagemLegado ?? "—"}</td>
-      <td class="placa">${escapar(d.placaVeiculo) || "—"}</td>
-      <td class="num">${d.participantes.filter(p => !p.saidaEm).length}</td>
-      <td class="num">${tempoDecorrido(d.iniciadaEm)}</td>
-    </tr>`).join("");
+// Descarregando agora: atividades de descarga abertas — placa, tempo e pessoas.
+function renderDescarregandoAgora(descargas) {
+  descargas = descargas || [];
+  setTexto("contDescarga", fmtInt.format(descargas.length));
+  setNum("dsAtivas", descargas.length);
+  const pessoas = descargas.reduce((s, a) => s + pessoasAtivas(a), 0);
+  setNum("dsPessoas", pessoas);
+  document.getElementById("dsDetalhe").innerHTML = descargas.slice(0, 6).map(a => {
+    const gente = pessoasAtivas(a);
+    return `<div class="linha">
+      <span class="placa">${escapar(a.placaVeiculo) || (a.idViagemLegado ? "Viagem " + escapar(a.idViagemLegado) : "—")}</span>
+      <span class="tempo">${escapar(tempoDecorrido(a.iniciadaEm))}</span>
+      <span class="gente num">${fmtInt.format(gente)} 👤</span>
+    </div>`;
+  }).join("") || '<p class="vazio">Nada descarregando agora.</p>';
 }
 
-function setNum(id, n) { document.getElementById(id).textContent = fmtInt.format(n || 0); }
-
-// Esteira: contagem por estágio do ciclo (chegada → expedição).
-function renderEsteira(snap) {
-  setNum("etAguardando", agruparViagens(snap.viagensAguardando || []).length);
-  setNum("etDescarregando", (snap.descargasEmAndamento || []).length);
-  setNum("etSeparar", (snap.noArmazem || []).length);
-  setNum("etSeparando", (snap.separacoesEmAndamento || []).length);
-  setNum("etPronto", (snap.prontosBox || []).length);
-  setNum("etCarregando", (snap.carregamentosEmAndamento || []).length);
+// No armazém (saldo): total + quebra por etapa do fluxo físico.
+function renderSaldo(saldo) {
+  saldo = saldo || {};
+  const total = saldo.total || {};
+  setNum("slCtes", total.qtd || 0);
+  setNum("slVolumes", total.volumes || 0);
+  setPeso("slPeso", total.peso || 0);
+  const etapas = [
+    { rot: "Aguardando separação", cls: "s-armazem", a: saldo.noArmazem },
+    { rot: "Em separação", cls: "s-separacao", a: saldo.emSeparacao },
+    { rot: "Separado (box)", cls: "s-box", a: saldo.separadoBox },
+    { rot: "Carregando", cls: "s-carreg", a: saldo.emCarregamento },
+  ];
+  // Barra de ocupação: cada etapa proporcional à sua qtd de CT-es.
+  const somaQtd = etapas.reduce((s, e) => s + (e.a?.qtd || 0), 0) || 1;
+  document.getElementById("barraSaldo").innerHTML = etapas.map(e => {
+    const q = e.a?.qtd || 0;
+    const pct = (q / somaQtd) * 100;
+    return `<div class="seg ${e.cls}" style="flex:0 0 ${pct}%" title="${e.rot}: ${q}">${pct >= 8 ? fmtInt.format(q) : ""}</div>`;
+  }).join("");
+  document.getElementById("slDetalhe").innerHTML = etapas.map(e => `
+    <div class="linha">
+      <span>${e.rot}</span>
+      <span class="num">${fmtInt.format(e.a?.qtd || 0)} CT-es · ${fmtInt.format(e.a?.volumes || 0)} vol</span>
+    </div>`).join("");
 }
 
-// Aguardando separação: documentos NO_ARMAZEM (descarregados, esperando separar).
-function renderSeparar(docs) {
-  docs = docs || [];
-  document.getElementById("contSeparar").textContent = docs.length;
-  document.getElementById("vazioSeparar").hidden = docs.length > 0;
-  document.getElementById("tbSeparar").innerHTML = docs.map(d => `<tr>
-    <td>${escapar(d.numeroCte) || '<span class="pre">NF</span>'}</td>
-    <td>${escapar(d.destinatario)}</td>
-    <td>${escapar(d.cidadeDestino)}</td>
-    <td class="num">${fmtInt.format(d.volumes || 0)}</td>
-  </tr>`).join("");
+// Semáforo de cada estágio: verde=operando, amarelo=fila parada (tem carga esperando
+// e ninguém trabalhando), cinza=vazio. Insight típico de torre de controle de WMS.
+function atualizarSemaforos(snap) {
+  const chegando = (snap.emTransito || []).length;
+  const aguardando = agruparViagens(snap.viagensAguardando || []).length;
+  const descargas = (snap.descargasEmAndamento || []).length;
+  const separacoes = (snap.separacoesEmAndamento || []).length;
+  const aguardandoSep = snap.saldoArmazem?.noArmazem?.qtd || 0;
+
+  const set = (id, cls) => { const el = document.getElementById(id); if (el) el.className = "status-dot " + cls; };
+  set("stTransito", chegando > 0 ? "ok" : "idle");
+  set("stAguardando", aguardando > 0 ? (descargas > 0 ? "ok" : "warn") : "idle");
+  set("stDescarga", descargas > 0 ? "ok" : "idle");
+  set("stSeparacao", separacoes > 0 ? "ok" : (aguardandoSep > 0 ? "warn" : "idle"));
 }
 
-// Carregando agora (atividades) + o que já está pronto no box de distribuição.
-function renderCarregar(atividades, prontos) {
-  atividades = atividades || [];
-  prontos = prontos || [];
-  const rows = atividades.map(a => `<tr>
-    <td class="placa">${escapar(a.placaVeiculo) || (a.idViagemLegado ? "viagem " + a.idViagemLegado : "—")}</td>
-    <td>Carregando</td>
-    <td class="num">${a.participantes.filter(p => !p.saidaEm).length}</td>
-    <td class="num">${tempoDecorrido(a.iniciadaEm)}</td>
-  </tr>`).concat(prontos.map(d => `<tr>
-    <td>${escapar(d.numeroCte) || escapar(d.destinatario) || "—"}</td>
-    <td>Pronto no box</td><td class="num">—</td><td class="num">—</td>
-  </tr>`));
-  document.getElementById("contCarregar").textContent = atividades.length + prontos.length;
-  document.getElementById("vazioCarregar").hidden = rows.length > 0;
-  document.getElementById("tbCarregar").innerHTML = rows.join("");
+// Separando agora: atividades de separação abertas + quanto aguarda separação.
+function renderSeparandoAgora(separacoes, aguardandoAgregado) {
+  separacoes = separacoes || [];
+  setTexto("contSeparacao", fmtInt.format(separacoes.length));
+  setNum("spAtivas", separacoes.length);
+  setNum("spPessoas", separacoes.reduce((s, a) => s + pessoasAtivas(a), 0));
+  setNum("spAguardando", aguardandoAgregado?.qtd || 0);
+  document.getElementById("spDetalhe").innerHTML = separacoes.slice(0, 6).map(a => {
+    const gente = pessoasAtivas(a);
+    return `<div class="linha">
+      <span class="placa">${a.idViagemLegado ? "Viagem " + escapar(a.idViagemLegado) : escapar(a.placaVeiculo) || "—"}</span>
+      <span class="tempo">${escapar(tempoDecorrido(a.iniciadaEm))}</span>
+      <span class="gente num">${fmtInt.format(gente)} 👤</span>
+    </div>`;
+  }).join("") || '<p class="vazio">Nada em separação agora.</p>';
+}
+
+// Pra rua (em rota de entrega): caminhões que saíram para entrega.
+function renderPraRua(lista) {
+  lista = lista || [];
+  setTexto("contRua", fmtInt.format(lista.length));
+  setNum("ruVeiculos", lista.length);
+  const tot = somarCaminhoes(lista);
+  setNum("ruVolumes", tot.volumes);
+  setPeso("ruPeso", tot.peso);
+  document.getElementById("ruDetalhe").innerHTML = lista.slice(0, 6).map(c => `
+    <div class="linha">
+      <span class="placa">${escapar(c.placa) || "—"}</span>
+      <span>${fmtInt.format(c.qtdCtes || 0)} CT-es</span>
+      <span class="num">${fmtInt.format(Number(c.volumes || 0))} vol</span>
+    </div>`).join("") || '<p class="vazio">Nenhum veículo em rota.</p>';
 }
 
 // ---- Autenticação (mesmo login da Torre; modo TV pode manter a sessão) ----
@@ -232,12 +329,14 @@ async function carregar() {
     if (r.status === 401) return aoExpirar();
     if (!r.ok) throw new Error("HTTP " + r.status);
     const snap = await r.json();
-    renderIndicadores(snap.indicadores);
-    renderEsteira(snap);
-    renderViagens(snap.viagensAguardando || []);
-    renderDescargas(snap.descargasEmAndamento || []);
-    renderSeparar(snap.noArmazem || []);
-    renderCarregar(snap.carregamentosEmAndamento || [], snap.prontosBox || []);
+    renderIndicadores(snap.indicadores, snap.descargasFinalizadasAgregado);
+    renderChegando(snap.emTransito || []);
+    renderAguardandoDescarga(snap.viagensAguardando || []);
+    renderDescarregandoAgora(snap.descargasEmAndamento || []);
+    renderSaldo(snap.saldoArmazem);
+    renderSeparandoAgora(snap.separacoesEmAndamento || [], snap.saldoArmazem?.noArmazem);
+    renderPraRua(snap.emRotaEntrega || []);
+    atualizarSemaforos(snap);
     document.getElementById("atualizado").textContent =
       "atualizado " + new Date(snap.atualizadoEm).toLocaleTimeString("pt-BR");
     erro.hidden = true;

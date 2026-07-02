@@ -118,6 +118,53 @@ public class TorreAtividadeRepository implements AtividadeRepository {
     }
 
     @Override
+    public Set<Long> idsViagensComSeparacaoConcluida(int idFilial) {
+        // Viagem com separação FINALIZADA = já separada uma vez. Some da lista de
+        // caminhões a separar. CANCELADA/ABERTA não contam (aberta ainda é colaborável).
+        List<Long> ids = jdbc.queryForList("""
+                SELECT DISTINCT id_viagem_legado
+                  FROM atividade_armazem
+                 WHERE id_filial = ?
+                   AND tipo = 'SEPARACAO'
+                   AND id_viagem_legado IS NOT NULL
+                   AND status = 'FINALIZADA'
+                """, Long.class, idFilial);
+        return new HashSet<>(ids);
+    }
+
+    @Override
+    public Set<Long> idsViagensComSeparacaoAberta(int idFilial) {
+        // Viagem com separação ABERTA (em andamento) some da lista de caminhões a separar —
+        // não se abre outra por cima; quem for ajudar entra pelo aviso de atividade ativa.
+        List<Long> ids = jdbc.queryForList("""
+                SELECT DISTINCT id_viagem_legado
+                  FROM atividade_armazem
+                 WHERE id_filial = ?
+                   AND tipo = 'SEPARACAO'
+                   AND id_viagem_legado IS NOT NULL
+                   AND status = 'ABERTA'
+                """, Long.class, idFilial);
+        return new HashSet<>(ids);
+    }
+
+    @Override
+    public Optional<Atividade> buscarSeparacaoAbertaDaViagem(int idFilial, long idViagem) {
+        try {
+            return Optional.ofNullable(jdbc.queryForObject("""
+                    SELECT * FROM atividade_armazem
+                     WHERE id_filial = ?
+                       AND tipo = 'SEPARACAO'
+                       AND id_viagem_legado = ?
+                       AND status = 'ABERTA'
+                     ORDER BY iniciada_em
+                     LIMIT 1
+                    """, MAPPER, idFilial, idViagem));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public List<CaminhaoEmDescarga> listarCaminhoesEmDescarga(int idFilial, Instant finalizadaDesde) {
         return jdbc.query("""
                 SELECT a.id_viagem_legado AS id_viagem,

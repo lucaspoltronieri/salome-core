@@ -1,5 +1,6 @@
 package br.com.salome.core.application.torre;
 
+import br.com.salome.core.domain.torre.AgregadoOperacional;
 import br.com.salome.core.domain.torre.DocumentoArmazenado;
 import br.com.salome.core.domain.torre.DocumentoComLocal;
 import br.com.salome.core.domain.torre.DocumentoOperacional;
@@ -45,6 +46,22 @@ public interface DocumentoRepository {
      */
     default List<DocumentoComLocal> listarSeparaveisDaViagem(int idFilial, long idViagem) {
         return List.of();
+    }
+
+    /**
+     * Veículos distintos (id_viagem_legado)/volume/peso dos documentos num status — usado pro
+     * agregado "Aguardando separação" do painel TV. Default vazio para fakes de teste.
+     */
+    default AgregadoOperacional agregarPorStatus(int idFilial, StatusDocumento status) {
+        return AgregadoOperacional.vazio();
+    }
+
+    /**
+     * Total de CT-e/volume/peso dos documentos em qualquer um dos status — usado pro agregado
+     * "Armazém atual" (total do galpão, não por box). Default vazio para fakes de teste.
+     */
+    default AgregadoOperacional agregarPorStatus(int idFilial, List<StatusDocumento> status) {
+        return AgregadoOperacional.vazio();
     }
 
     void atualizarStatusELocal(long id, StatusDocumento status, Long idLocalAtual, Instant em);

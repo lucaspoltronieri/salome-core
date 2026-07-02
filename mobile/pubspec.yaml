@@ -11,7 +11,8 @@ dependencies:
     sdk: flutter
   http: ^1.2.2
   http_parser: ^4.0.2
-  mobile_scanner: ^5.2.3
+  flutter_zxing: ^2.3.0
+  permission_handler: ^11.3.1
   image_picker: ^1.1.2
   shared_preferences: ^2.3.2
 

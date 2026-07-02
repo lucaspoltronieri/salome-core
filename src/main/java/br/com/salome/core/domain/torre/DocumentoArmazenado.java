@@ -10,9 +10,9 @@ import java.time.LocalDate;
  * o dashboard (ocupação por box). Distingue, pelo {@code status}, o que está
  * aguardando separação (NO_ARMAZEM) do que já está pronto (SEPARADO_BOX).
  *
- * <p>{@code dataEmissao} não é coluna própria da Torre: vem do legado
- * ({@code conhecimento.cteEmissao}) e é enriquecida em {@code ArmazemService} a
- * partir de {@code idConhecimentoLegado}; fica nula para pré-CTes sem CT-e casado.
+ * <p>As datas fiscais/logísticas são enriquecidas em {@code ArmazemService}: emissão
+ * e previsão vêm do legado; chegada vem da baixa de transferência no legado ou da
+ * descarga de coleta registrada na Torre.
  */
 public record DocumentoArmazenado(
         long id,
@@ -24,6 +24,8 @@ public record DocumentoArmazenado(
         String destinatario,
         String cidadeDestino,
         LocalDate dataEmissao,
+        LocalDate dataChegada,
+        LocalDate dataPrevistaEntrega,
         StatusDocumento status,
         Long idLocal,
         String codigoLocal,
@@ -33,10 +35,10 @@ public record DocumentoArmazenado(
         Instant atualizadoEm
 ) {
 
-    /** Cópia com a data de emissão enriquecida do legado. */
-    public DocumentoArmazenado comDataEmissao(LocalDate emissao) {
+    /** Cópia com datas enriquecidas para a tela "Armazém atual". */
+    public DocumentoArmazenado comDatas(LocalDate emissao, LocalDate chegada, LocalDate previstaEntrega) {
         return new DocumentoArmazenado(id, numeroCte, preCte, volumes, peso, remetente, destinatario,
-                cidadeDestino, emissao, status, idLocal, codigoLocal, nomeLocal, tipoLocal,
+                cidadeDestino, emissao, chegada, previstaEntrega, status, idLocal, codigoLocal, nomeLocal, tipoLocal,
                 idConhecimentoLegado, atualizadoEm);
     }
 }

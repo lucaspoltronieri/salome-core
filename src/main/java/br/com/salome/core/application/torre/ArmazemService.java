@@ -2,10 +2,10 @@ package br.com.salome.core.application.torre;
 
 import br.com.salome.core.domain.torre.ArmazemSnapshot;
 import br.com.salome.core.domain.torre.BoxOcupacao;
+import br.com.salome.core.domain.torre.ConhecimentoDatas;
 import br.com.salome.core.domain.torre.DocumentoArmazenado;
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,15 +40,15 @@ public class ArmazemService {
     }
 
     public ArmazemSnapshot snapshot(int idFilial) {
-        List<DocumentoArmazenado> documentos = enriquecerEmissao(documentoRepository.listarArmazenados(idFilial));
+        List<DocumentoArmazenado> documentos = enriquecerDatas(idFilial, documentoRepository.listarArmazenados(idFilial));
         return new ArmazemSnapshot(idFilial, clock.instant(), agruparPorBox(documentos), documentos);
     }
 
     /**
-     * Preenche a data de emissão (não guardada pela Torre) buscando no legado em
-     * lote por idConhecimento. Pré-CTes sem CT-e casado ficam sem data.
+     * Preenche datas não guardadas pela Torre buscando no legado em lote por
+     * idConhecimento. Pré-CTes sem CT-e casado ficam sem datas fiscais.
      */
-    private List<DocumentoArmazenado> enriquecerEmissao(List<DocumentoArmazenado> documentos) {
+    private List<DocumentoArmazenado> enriquecerDatas(int idFilial, List<DocumentoArmazenado> documentos) {
         Set<Long> ids = documentos.stream()
                 .map(DocumentoArmazenado::idConhecimentoLegado)
                 .filter(Objects::nonNull)
@@ -56,12 +56,20 @@ public class ArmazemService {
         if (ids.isEmpty()) {
             return documentos;
         }
-        Map<Long, LocalDate> emissoes = conhecimentoRepository.emissaoPorConhecimento(ids);
+        Map<Long, ConhecimentoDatas> datas = conhecimentoRepository.datasPorConhecimento(ids, idFilial);
         return documentos.stream()
-                .map(d -> d.idConhecimentoLegado() == null
-                        ? d
-                        : d.comDataEmissao(emissoes.get(d.idConhecimentoLegado())))
+                .map(d -> enriquecer(d, datas.get(d.idConhecimentoLegado())))
                 .toList();
+    }
+
+    private DocumentoArmazenado enriquecer(DocumentoArmazenado d, ConhecimentoDatas datas) {
+        if (datas == null) {
+            return d;
+        }
+        return d.comDatas(
+                datas.dataEmissao(),
+                d.dataChegada() != null ? d.dataChegada() : datas.dataChegada(),
+                datas.dataPrevistaEntrega());
     }
 
     /** Agrupa os documentos por box/local, somando volumes/peso e contando por estágio. */

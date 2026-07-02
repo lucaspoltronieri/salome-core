@@ -4,10 +4,13 @@
 /// numero[26-34] tpEmis[35] codigo[36-43] dv[44].
 class ChaveParser {
   static final RegExp _so44 = RegExp(r'^\d{44}$');
+  static final RegExp _chaveEmTexto = RegExp(r'(?:^|\D)(\d{44})(?:\D|$)');
 
   /// Normaliza o que veio do scanner: tira tudo que não é dígito.
   static String? normalizar(String? bruto) {
     if (bruto == null) return null;
+    final chaveEmTexto = _chaveEmTexto.firstMatch(bruto);
+    if (chaveEmTexto != null) return chaveEmTexto.group(1);
     final digitos = bruto.replaceAll(RegExp(r'\D'), '');
     return _so44.hasMatch(digitos) ? digitos : null;
   }

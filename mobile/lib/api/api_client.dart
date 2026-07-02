@@ -58,6 +58,26 @@ class ApiClient {
     return _handle(r);
   }
 
+  /// POST multipart com várias fotos: parte JSON `dados` + N arquivos `fotos`
+  /// (avaria) + N arquivos `fotosNf` (nota fiscal). Usado no registro de avaria.
+  Future<dynamic> postMultipartMulti(String path,
+      {required Map<String, dynamic> dados,
+      List<String> fotos = const [],
+      List<String> fotosNf = const []}) async {
+    final req = http.MultipartRequest('POST', _uri(path));
+    if (token != null) req.headers['Authorization'] = 'Bearer $token';
+    req.files.add(http.MultipartFile.fromString('dados', jsonEncode(dados),
+        contentType: MediaType('application', 'json')));
+    for (final p in fotos) {
+      req.files.add(await http.MultipartFile.fromPath('fotos', p));
+    }
+    for (final p in fotosNf) {
+      req.files.add(await http.MultipartFile.fromPath('fotosNf', p));
+    }
+    final r = await http.Response.fromStream(await req.send());
+    return _handle(r);
+  }
+
   dynamic _handle(http.Response r) {
     if (r.statusCode == 401) {
       onUnauthorized?.call();
