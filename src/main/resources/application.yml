@@ -13,7 +13,8 @@ spring:
   servlet:
     multipart:
       max-file-size: ${SALOME_TORRE_FOTOS_MAX:10MB}
-      max-request-size: ${SALOME_TORRE_FOTOS_MAX:10MB}
+      # Uma avaria pode subir várias fotos (avaria + nota fiscal) num único request.
+      max-request-size: ${SALOME_TORRE_FOTOS_REQ_MAX:80MB}
 
 server:
   port: ${SALOME_SERVER_PORT:8787}

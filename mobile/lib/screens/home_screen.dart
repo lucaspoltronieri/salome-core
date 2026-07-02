@@ -270,9 +270,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           if (v == 'finalizar') _finalizar(a);
                           if (v == 'cancelar') _cancelar(a);
                           if (v == 'abrir') _reabrir(a);
+                          if (v == 'avaria') _abrir(OcorrenciaScreen(atividade: a));
                         },
                         itemBuilder: (_) => [
                           const PopupMenuItem(value: 'abrir', child: Text('Abrir')),
+                          const PopupMenuItem(value: 'avaria', child: Text('Registrar avaria')),
                           PopupMenuItem(
                               value: 'finalizar',
                               child: Text(a.tipo == 'DESCARGA_TRANSFERENCIA' || a.tipo == 'CARREGAMENTO'

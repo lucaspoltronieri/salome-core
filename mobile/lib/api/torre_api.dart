@@ -272,4 +272,43 @@ class TorreApi {
       await _c.post('/api/torre/ocorrencias', body: dados);
     }
   }
+
+  /// Registra uma avaria amarrada a uma atividade (viagem), com CT-es, itens e
+  /// fotos (avaria + nota fiscal). Retorna o detalhe gravado.
+  Future<Map<String, dynamic>> registrarAvaria({
+    required int idAtividade,
+    String tipo = 'AVARIA',
+    String? placa,
+    String? motorista,
+    List<int> numerosCte = const [],
+    String? descricao,
+    String? culpa,
+    String? quemCausou,
+    String? responsavelPagamento,
+    double? valorTotal,
+    DateTime? dataIdentificacao,
+    int? duracaoSegundos,
+    List<Map<String, dynamic>> itens = const [],
+    List<String> fotos = const [],
+    List<String> fotosNf = const [],
+  }) async {
+    final dados = <String, dynamic>{
+      'tipo': tipo,
+      'idAtividade': idAtividade,
+      if (placa != null) 'placa': placa,
+      if (motorista != null) 'motorista': motorista,
+      if (numerosCte.isNotEmpty) 'numerosCte': numerosCte,
+      if (descricao != null) 'descricao': descricao,
+      if (culpa != null) 'culpa': culpa,
+      if (quemCausou != null) 'quemCausou': quemCausou,
+      if (responsavelPagamento != null) 'responsavelPagamento': responsavelPagamento,
+      if (valorTotal != null) 'valorTotal': valorTotal,
+      if (dataIdentificacao != null) 'dataIdentificacao': dataIdentificacao.toUtc().toIso8601String(),
+      if (duracaoSegundos != null) 'duracaoSegundos': duracaoSegundos,
+      if (itens.isNotEmpty) 'itens': itens,
+    };
+    final j = await _c.postMultipartMulti('/api/torre/ocorrencias/avaria',
+        dados: dados, fotos: fotos, fotosNf: fotosNf);
+    return (j as Map).cast<String, dynamic>();
+  }
 }
