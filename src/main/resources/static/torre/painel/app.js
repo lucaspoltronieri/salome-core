@@ -200,7 +200,7 @@ function atualizarSemaforos(snap) {
   const aguardando = agruparViagens(snap.viagensAguardando || []).length;
   const descargas = (snap.descargasEmAndamento || []).length;
   const separacoes = (snap.separacoesEmAndamento || []).length;
-  const aguardandoSep = snap.aguardandoSeparacaoAgregado?.qtd || 0;
+  const aguardandoSep = snap.saldoArmazem?.noArmazem?.qtd || 0;
 
   const set = (id, cls) => { const el = document.getElementById(id); if (el) el.className = "status-dot " + cls; };
   set("stTransito", chegando > 0 ? "ok" : "idle");
@@ -325,7 +325,7 @@ async function carregar() {
     renderAguardandoDescarga(snap.viagensAguardando || []);
     renderDescarregandoAgora(snap.descargasEmAndamento || []);
     renderSaldo(snap.saldoArmazem);
-    renderSeparandoAgora(snap.separacoesEmAndamento || [], snap.aguardandoSeparacaoAgregado);
+    renderSeparandoAgora(snap.separacoesEmAndamento || [], snap.saldoArmazem?.noArmazem);
     renderPraRua(snap.emRotaEntrega || []);
     atualizarSemaforos(snap);
     document.getElementById("atualizado").textContent =

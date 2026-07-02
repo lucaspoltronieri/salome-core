@@ -63,12 +63,14 @@ public class PainelService {
         AgregadoOperacional descargasFinalizadas =
                 indicadoresRepository.descargasFinalizadasHoje(idFilial, inicioDia);
         AgregadoOperacional armazemAtual = documentoRepository.agregarPorStatus(idFilial, STATUS_ARMAZEM_ATUAL);
+        // Quebra por etapa em CT-es (COUNT(*), sobrecarga de lista) para o total bater com
+        // a soma das partes — a sobrecarga de status único conta viagens, não documentos.
         SaldoArmazem saldoArmazem = new SaldoArmazem(
                 armazemAtual,
-                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.NO_ARMAZEM),
-                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.EM_SEPARACAO),
-                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.SEPARADO_BOX),
-                documentoRepository.agregarPorStatus(idFilial, StatusDocumento.EM_CARREGAMENTO));
+                documentoRepository.agregarPorStatus(idFilial, List.of(StatusDocumento.NO_ARMAZEM)),
+                documentoRepository.agregarPorStatus(idFilial, List.of(StatusDocumento.EM_SEPARACAO)),
+                documentoRepository.agregarPorStatus(idFilial, List.of(StatusDocumento.SEPARADO_BOX)),
+                documentoRepository.agregarPorStatus(idFilial, List.of(StatusDocumento.EM_CARREGAMENTO)));
 
         // O mapa é cacheado por filial (~25s), então uma chamada alimenta chegando + pra rua.
         MapaArmazemSnapshot mapa = mapaArmazemService.snapshot(idFilial);
