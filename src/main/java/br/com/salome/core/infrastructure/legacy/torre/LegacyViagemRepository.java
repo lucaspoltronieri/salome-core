@@ -27,6 +27,12 @@ import org.springframework.stereotype.Repository;
 @ConditionalOnBean(JdbcTemplate.class)
 public class LegacyViagemRepository implements ViagemLegadoRepository {
 
+    // O piso (dataBaixa >= ?) só decide QUAIS viagens aparecem (subselect): basta um
+    // manifesto baixado a partir do piso pra o caminhão entrar na lista. Já a contagem
+    // cobre TODOS os manifestos baixados da viagem pra filial — inclusive os baixados
+    // antes do piso — pra bater com a descarga (listarCtesDaViagem é por idViagem, não
+    // por manifesto). Sem isso, CT-es de manifestos antigos somem do painel mas voltam
+    // ao concluir a descarga.
     private static final String SQL = """
             SELECT vt.idViagemTransferencia                                         AS idViagemTransferencia,
                    vt.idViagem                                                      AS idViagem,
@@ -51,7 +57,14 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
              WHERE vt.idFilialDestino = ?
                AND vt.status = 'Baixado'
                AND vt.dataBaixa IS NOT NULL
-               AND vt.dataBaixa >= ?
+               AND vt.idViagem IN (
+                     SELECT vt2.idViagem
+                       FROM viagemtransferencia vt2
+                      WHERE vt2.idFilialDestino = ?
+                        AND vt2.status = 'Baixado'
+                        AND vt2.dataBaixa IS NOT NULL
+                        AND vt2.dataBaixa >= ?
+               )
              GROUP BY vt.idViagemTransferencia, vt.idViagem, vt.dataBaixa, vt.horaBaixa, placa, motorista, origem
              ORDER BY vt.dataBaixa DESC, vt.horaBaixa DESC
              LIMIT ?
@@ -100,7 +113,7 @@ public class LegacyViagemRepository implements ViagemLegadoRepository {
                 rs.getInt("qtdCtes"),
                 zero(rs.getBigDecimal("volumes")),
                 zero(rs.getBigDecimal("peso"))
-        ), idFilialDestino, dataCorte, limite);
+        ), idFilialDestino, idFilialDestino, dataCorte, limite);
     }
 
     @Override
