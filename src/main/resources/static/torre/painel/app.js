@@ -7,7 +7,7 @@ const CRED_KEY = "torre_painel_cred";
 let pollTimer = null;
 
 const fmtInt = new Intl.NumberFormat("pt-BR");
-const fmtPeso = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+const fmtPeso = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 let vistas = new Set();
 
@@ -135,6 +135,7 @@ function renderChegando(lista) {
       <span class="placa">${escapar(c.placa) || "—"}</span>
       <span>${escapar(limparOrigem(c.origem))} · ${escapar(fmtDataHora(c.dataPrevisaoChegada, c.horaPrevisaoChegada))}</span>
       <span class="num">${fmtInt.format(Number(c.volumes || 0))} vol</span>
+      <span class="num">${fmtPeso.format(Number(c.peso || 0))} kg</span>
     </div>`).join("") || '<p class="vazio">Nenhum caminhão a caminho.</p>';
 }
 

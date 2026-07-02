@@ -171,6 +171,11 @@ body {
   display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
 }
 .detalhe-compacto .linha:last-child { border-bottom: none; }
+#chDetalhe .linha {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.1fr) minmax(180px, 2fr) .8fr 1fr;
+  align-items: baseline;
+}
 #agdDetalhe .linha {
   display: grid;
   grid-template-columns: minmax(96px, 1.3fr) .9fr .9fr 1fr;
