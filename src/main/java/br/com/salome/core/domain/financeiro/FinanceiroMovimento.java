@@ -29,7 +29,9 @@ public record FinanceiroMovimento(
         String historico,
         boolean tomadorExpressoSalome,
         boolean bancoPerdasDanos,
-        LegacyOrigin origin
+        LegacyOrigin origin,
+        boolean carteiraDescontada,
+        String carteira
 ) {
 
     public FinanceiroMovimento {
@@ -43,6 +45,36 @@ public record FinanceiroMovimento(
         dmr = branco(dmr);
         documento = branco(documento);
         historico = branco(historico);
+    }
+
+    /**
+     * Construtor de compatibilidade (sem {@code carteiraDescontada}): mantem os pontos de criacao
+     * existentes funcionando com o padrao {@code false}. So as faturas em carteira descontada
+     * marcam o campo, via {@link #comCarteira(String, boolean)}.
+     */
+    public FinanceiroMovimento(
+            FinanceiroNatureza natureza, FinanceiroStatus status, FinanceiroOrigemTipo origemTipo, Integer origemId,
+            LocalDate dataCompetencia, LocalDate dataVencimento, LocalDate dataBaixa, BigDecimal valor, Integer bancoId,
+            String banco, Integer clienteFornecedorId, String clienteFornecedor, Integer centroCustoId,
+            String centroCusto, Integer filialId, String filial, Integer planoContasCentroCustoId, String planoContas,
+            String classificacao, String dmr, String documento, String historico, boolean tomadorExpressoSalome,
+            boolean bancoPerdasDanos, LegacyOrigin origin) {
+        this(natureza, status, origemTipo, origemId, dataCompetencia, dataVencimento, dataBaixa, valor, bancoId, banco,
+                clienteFornecedorId, clienteFornecedor, centroCustoId, centroCusto, filialId, filial,
+                planoContasCentroCustoId, planoContas, classificacao, dmr, documento, historico, tomadorExpressoSalome,
+                bancoPerdasDanos, origin, false, null);
+    }
+
+    /**
+     * Copia marcando o tipo de carteira da fatura: {@code descontada} (dinheiro ja antecipado no
+     * banco) e o rotulo {@code carteira} ("Simples"/"Descontada") para exibicao. {@code null}/vazio
+     * em {@code carteira} quando o tipo nao esta configurado/disponivel.
+     */
+    public FinanceiroMovimento comCarteira(String carteira, boolean descontada) {
+        return new FinanceiroMovimento(natureza, status, origemTipo, origemId, dataCompetencia, dataVencimento,
+                dataBaixa, valor, bancoId, banco, clienteFornecedorId, clienteFornecedor, centroCustoId, centroCusto,
+                filialId, filial, planoContasCentroCustoId, planoContas, classificacao, dmr, documento, historico,
+                tomadorExpressoSalome, bancoPerdasDanos, origin, descontada, carteira);
     }
 
     public LocalDate dataFluxo() {

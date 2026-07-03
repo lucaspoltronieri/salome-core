@@ -180,6 +180,10 @@ public final class CteVencimentoPrevisao {
         // dia 30 (ultimo) do mes seguinte. Uma parcela.
         regras.add(cliente("BRAILE", CteVencimentoPrevisao::regraBraile));
 
+        // Salvabras - fechamento mensal: acumula os CT-es do dia 1 ao ultimo dia do mes; a fatura e
+        // emitida no fim do mes e vence no dia 10 do mes seguinte. Uma parcela.
+        regras.add(cliente("SALVABRAS", CteVencimentoPrevisao::regraSalvabras));
+
         return regras;
     }
 
@@ -259,6 +263,16 @@ public final class CteVencimentoPrevisao {
         LocalDate proximoMes = emissao.plusMonths(1);
         int dia = emissao.getDayOfMonth() <= 15 ? 15 : 30;
         return umaParcela(fechamentoQuinzenal(emissao), comDia(proximoMes, dia), valor);
+    }
+
+    /**
+     * Salvabras: fechamento mensal. Independente do dia da emissao, a fatura fecha no ultimo dia do
+     * mes da emissao e vence no dia 10 do mes seguinte. Ex.: emissao em junho -> fechamento 30/06,
+     * vencimento 10/07. Uma unica parcela.
+     */
+    private static List<Parcela> regraSalvabras(LocalDate emissao, BigDecimal valor) {
+        LocalDate fechamento = emissao.withDayOfMonth(emissao.lengthOfMonth());
+        return umaParcela(fechamento, comDia(fechamento.plusMonths(1), 10), valor);
     }
 
     // ------------------------------------------------------------------------------------------

@@ -12,8 +12,10 @@ public record FinanceiroContaDocumento(
         String clienteFornecedor,
         String filial,
         String banco,
+        LocalDate dataCompetencia,
         LocalDate dataVencimento,
         BigDecimal valor,
-        String origemTipo
+        String origemTipo,
+        String carteira
 ) {
 }

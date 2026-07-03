@@ -42,8 +42,8 @@ final class FinanceiroPlanoContasArvore {
             }
             No folha = nos.get(chave);
             folha.documentos.add(new FinanceiroContaDocumento(movimento.documento(), movimento.clienteFornecedor(),
-                    movimento.filial(), movimento.banco(), movimento.dataVencimento(), movimento.valor(),
-                    movimento.origemTipo().name()));
+                    movimento.filial(), movimento.banco(), movimento.dataCompetencia(), movimento.dataVencimento(),
+                    movimento.valor(), movimento.origemTipo().name(), movimento.carteira()));
         }
 
         // Liga filhos aos pais e coleta as raizes.

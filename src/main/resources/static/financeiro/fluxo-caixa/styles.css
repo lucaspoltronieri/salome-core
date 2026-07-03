@@ -1090,8 +1090,31 @@ text.axis {
     font-weight: 700;
 }
 
+.conta-doc .doc-carteira {
+    flex: 0 0 96px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.conta-doc .doc-carteira.descontada {
+    color: var(--danger, #c4161c);
+    font-weight: 700;
+}
+
+.conta-doc .doc-emissao {
+    flex: 0 0 100px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+
 .conta-doc .doc-venc {
-    flex: 0 0 90px;
+    flex: 0 0 110px;
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
@@ -1101,6 +1124,55 @@ text.axis {
     text-align: right;
     font-variant-numeric: tabular-nums;
     color: var(--text);
+}
+
+/* Cabecalho das colunas dos documentos (emissao / previsao de vencimento) */
+.doc-cols {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+}
+
+.doc-cols .doc-cols-spacer {
+    flex: 1;
+    min-width: 0;
+}
+
+.doc-cols .doc-cols-carteira {
+    flex: 0 0 96px;
+    text-align: right;
+}
+
+.doc-cols .doc-cols-banco {
+    flex: 0 0 150px;
+    text-align: right;
+}
+
+.doc-cols .doc-cols-filial {
+    flex: 0 0 70px;
+    text-align: right;
+}
+
+.doc-cols .doc-cols-emissao {
+    flex: 0 0 100px;
+    text-align: right;
+}
+
+.doc-cols .doc-cols-venc {
+    flex: 0 0 110px;
+    text-align: right;
+}
+
+.doc-cols .doc-cols-valor {
+    flex: 0 0 140px;
+    text-align: right;
 }
 
 /* Itens/produtos no drawer */

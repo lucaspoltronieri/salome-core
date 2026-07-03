@@ -99,10 +99,18 @@ public class FinanceiroFluxoCaixaService {
                 .filter(movimento -> movimento.valor() != null && movimento.valor().signum() > 0)
                 .toList();
 
+        // Previsao de "a receber": exclui as faturas em carteira DESCONTADA (dinheiro ja antecipado
+        // no banco) do KPI "A receber", dos cards de horizonte e da projecao de caixa. Elas seguem
+        // visiveis no painel "Faturamento pendente" (card "Faturas atrasadas"), por isso o filtro NAO
+        // e aplicado a lista completa usada la.
+        List<FinanceiroMovimento> previstosReceber = previstos.stream()
+                .filter(movimento -> !movimento.carteiraDescontada())
+                .toList();
+
         List<FinanceiroHorizonteCard> aPagar = horizontes(previstos, FinanceiroNatureza.DESPESA, hoje, fimMes, descricaoPlano);
-        List<FinanceiroHorizonteCard> aReceber = horizontes(previstos, FinanceiroNatureza.RECEITA, hoje, fimMes, descricaoPlano);
+        List<FinanceiroHorizonteCard> aReceber = horizontes(previstosReceber, FinanceiroNatureza.RECEITA, hoje, fimMes, descricaoPlano);
         List<FinanceiroHorizonteCard> faturamentoPendente = faturamentoPendente(previstos, hoje, descricaoPlano);
-        List<FinanceiroProjecaoPonto> projecao = projecao(previstos, hoje, fimMes, saldoBancarioAtual);
+        List<FinanceiroProjecaoPonto> projecao = projecao(previstosReceber, hoje, fimMes, saldoBancarioAtual);
         List<FinanceiroRetrospectivoCard> retrospectivo = retrospectivo(movimentosResumo, tela, descricaoPlano);
 
         BigDecimal aReceberMes = valorDoHorizonte(aReceber, "MES");

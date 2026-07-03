@@ -44,16 +44,23 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
 
     private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
+    private final FinanceiroFluxoCaixaProperties properties;
     private final CteVencimentoPrevisao previsao = new CteVencimentoPrevisao();
 
     @Autowired
-    public LegacyFinanceiroFluxoCaixaRepository(JdbcTemplate jdbcTemplate) {
-        this(jdbcTemplate, Clock.systemDefaultZone());
+    public LegacyFinanceiroFluxoCaixaRepository(JdbcTemplate jdbcTemplate, FinanceiroFluxoCaixaProperties properties) {
+        this(jdbcTemplate, Clock.systemDefaultZone(), properties);
     }
 
     LegacyFinanceiroFluxoCaixaRepository(JdbcTemplate jdbcTemplate, Clock clock) {
+        this(jdbcTemplate, clock, new FinanceiroFluxoCaixaProperties(null, null));
+    }
+
+    LegacyFinanceiroFluxoCaixaRepository(JdbcTemplate jdbcTemplate, Clock clock,
+            FinanceiroFluxoCaixaProperties properties) {
         this.jdbcTemplate = jdbcTemplate;
         this.clock = clock;
+        this.properties = properties;
     }
 
     @Override
@@ -460,7 +467,7 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
     }
 
     private List<FinanceiroMovimento> listarFaturasAbertas(FinanceiroFiltro filtro) {
-        return jdbcTemplate.query("""
+        String sql = ("""
                 SELECT
                     f.idFatura origemId,
                     f.emissao dataCompetencia,
@@ -489,6 +496,8 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                     IF(f.idBanco = ?
                         OR UPPER(COALESCE(b.conta, '')) LIKE '%%PERDAS%%DANOS%%'
                         OR UPPER(COALESCE(b.nome, '')) LIKE '%%PERDAS%%DANOS%%', 1, 0) bancoPerdasDanos,
+                    %s carteiraDescontada,
+                    %s carteiraTipo,
                     IF(expresso.idCliente IS NULL, 0, 1) tomadorExpressoSalome
                 FROM fatura f
                 LEFT JOIN banco b ON b.idBanco = f.idBanco
@@ -504,11 +513,47 @@ public class LegacyFinanceiroFluxoCaixaRepository implements FinanceiroFluxoCaix
                 LEFT JOIN filial fil ON fil.idFilial = f.idFilial
                 WHERE f.vencimento BETWEEN ? AND ?
                   AND NOT EXISTS (SELECT 1 FROM faturabaixa fb WHERE fb.idFatura = f.idFatura)
-                """.formatted(BANCOS_FLUXO_IDS, CLIENTE_EXPRESSO_SALOME_SQL), (rs, rowNum) -> movimentoReceita(rs,
+                """).formatted(BANCOS_FLUXO_IDS, colunaCarteiraDescontadaSql(), colunaCarteiraTipoSql(),
+                CLIENTE_EXPRESSO_SALOME_SQL);
+
+        List<Object> params = new ArrayList<>();
+        params.add(BANCO_PERDAS_DANOS_ID);
+        params.addAll(properties.carteiraDescontadaValores());
+        params.add(Date.valueOf(inicioFaturas(filtro)));
+        params.add(Date.valueOf(filtro.fim()));
+
+        return jdbcTemplate.query(sql, (rs, rowNum) -> movimentoReceita(rs,
                 rs.getInt("cartorio") == 1 ? FinanceiroOrigemTipo.FATURA_CARTORIO : FinanceiroOrigemTipo.FATURA_ABERTA,
                 FinanceiroStatus.PREVISTO, FinanceiroRuleOrigins.FATURA,
-                rs.getInt("tomadorExpressoSalome") == 1, rs.getInt("bancoPerdasDanos") == 1),
-                BANCO_PERDAS_DANOS_ID, Date.valueOf(inicioFaturas(filtro)), Date.valueOf(filtro.fim()));
+                rs.getInt("tomadorExpressoSalome") == 1, rs.getInt("bancoPerdasDanos") == 1)
+                .comCarteira(rs.getString("carteiraTipo"), rs.getInt("carteiraDescontada") == 1),
+                params.toArray());
+    }
+
+    /**
+     * Expressao de SELECT que marca a fatura como carteira DESCONTADA (dinheiro ja antecipado no
+     * banco). Retorna {@code "0"} quando o filtro nao esta configurado (ver
+     * {@link FinanceiroFluxoCaixaProperties}); nesse caso nenhuma fatura e marcada e o comportamento
+     * historico e preservado. A coluna e sanitizada; os valores entram por {@code ?} em UPPER/TRIM.
+     */
+    private String colunaCarteiraDescontadaSql() {
+        if (!properties.filtroAtivo()) {
+            return "0";
+        }
+        String coluna = properties.colunaSegura();
+        String placeholders = String.join(", ",
+                properties.carteiraDescontadaValores().stream().map(valor -> "?").toList());
+        return "IF(UPPER(TRIM(f." + coluna + ")) IN (" + placeholders + "), 1, 0)";
+    }
+
+    /**
+     * Expressao de SELECT com o rotulo do tipo de carteira ("Simples"/"Descontada", como gravado no
+     * legado) para exibir na listagem de faturas. Retorna {@code NULL} quando a coluna nao esta
+     * configurada. A coluna e sanitizada (ver {@link FinanceiroFluxoCaixaProperties#colunaSegura()}).
+     */
+    private String colunaCarteiraTipoSql() {
+        String coluna = properties.colunaSegura();
+        return coluna.isEmpty() ? "NULL" : "f." + coluna;
     }
 
     /**

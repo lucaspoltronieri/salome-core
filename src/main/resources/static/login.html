@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar &middot; Core Financeiro</title>
+    <style>
+        :root {
+            --surface: #ffffff;
+            --surface-2: #eef3f6;
+            --linha: #dde5e8;
+            --texto: #17252b;
+            --suave: #667982;
+            --azul: #0e5964;
+            --azul-claro: #226da8;
+            --vermelho: #b0322a;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", system-ui, Arial, sans-serif; }
+        .login-overlay {
+            position: fixed; inset: 0; z-index: 50;
+            background: linear-gradient(135deg, #0e5964 0%, #17343b 100%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .login-card {
+            background: var(--surface); border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.3);
+            padding: 34px 38px; width: 360px; max-width: 90vw; display: flex; flex-direction: column; gap: 13px;
+        }
+        .login-card h2 { color: var(--azul); font-size: 24px; margin: 0; }
+        .login-sub { color: var(--suave); font-size: 13px; margin: -6px 0 0; }
+        .login-card label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--suave); font-weight: 600; }
+        .login-card input[type="text"], .login-card input[type="password"] {
+            padding: 11px 13px; border: 1px solid var(--linha); border-radius: 8px; font-size: 16px;
+            color: var(--texto); background: var(--surface-2);
+        }
+        .login-card input:focus { outline: 2px solid var(--azul-claro); border-color: var(--azul-claro); }
+        .login-card button {
+            margin-top: 6px; padding: 12px; border: none; border-radius: 8px; background: var(--azul);
+            color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+        }
+        .login-card button:hover { background: var(--azul-claro); }
+        .login-erro { color: var(--vermelho); font-weight: 600; font-size: 14px; text-align: center; }
+        .login-ok { color: #2f6b39; font-weight: 600; font-size: 14px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="login-overlay">
+        <form class="login-card" method="post" action="login" autocomplete="off">
+            <h2>Core Financeiro</h2>
+            <p class="login-sub">Expresso Salom&eacute; — entre com seu usu&aacute;rio</p>
+            <span id="erro" class="login-erro" hidden>Usu&aacute;rio ou senha inv&aacute;lidos.</span>
+            <span id="saiu" class="login-ok" hidden>Voc&ecirc; saiu com seguran&ccedil;a.</span>
+            <label>Usu&aacute;rio<input name="username" type="text" required autofocus autocomplete="off"></label>
+            <label>Senha<input name="password" type="password" required autocomplete="new-password"></label>
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        if (params.has("erro")) { document.getElementById("erro").hidden = false; }
+        if (params.has("saiu")) { document.getElementById("saiu").hidden = false; }
+    </script>
+</body>
+</html>

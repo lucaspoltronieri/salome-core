@@ -86,6 +86,25 @@ class CteVencimentoPrevisaoTest {
     }
 
     @Test
+    void salvabrasFechaFimDoMesVenceDia10DoMesSeguinte() {
+        // Emissao 06/01 -> fechamento 31/01, vencimento 10/02.
+        List<Parcela> parcelas = previsao.resolver("SALVABRAS INDUSTRIA", null, SEGUNDA, CEM);
+        assertEquals(1, parcelas.size());
+        assertEquals(LocalDate.of(2025, 1, 31), parcelas.get(0).fechamento());
+        assertEquals(LocalDate.of(2025, 2, 10), parcelas.get(0).vencimento());
+        assertEquals(CEM, parcelas.get(0).valor());
+    }
+
+    @Test
+    void salvabrasIndependeDoDiaDaEmissao() {
+        // Emissao 20/01 (segunda metade) tambem fecha 31/01 e vence 10/02.
+        List<Parcela> parcelas = previsao.resolver("SALVABRAS", null, LocalDate.of(2025, 1, 20), CEM);
+        assertEquals(1, parcelas.size());
+        assertEquals(LocalDate.of(2025, 1, 31), parcelas.get(0).fechamento());
+        assertEquals(LocalDate.of(2025, 2, 10), parcelas.get(0).vencimento());
+    }
+
+    @Test
     void identificacaoIgnoraAcentoECaixa() {
         List<Parcela> comAcento = previsao.resolver("Eucatex Indústria", null, SEGUNDA, CEM);
         assertEquals(LocalDate.of(2025, 1, 27), comAcento.get(0).vencimento());

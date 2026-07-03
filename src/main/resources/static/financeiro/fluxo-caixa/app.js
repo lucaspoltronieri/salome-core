@@ -212,6 +212,15 @@ function renderDrillDetail(detail, card, metaFn) {
             <span class="col-qtd">Qtd</span>
             <span class="col-valor">Valor</span>
         </div>
+        <div class="doc-cols">
+            <span class="doc-cols-spacer"></span>
+            <span class="doc-cols-carteira">Carteira</span>
+            <span class="doc-cols-banco">Banco</span>
+            <span class="doc-cols-filial">Filial</span>
+            <span class="doc-cols-emissao">Emissao</span>
+            <span class="doc-cols-venc">Prev. vencimento</span>
+            <span class="doc-cols-valor">Valor</span>
+        </div>
         <div class="conta-tree wide"></div>`;
     const tree = detail.querySelector(".conta-tree");
     (card.contas || []).forEach(node => tree.appendChild(renderContaNo(node)));
@@ -255,11 +264,14 @@ function renderContaDoc(doc, nivelPai) {
     item.type = "button";
     item.className = "conta-doc";
     item.style.paddingLeft = `${10 + (nivelPai + 1) * 18}px`;
+    const descontada = (doc.carteira || "").trim().toLowerCase().startsWith("descont");
     item.innerHTML = `
         <span class="doc-name">${escapeHtml(doc.documento)}</span>
         <span class="doc-person">${escapeHtml(doc.clienteFornecedor)}</span>
+        <span class="doc-carteira ${descontada ? "descontada" : ""}">${escapeHtml(doc.carteira || "")}</span>
         <span class="doc-banco">${escapeHtml(doc.banco || "-")}</span>
         <span class="doc-filial">${escapeHtml(doc.filial || "-")}</span>
+        <span class="doc-emissao">${date(doc.dataCompetencia)}</span>
         <span class="doc-venc">${date(doc.dataVencimento)}</span>
         <span class="doc-value">${fmtMoney.format(doc.valor || 0)}</span>`;
     item.addEventListener("click", () => openDocDrawer(doc));
