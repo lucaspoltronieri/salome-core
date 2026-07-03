@@ -30,11 +30,11 @@ salome:
   financeiro:
     fluxo-caixa:
       # Previsão "A receber (faturado)": exclui as faturas em carteira DESCONTADA (dinheiro já
-      # antecipado no banco). DESLIGADO por padrão. Para ativar, informar o nome REAL da coluna de
-      # carteira na tabela `fatura` do legado e os valores que significam "descontada" (confirmar no
-      # banco antes de ativar). Valores múltiplos: separar por vírgula (ex.: Descontada,Antecipada).
-      carteira-coluna: ${SALOME_FIN_CARTEIRA_COLUNA:}
-      carteira-descontada-valores: ${SALOME_FIN_CARTEIRA_DESCONTADA:}
+      # antecipado no banco). Coluna do legado = fatura.tipoCarteira (String), valores "Simples" /
+      # "Descontada" (NULL nas faturas antigas). Confirmado no fonte legado (FaturaData/FaturaTable).
+      # Ativo por padrão; para desligar/ajustar, sobrescrever pelas envs. Múltiplos valores: vírgula.
+      carteira-coluna: ${SALOME_FIN_CARTEIRA_COLUNA:tipoCarteira}
+      carteira-descontada-valores: ${SALOME_FIN_CARTEIRA_DESCONTADA:Descontada}
     auth:
       # Login por formulário da própria aplicação (substitui o Basic Auth do nginx).
       # DESLIGADO por padrão: enquanto false, tudo fica liberado (controle no nginx).
