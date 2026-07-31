@@ -36,6 +36,13 @@ servir como:
     Sheets sem alterar o legado.
 12. Escritas no MySQL legado por modulos web exigem mapeamento, aprovacao e
     script SQL versionado quando houver alteracao de schema.
+13. Ao concluir uma unidade coerente de trabalho, o agente deve validar a
+    alteracao e criar um commit checkpoint com mensagem padronizada.
+14. Nunca incluir em commits credenciais, arquivos temporarios, dumps, saídas
+    de consultas, `node_modules/`, `target/` ou artefatos gerados, salvo pedido
+    explicito.
+15. O commit deve conter somente arquivos da unidade concluida; alteracoes
+    paralelas ou nao relacionadas devem permanecer fora do stage.
 
 ## Padrao legado observado
 
