@@ -44,7 +44,8 @@ O Excel deve conter:
 - e-mail principal da empresa;
 - telefone fixo do cadastro;
 - tipo no CT-e (`Destinatário`);
-- data de cadastro; se não houver, data do primeiro CT-e sem frete;
+- data de cadastro; se não houver, data da emissão do primeiro CT-e sem frete
+  (apresentada na coluna `Data cadastro (ou emissão CT-e)`);
 - primeiro CT-e sem frete;
 - contato separado em nome, setor, e-mail e telefone.
 
