@@ -67,9 +67,10 @@ O relatório deverá receber como parâmetros:
 Antes de montar qualquer aba ou totalizador, filtrar os cards pelos dois
 critérios abaixo, em conjunto:
 
-- o card deve ter sido criado dentro do período solicitado (data inicial e
-  final inclusivas; tecnicamente, consultar até o início do dia seguinte ao
-  final informado);
+- a data do status deve estar dentro do período solicitado (para `Ganho`,
+  usar a data de ganho/aprovação; para `Perdido`, a data de perda; para cards
+  abertos, a última movimentação). As datas inicial e final são inclusivas;
+  tecnicamente, consultar até o início do dia seguinte ao final informado;
 - o estágio atual do card deve ser exatamente `Proposta Enviada`.
 
 Cards de outros estágios não entram na relação, nas abas de revisão ou nos
