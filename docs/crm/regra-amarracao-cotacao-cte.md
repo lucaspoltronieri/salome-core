@@ -64,6 +64,18 @@ O relatório deverá receber como parâmetros:
 - período inicial e final;
 - usuário/vendedor do Cubo.
 
+Antes de montar qualquer aba ou totalizador, filtrar os cards pelos dois
+critérios abaixo, em conjunto:
+
+- o card deve ter sido criado dentro do período solicitado (data inicial e
+  final inclusivas; tecnicamente, consultar até o início do dia seguinte ao
+  final informado);
+- o estágio atual do card deve ser exatamente `Proposta Enviada`.
+
+Cards de outros estágios não entram na relação, nas abas de revisão ou nos
+totalizadores, mesmo que estejam dentro do período ou tenham status de ganho
+no Cubo.
+
 Para o período e vendedor informados, consultar os cards do Cubo com status
 `won` (Ganho) e usar a data `winDate` como data de aprovação no Cubo. Para cada
 card, apresentar:
