@@ -136,13 +136,17 @@ determinado pelo `tipoPagamento` do CT-e: quando o valor contem
 `DESTINATARIO` e `FOB`, usa-se `idClienteDestinatario`; nos demais casos,
 usa-se `idClienteEmitente`.
 
-- `Tabela Preco`: preencher `sim` quando existir pelo menos um registro em
+Depois da coluna `Observação`, a aba principal deve apresentar as duas colunas
+adicionais abaixo:
+
+- `Tabela Preço`: preencher `sim` quando existir pelo menos um registro em
   `tabelapreco` com `idCliente` igual ao pagador. Caso contrario, preencher
   `nao`. Tabelas gerais, sem vinculo especifico ao cliente, nao contam como
   tabela comercial cadastrada para este indicador.
 - `CTes Ultimos 6 meses`: contar CT-es nao cancelados do mesmo pagador, com
-  `cteEmissao` de 30/01/2026 a 30/07/2026 (inclusive), para o relatorio atual.
-  Em novas consultas, recalcular a janela de seis meses a partir da data final
-  informada.
+  `cteEmissao` dentro dos seis meses anteriores até a data final do relatório,
+  inclusive. Para o relatório de 07/07/2026 a 31/07/2026, a janela usada foi
+  de 31/01/2026 a 31/07/2026. Em novas consultas, recalcular a janela a partir
+  da data final informada.
 
 Esses indicadores sao somente leitura e nao alteram o cadastro do legado.
