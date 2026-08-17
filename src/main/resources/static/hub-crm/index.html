@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Salomé Hub CRM</title>
+  <link rel="stylesheet" href="/hub-crm/styles.css">
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">SALOMÉ CORE</span><h1>Hub CRM</h1></div>
+    <div id="health" class="pill neutral">Carregando...</div>
+  </header>
+  <main>
+    <section class="hero">
+      <div><h2>Legado ↔ ArpaSuite</h2><p>Acompanhamento dos clientes, cotações e eventos integrados.</p></div>
+      <div class="actions">
+        <button id="validate">Validar ArpaSuite</button>
+        <button id="sync">Sincronizar agora</button>
+        <button id="load" class="danger">Executar carga inicial</button>
+      </div>
+    </section>
+    <section id="metrics" class="metrics"></section>
+    <section class="panel">
+      <div class="tabs">
+        <button class="tab active" data-view="clientes">Clientes</button>
+        <button class="tab" data-view="cotacoes">Cotações</button>
+        <button class="tab" data-view="eventos">Eventos</button>
+      </div>
+      <div class="table-wrap"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
+    </section>
+    <p id="message" class="message"></p>
+  </main>
+  <script src="/hub-crm/app.js"></script>
+</body>
+</html>
