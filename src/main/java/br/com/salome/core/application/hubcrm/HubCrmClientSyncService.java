@@ -60,6 +60,10 @@ public class HubCrmClientSyncService {
                 skipped++;
                 continue;
             }
+            if ("ERRO".equals(current.status()) && !store.canRetryClient(cnpj)) {
+                skipped++;
+                continue;
+            }
             if (attempted >= maximum) continue;
             attempted++;
             try {

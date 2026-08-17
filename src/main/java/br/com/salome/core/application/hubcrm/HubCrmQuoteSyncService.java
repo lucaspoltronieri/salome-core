@@ -52,6 +52,11 @@ public class HubCrmQuoteSyncService {
                 skipped++;
                 continue;
             }
+            if ("REVISAO".equals(current.status())
+                    || ("ERRO".equals(current.status()) && !store.canRetryQuote(quote.id()))) {
+                skipped++;
+                continue;
+            }
             try {
                 if (quote.payerCnpj().length() != 14) {
                     throw new ReviewException("CNPJ do pagador inválido: " + quote.payerCnpj());

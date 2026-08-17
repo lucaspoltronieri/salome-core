@@ -50,7 +50,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         lostReasonIds.clear();
         for (LossReason reason : LossReason.values()) {
             entries.stream()
-                    .filter(item -> normalized(item.path("name").asText()).equals(normalized(reason.arpaName())))
+                    .filter(item -> normalized(item.path("reason").asText()).equals(normalized(reason.arpaName())))
                     .findFirst()
                     .ifPresent(item -> lostReasonIds.put(reason, item.path("id").asLong()));
         }

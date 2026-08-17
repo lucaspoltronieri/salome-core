@@ -15,13 +15,14 @@ APP_DIR=/opt/salome-core
 JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-amd64
 PORT=8788                       # porta interna (nginx faz o TLS/BasicAuth na 8787)
 SERVICES="salome-web salome-export"
+DEPLOY_REF=${DEPLOY_REF:-origin/main}
 
 export JAVA_HOME
 cd "$APP_DIR"
 
-echo "==> Atualizando codigo (origin/main)"
+echo "==> Atualizando codigo ($DEPLOY_REF)"
 git fetch origin
-git reset --hard origin/main
+git reset --hard "$DEPLOY_REF"
 echo "    HEAD: $(git log --oneline -1)"
 
 echo "==> Build (mvn clean package -DskipTests)"
@@ -64,5 +65,8 @@ for p in fluxo-caixa dre-gerencial dre-cliente dre-filial; do
     code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/financeiro/$p/")
     printf '    %-14s = %s\n' "$p" "$code"
 done
+
+hub_code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/hub-crm/status")
+printf '    %-14s = %s\n' 'hub-crm' "$hub_code"
 
 echo "==> Deploy concluido."

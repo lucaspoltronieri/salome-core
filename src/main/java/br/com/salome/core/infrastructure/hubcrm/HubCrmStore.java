@@ -66,15 +66,24 @@ public class HubCrmStore {
         jdbc.update("""
                 UPDATE hub_crm_client SET organization_id=?, people_id=?, deal_id=?,
                   assigned_user_id=?, snapshot_hash=?, sync_status='INTEGRADO', attempt_count=0,
-                  last_error=NULL, last_synced_at=NOW() WHERE cnpj=?
+                  next_attempt_at=NULL, last_error=NULL, last_synced_at=NOW() WHERE cnpj=?
                 """, organizationId, peopleId, dealId, userId, hash, cnpj);
     }
 
     public void markClientError(String cnpj, Exception error) {
         jdbc.update("""
                 UPDATE hub_crm_client SET sync_status='ERRO', attempt_count=attempt_count+1,
+                  next_attempt_at=TIMESTAMPADD(MINUTE, LEAST(POW(2, attempt_count), 60), NOW()),
                   last_error=? WHERE cnpj=?
                 """, truncate(error.getMessage()), cnpj);
+    }
+
+    public boolean canRetryClient(String cnpj) {
+        Boolean result = jdbc.queryForObject("""
+                SELECT next_attempt_at IS NULL OR next_attempt_at<=NOW()
+                FROM hub_crm_client WHERE cnpj=?
+                """, Boolean.class, cnpj);
+        return Boolean.TRUE.equals(result);
     }
 
     @Transactional("hubCrmTransactionManager")
@@ -154,7 +163,7 @@ public class HubCrmStore {
         jdbc.update("""
                 UPDATE hub_crm_quote SET organization_id=?, people_id=?, deal_id=?, assigned_user_id=?,
                   legacy_status=?, total_freight=?, snapshot_hash=?, sync_status='INTEGRADO',
-                  pdf_status='DISPONIVEL', whatsapp_status=?, attempt_count=0, last_error=NULL,
+                  pdf_status='DISPONIVEL', whatsapp_status=?, attempt_count=0, next_attempt_at=NULL, last_error=NULL,
                   last_synced_at=NOW() WHERE legacy_quote_id=?
                 """, organizationId, peopleId, dealId, userId, quote.status(), quote.totalFreight(),
                 hash, whatsappStatus, quote.id());
@@ -174,8 +183,33 @@ public class HubCrmStore {
     public void markQuoteError(long quoteId, Exception error) {
         jdbc.update("""
                 UPDATE hub_crm_quote SET sync_status='ERRO', attempt_count=attempt_count+1,
+                  next_attempt_at=TIMESTAMPADD(MINUTE, LEAST(POW(2, attempt_count), 60), NOW()),
                   last_error=? WHERE legacy_quote_id=?
                 """, truncate(error.getMessage()), quoteId);
+    }
+
+    public boolean canRetryQuote(long quoteId) {
+        Boolean result = jdbc.queryForObject("""
+                SELECT next_attempt_at IS NULL OR next_attempt_at<=NOW()
+                FROM hub_crm_quote WHERE legacy_quote_id=?
+                """, Boolean.class, quoteId);
+        return Boolean.TRUE.equals(result);
+    }
+
+    public void reprocess(String entityType, long legacyId) {
+        if ("CLIENTE".equalsIgnoreCase(entityType)) {
+            jdbc.update("""
+                    UPDATE hub_crm_client SET sync_status='ATUALIZAR', next_attempt_at=NULL,
+                      last_error=NULL WHERE legacy_client_id=?
+                    """, legacyId);
+        } else if ("COTACAO".equalsIgnoreCase(entityType) || "COTAÇÃO".equalsIgnoreCase(entityType)) {
+            jdbc.update("""
+                    UPDATE hub_crm_quote SET sync_status='ATUALIZAR', next_attempt_at=NULL,
+                      last_error=NULL WHERE legacy_quote_id=?
+                    """, legacyId);
+        } else {
+            throw new IllegalArgumentException("Tipo deve ser CLIENTE ou COTACAO");
+        }
     }
 
     public void recordEvent(String key, String entityType, long entityId, String eventType,

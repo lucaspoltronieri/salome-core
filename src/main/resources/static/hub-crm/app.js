@@ -10,5 +10,6 @@ async function action(url,confirmation){if(confirmation&&!confirm(confirmation))
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.view=b.dataset.view;table()});
 $('#validate').onclick=()=>action('/api/hub-crm/acoes/validar-arpa');
 $('#sync').onclick=()=>action('/api/hub-crm/acoes/sincronizar');
+$('#retry').onclick=()=>{const tipo=prompt('Tipo: CLIENTE ou COTACAO');if(!tipo)return;const id=prompt('ID no legado');if(!id)return;action(`/api/hub-crm/acoes/reprocessar?tipo=${encodeURIComponent(tipo)}&id=${encodeURIComponent(id)}`)};
 $('#load').onclick=()=>action('/api/hub-crm/acoes/carga-inicial','A carga cria organizações, pessoas e cards reais no ArpaSuite. Continuar?');
 status();table();setInterval(()=>{status();table()},30000);

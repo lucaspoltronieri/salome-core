@@ -44,8 +44,8 @@ O Excel deve conter:
 - e-mail principal da empresa;
 - telefone fixo do cadastro;
 - tipo no CT-e (`Destinatário`);
-- data de cadastro; se não houver, data da emissão do primeiro CT-e sem frete
-  (apresentada na coluna `Data cadastro (ou emissão CT-e)`);
+- data de emissão do primeiro CT-e em que o cliente apareceu como destinatário
+  sem pagar o frete; a data de cadastro do cliente não é usada pelo Hub CRM;
 - primeiro CT-e sem frete;
 - contato separado em nome, setor, e-mail e telefone.
 

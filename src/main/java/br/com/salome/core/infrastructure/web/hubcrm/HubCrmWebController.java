@@ -13,9 +13,9 @@ import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @Controller
 @ConditionalOnProperty(prefix = "salome.hub-crm", name = "enabled", havingValue = "true")
@@ -75,22 +75,29 @@ public class HubCrmWebController {
         return store.events(limit);
     }
 
-    @RequestMapping("/api/hub-crm/acoes/carga-inicial")
+    @PostMapping("/api/hub-crm/acoes/carga-inicial")
     @ResponseBody
     public Object initialLoad() {
         return clients.initialPilotAndBatch();
     }
 
-    @RequestMapping("/api/hub-crm/acoes/sincronizar")
+    @PostMapping("/api/hub-crm/acoes/sincronizar")
     @ResponseBody
     public Map<String, Object> synchronize() {
         return Map.of("clientes", clients.syncNewClients(), "cotacoes", quotes.syncQuotes());
     }
 
-    @RequestMapping("/api/hub-crm/acoes/validar-arpa")
+    @PostMapping("/api/hub-crm/acoes/validar-arpa")
     @ResponseBody
     public Map<String, Object> validateArpa() {
         arpa.validateCatalog();
         return Map.of("ok", true, "message", "Catálogo e acesso ao ArpaSuite validados");
+    }
+
+    @PostMapping("/api/hub-crm/acoes/reprocessar")
+    @ResponseBody
+    public Map<String, Object> reprocess(@RequestParam String tipo, @RequestParam long id) {
+        store.reprocess(tipo, id);
+        return Map.of("ok", true, "tipo", tipo, "id", id);
     }
 }
