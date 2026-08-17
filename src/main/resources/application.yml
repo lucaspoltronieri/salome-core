@@ -76,3 +76,32 @@ salome:
       url: ${SALOME_TORRE_DB_URL:}
       username: ${SALOME_TORRE_DB_USERNAME:}
       password: ${SALOME_TORRE_DB_PASSWORD:}
+  hub-crm:
+    enabled: ${SALOME_HUB_CRM_ENABLED:false}
+    polling-enabled: ${SALOME_HUB_CRM_POLLING_ENABLED:false}
+    polling-delay-ms: ${SALOME_HUB_CRM_POLLING_DELAY_MS:30000}
+    initial-cutoff-client-id: ${SALOME_HUB_CRM_CLIENT_CUTOFF:32001}
+    pilot-size: ${SALOME_HUB_CRM_PILOT_SIZE:10}
+    public-base-url: ${SALOME_HUB_CRM_PUBLIC_BASE_URL:}
+    media-signing-key: ${SALOME_HUB_CRM_MEDIA_SIGNING_KEY:}
+    media-url-ttl-minutes: ${SALOME_HUB_CRM_MEDIA_TTL_MINUTES:60}
+    datasource:
+      url: ${SALOME_HUB_CRM_DB_URL:}
+      username: ${SALOME_HUB_CRM_DB_USERNAME:}
+      password: ${SALOME_HUB_CRM_DB_PASSWORD:}
+    arpa:
+      base-url: ${SALOME_HUB_CRM_ARPA_URL:https://suite.arpacore.com.br}
+      api-key: ${SALOME_HUB_CRM_ARPA_API_KEY:}
+      pipe-id: ${SALOME_HUB_CRM_PIPE_ID:304805}
+      carteira-stage-id: ${SALOME_HUB_CRM_CARTEIRA_STAGE_ID:320394}
+      proposta-stage-id: ${SALOME_HUB_CRM_PROPOSTA_STAGE_ID:320618}
+      fernanda-user-id: ${SALOME_HUB_CRM_FERNANDA_USER_ID:303711}
+      jaci-user-id: ${SALOME_HUB_CRM_JACI_USER_ID:303709}
+      cnpj-customfield-id: ${SALOME_HUB_CRM_CNPJ_FIELD_ID:320014}
+      cidade-customfield-id: ${SALOME_HUB_CRM_CIDADE_FIELD_ID:320015}
+      estado-customfield-id: ${SALOME_HUB_CRM_ESTADO_FIELD_ID:320016}
+      segmento-customfield-id: ${SALOME_HUB_CRM_SEGMENTO_FIELD_ID:320013}
+      base-cotacao-customfield-id: ${SALOME_HUB_CRM_BASE_COTACAO_FIELD_ID:320209}
+      rota-customfield-id: ${SALOME_HUB_CRM_ROTA_FIELD_ID:320206}
+      tipo-carga-customfield-id: ${SALOME_HUB_CRM_TIPO_CARGA_FIELD_ID:320208}
+      volume-customfield-id: ${SALOME_HUB_CRM_VOLUME_FIELD_ID:320207}
