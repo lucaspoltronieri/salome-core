@@ -21,11 +21,13 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 @ConditionalOnProperty(prefix = "salome.hub-crm", name = "enabled", havingValue = "true")
 public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     private static final ZoneOffset SAO_PAULO_OFFSET = ZoneOffset.ofHours(-3);
+    private static final JsonMapper JSON = JsonMapper.builder().build();
     private final RestClient client;
     private final HubCrmProperties properties;
     private final Map<LossReason, Long> lostReasonIds = new EnumMap<>(LossReason.class);
@@ -246,13 +248,26 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     private JsonNode post(String path, Object payload) {
-        return client.post().uri(path).contentType(MediaType.APPLICATION_JSON)
-                .body(payload).retrieve().body(JsonNode.class);
+        String response = client.post().uri(path).contentType(MediaType.APPLICATION_JSON)
+                .body(payload).retrieve().body(String.class);
+        return parse(response);
     }
 
     private JsonNode put(String path, Object payload) {
-        return client.put().uri(path).contentType(MediaType.APPLICATION_JSON)
-                .body(payload).retrieve().body(JsonNode.class);
+        String response = client.put().uri(path).contentType(MediaType.APPLICATION_JSON)
+                .body(payload).retrieve().body(String.class);
+        return parse(response);
+    }
+
+    private JsonNode parse(String response) {
+        if (response == null || response.isBlank()) {
+            throw new IllegalStateException("Resposta vazia do ArpaSuite");
+        }
+        try {
+            return JSON.readTree(response);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Resposta inválida do ArpaSuite", exception);
+        }
     }
 
     private long extractId(JsonNode response) {
