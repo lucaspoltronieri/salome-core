@@ -78,6 +78,14 @@ public class HubCrmStore {
                 """, truncate(error.getMessage()), cnpj);
     }
 
+    public void markClientWithoutContact(String cnpj, String hash) {
+        jdbc.update("""
+                UPDATE hub_crm_client SET snapshot_hash=?, sync_status='SEM_CONTATO', attempt_count=0,
+                  next_attempt_at=NULL, last_error='Sem contato pessoal; não criar pessoa ou card',
+                  last_synced_at=NOW() WHERE cnpj=?
+                """, hash, cnpj);
+    }
+
     public boolean canRetryClient(String cnpj) {
         Boolean result = jdbc.queryForObject("""
                 SELECT next_attempt_at IS NULL OR next_attempt_at<=NOW()

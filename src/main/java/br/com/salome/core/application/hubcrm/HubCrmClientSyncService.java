@@ -70,7 +70,8 @@ public class HubCrmClientSyncService {
             String hash = clientHash(client);
             store.discoverClient(client, normalizedName, hash);
             ClientIntegration current = store.findClient(cnpj).orElseThrow();
-            if ("INTEGRADO".equals(current.status()) && hash.equals(current.snapshotHash())) {
+            if (("INTEGRADO".equals(current.status()) || "SEM_CONTATO".equals(current.status()))
+                    && hash.equals(current.snapshotHash())) {
                 skipped++;
                 continue;
             }
@@ -111,6 +112,11 @@ public class HubCrmClientSyncService {
 
     private ClientResult process(ClientWork item) {
         try {
+            if (!HubCrmNormalization.validContactName(
+                    HubCrmNormalization.contactName(item.client().contactName()))) {
+                store.markClientWithoutContact(item.cnpj(), item.hash());
+                return new ClientResult(0, 0, 0);
+            }
             boolean wasIntegrated = item.current().dealId() != null;
             integrate(item.client(), item.current(), item.hash(), item.userId());
             return wasIntegrated ? new ClientResult(0, 1, 0) : new ClientResult(1, 0, 0);
