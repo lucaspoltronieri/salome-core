@@ -42,7 +42,10 @@ public final class HubCrmNormalization {
 
     public static boolean validContactName(String value) {
         String name = contactName(value);
-        return !valueIsBlank(name) && !normalizedText(name).equals("ERICK");
+        String digitsOnly = name.replaceAll("[^0-9]", "");
+        boolean numericOnly = !valueIsBlank(name) && digitsOnly.length() >= 7
+                && name.replaceAll("[0-9 .()\\-]", "").isBlank();
+        return !valueIsBlank(name) && !numericOnly && !normalizedText(name).equals("ERICK");
     }
 
     /**
