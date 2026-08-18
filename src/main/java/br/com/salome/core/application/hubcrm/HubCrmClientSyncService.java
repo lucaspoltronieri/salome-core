@@ -124,9 +124,12 @@ public class HubCrmClientSyncService {
 
     private void integrate(LegacyCrmClient client, ClientIntegration current, String hash, long userId) {
         long organizationId;
-        long peopleId;
+        Long peopleId;
         long dealId;
         String contactName = HubCrmNormalization.contactName(client.contactName());
+        boolean hasContact = HubCrmNormalization.validContactName(contactName)
+                || HubCrmNormalization.validEmail(client.contactEmail())
+                || !preferredPhone(client.contactPhone(), client.phone()).isBlank();
         String personName = HubCrmNormalization.validContactName(contactName)
                 ? contactName : HubCrmNormalization.shortName(client.legalName());
         String phone = preferredPhone(client.contactPhone(), client.phone());
@@ -135,8 +138,8 @@ public class HubCrmClientSyncService {
             organizationId = current.organizationId();
             dealId = current.dealId();
             arpa.updateOrganization(organizationId, client.legalName());
-            peopleId = arpa.createPerson(personName, phone, organizationId);
-            arpa.updatePerson(peopleId, personName, phone, organizationId);
+            peopleId = hasContact ? arpa.createPerson(personName, phone, organizationId) : null;
+            if (peopleId != null) arpa.updatePerson(peopleId, personName, phone, organizationId);
             arpa.linkDeal(dealId, organizationId, peopleId, userId);
             arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
         } else {
@@ -150,13 +153,19 @@ public class HubCrmClientSyncService {
                 arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
             } else {
                 organizationId = arpa.createOrganization(client.legalName());
-                peopleId = arpa.createPerson(personName, phone, organizationId);
+                peopleId = hasContact ? arpa.createPerson(personName, phone, organizationId) : null;
                 if (external.isPresent()) {
                     dealId = external.get().id();
-                    arpa.linkDeal(dealId, organizationId, peopleId, userId);
-                    arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
+                    if (peopleId != null) arpa.linkDeal(dealId, organizationId, peopleId, userId);
+                    if (peopleId == null) {
+                        arpa.updatePortfolioDealWithoutPerson(dealId, client, organizationId, userId);
+                    } else {
+                        arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
+                    }
                 } else {
-                    dealId = arpa.createPortfolioDeal(client, organizationId, peopleId, userId);
+                    dealId = peopleId == null
+                            ? arpa.createPortfolioDealWithoutPerson(client, organizationId, userId)
+                            : arpa.createPortfolioDeal(client, organizationId, peopleId, userId);
                 }
             }
         }

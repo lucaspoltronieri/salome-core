@@ -142,12 +142,37 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
+    public long createPortfolioDealWithoutPerson(LegacyCrmClient item, long organizationId, long userId) {
+        Map<String, Object> payload = baseDealWithoutPerson(
+                HubCrmNormalization.shortName(item.legalName()), organizationId, userId,
+                properties.arpa().carteiraStageId(), BigDecimal.ZERO);
+        payload.put("details", "Cliente destinatário que não paga frete no legado");
+        payload.put("customfields", clientFields(item));
+        try {
+            return extractId(post("/deals", payload));
+        } catch (InvalidArpaResponseException exception) {
+            return findLatestOpenDealByCnpj(item.cnpj()).map(ArpaDeal::id).orElseThrow(() -> exception);
+        }
+    }
+
+    @Override
     public void updatePortfolioDeal(long dealId, LegacyCrmClient item, long organizationId,
             long peopleId, long userId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("title", HubCrmNormalization.shortName(item.legalName()));
         payload.put("userId", userId);
         payload.put("peopleId", peopleId);
+        payload.put("organizationId", organizationId);
+        payload.put("customfields", clientFields(item));
+        put("/deals/" + dealId, payload);
+    }
+
+    @Override
+    public void updatePortfolioDealWithoutPerson(long dealId, LegacyCrmClient item,
+            long organizationId, long userId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("title", HubCrmNormalization.shortName(item.legalName()));
+        payload.put("userId", userId);
         payload.put("organizationId", organizationId);
         payload.put("customfields", clientFields(item));
         put("/deals/" + dealId, payload);
@@ -238,6 +263,18 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         payload.put("price", amount(price));
         payload.put("userId", userId);
         payload.put("peopleId", peopleId);
+        payload.put("organizationId", organizationId);
+        payload.put("pipeId", properties.arpa().pipeId());
+        payload.put("stageId", stageId);
+        return payload;
+    }
+
+    private Map<String, Object> baseDealWithoutPerson(String title, long organizationId, long userId,
+            long stageId, BigDecimal price) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("title", title);
+        payload.put("price", amount(price));
+        payload.put("userId", userId);
         payload.put("organizationId", organizationId);
         payload.put("pipeId", properties.arpa().pipeId());
         payload.put("stageId", stageId);

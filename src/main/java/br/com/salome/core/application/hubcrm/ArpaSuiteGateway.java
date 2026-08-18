@@ -15,8 +15,11 @@ public interface ArpaSuiteGateway {
     void updatePerson(long peopleId, String name, String phone, long organizationId);
     void linkDeal(long dealId, long organizationId, long peopleId, long userId);
     long createPortfolioDeal(LegacyCrmClient client, long organizationId, long peopleId, long userId);
+    long createPortfolioDealWithoutPerson(LegacyCrmClient client, long organizationId, long userId);
     void updatePortfolioDeal(long dealId, LegacyCrmClient client, long organizationId,
             long peopleId, long userId);
+    void updatePortfolioDealWithoutPerson(long dealId, LegacyCrmClient client,
+            long organizationId, long userId);
     long createQuoteDeal(LegacyQuote quote, long organizationId, long peopleId, long userId);
     void updateDealFromQuote(long dealId, LegacyQuote quote, long userId);
     long addAnnotation(long dealId, String text);

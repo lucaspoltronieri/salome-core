@@ -61,7 +61,7 @@ public class HubCrmStore {
         }
     }
 
-    public void markClientIntegrated(String cnpj, long organizationId, long peopleId,
+    public void markClientIntegrated(String cnpj, long organizationId, Long peopleId,
             long dealId, long userId, String hash) {
         jdbc.update("""
                 UPDATE hub_crm_client SET organization_id=?, people_id=?, deal_id=?,
