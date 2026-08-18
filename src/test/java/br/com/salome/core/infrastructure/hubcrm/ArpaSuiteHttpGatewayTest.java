@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class ArpaSuiteHttpGatewayTest {
@@ -42,7 +43,9 @@ class ArpaSuiteHttpGatewayTest {
     @Test
     void leJsonDeBuscaDeCardsQueRespondeComoTexto() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> query = new AtomicReference<>();
         server.createContext("/api/deals", exchange -> {
+            query.set(exchange.getRequestURI().getRawQuery());
             byte[] response = "{\"data\":[]}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/plain;charset=utf-8");
             exchange.sendResponseHeaders(200, response.length);
@@ -55,6 +58,9 @@ class ArpaSuiteHttpGatewayTest {
                     properties("http://127.0.0.1:" + server.getAddress().getPort()));
 
             assertThat(gateway.findLatestOpenDealByCnpj("19076738000160")).isEmpty();
+            assertThat(query.get())
+                    .contains("pipe=1", "status=open", "customfields=6:19076738000160")
+                    .doesNotContain("orderColumn", "orderDirection");
         } finally {
             server.stop(0);
         }

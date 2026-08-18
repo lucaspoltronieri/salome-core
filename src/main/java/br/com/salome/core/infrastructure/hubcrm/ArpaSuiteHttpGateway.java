@@ -69,11 +69,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     public Optional<ArpaDeal> findLatestOpenDealByCnpj(String cnpj) {
         long fieldId = properties.arpa().cnpjCustomfieldId();
         JsonNode response = get("/deals?perPage=100&pipe=" + properties.arpa().pipeId()
-                + "&status=open&orderColumn=created_at&orderDirection=desc&customfields="
-                + fieldId + "%3A" + cnpj);
+                + "&status=open&customfields="
+                + fieldId + ":" + cnpj);
         return dataEntries(response).stream()
                 .filter(item -> item.path("status").asText().equalsIgnoreCase("open"))
-                .max(Comparator.comparing(item -> item.path("createdAt").asText("")))
+                .max(Comparator.comparing(this::createdAtValue))
                 .map(item -> new ArpaDeal(item.path("id").asLong(), nullableLong(item, "organizationId"),
                         nullableLong(item, "peopleId"), nullableLong(item, "userId")));
     }
@@ -292,6 +292,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     private Long nullableLong(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isMissingNode() || value.isNull() || !value.canConvertToLong() ? null : value.asLong();
+    }
+
+    private String createdAtValue(JsonNode item) {
+        String value = item.path("createdAt").asText("");
+        return value.isBlank() ? item.path("created_at").asText("") : value;
     }
 
     private double amount(BigDecimal value) {
