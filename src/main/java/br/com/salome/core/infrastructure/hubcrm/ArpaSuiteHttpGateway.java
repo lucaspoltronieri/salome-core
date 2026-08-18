@@ -31,13 +31,13 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     private final Map<LossReason, Long> lostReasonIds = new EnumMap<>(LossReason.class);
     private final AtomicReference<Long> whatsappChannelId = new AtomicReference<>();
 
-    public ArpaSuiteHttpGateway(RestClient.Builder builder, HubCrmProperties properties) {
+    public ArpaSuiteHttpGateway(HubCrmProperties properties) {
         this.properties = properties;
         String apiKey = properties.arpa().apiKey();
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("SALOME_HUB_CRM_ARPA_API_KEY não configurada");
         }
-        this.client = builder
+        this.client = RestClient.builder()
                 .baseUrl(stripTrailingSlash(properties.arpa().baseUrl()) + "/api")
                 .defaultHeader("X-API-Key", apiKey)
                 .build();
