@@ -106,18 +106,6 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
-    public Optional<ArpaDeal> findLatestPortfolioDealByCnpj(String cnpj) {
-        long fieldId = properties.arpa().cnpjCustomfieldId();
-        JsonNode response = get("/deals?perPage=100&pipe=" + properties.arpa().pipeId()
-                + "&status=open&customfields=" + fieldId + ":" + cnpj);
-        return dataEntries(response).stream()
-                .filter(item -> item.path("status").asText().equalsIgnoreCase("open"))
-                .filter(item -> item.path("stageId").asLong(0) == properties.arpa().carteiraStageId())
-                .max(Comparator.comparing(this::createdAtValue))
-                .map(this::dealFrom);
-    }
-
-    @Override
     public long createOrganization(String legalName) {
         Optional<Long> existing = findOrganizationId(legalName);
         if (existing.isPresent()) return existing.get();

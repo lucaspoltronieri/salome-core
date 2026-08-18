@@ -37,7 +37,7 @@ class HubCrmQuoteSyncServiceTest {
         arpa = mock(ArpaSuiteGateway.class);
         when(store.checkpoint(anyString(), anyLong())).thenReturn(0L);
         when(store.trackedQuoteIds()).thenReturn(List.of());
-        when(arpa.findLatestPortfolioDealByCnpj(anyString()))
+        when(arpa.findLatestOpenDealByCnpj(anyString()))
                 .thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(99, 77L, 88L, 4L)));
         when(arpa.addAnnotation(anyLong(), anyString())).thenReturn(123L);
         when(arpa.hasWhatsappChannel()).thenReturn(false);
@@ -82,7 +82,7 @@ class HubCrmQuoteSyncServiceTest {
         verify(store).bindQuote(quote.id(), 77, 88, 123, 4);
         verify(arpa).updateDealFromQuote(123, quote, 4);
         verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
-        verify(arpa, never()).findLatestPortfolioDealByCnpj(anyString());
+        verify(arpa, never()).findLatestOpenDealByCnpj(anyString());
     }
 
     @Test
@@ -101,6 +101,21 @@ class HubCrmQuoteSyncServiceTest {
         verify(arpa).updateDealFromQuote(321, quote, 4);
         verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
         verify(arpa, never()).findDealByLegacyQuoteId(anyLong());
+    }
+
+    @Test
+    void naoReaproveitaCardAbertoAmarradoAOutraCotacao() {
+        LegacyQuote quote = quote("ABERTA", Map.of());
+        prepare(quote);
+        when(store.dealBoundToOtherQuote(99, quote.id())).thenReturn(true);
+        when(arpa.createOrganization(anyString())).thenReturn(77L);
+        when(arpa.createPerson(anyString(), anyString(), anyLong())).thenReturn(88L);
+        when(arpa.createQuoteDeal(quote, 77, 88, 4)).thenReturn(456L);
+
+        service.syncQuotes();
+
+        verify(store).bindQuote(quote.id(), 77, 88, 456, 4);
+        verify(arpa).updateDealFromQuote(456, quote, 4);
     }
 
     @Test

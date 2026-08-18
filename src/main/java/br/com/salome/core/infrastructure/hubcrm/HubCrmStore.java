@@ -174,6 +174,14 @@ public class HubCrmStore {
                 """, organizationId, peopleId, dealId, userId, legacyQuoteId);
     }
 
+    public boolean dealBoundToOtherQuote(long dealId, long legacyQuoteId) {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM hub_crm_quote
+                WHERE deal_id=? AND legacy_quote_id<>?
+                """, Long.class, dealId, legacyQuoteId);
+        return count != null && count > 0;
+    }
+
     public void markQuoteIntegrated(LegacyQuote quote, long organizationId, long peopleId,
             long dealId, long userId, String hash, String whatsappStatus) {
         jdbc.update("""

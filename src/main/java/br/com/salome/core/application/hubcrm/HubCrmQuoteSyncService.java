@@ -90,7 +90,10 @@ public class HubCrmQuoteSyncService {
         var storedDeal = current.dealId() == null ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
                 : arpa.findDeal(current.dealId());
         var quoteDeal = storedDeal.isPresent() ? storedDeal : arpa.findDealByLegacyQuoteId(quote.id());
-        var external = quoteDeal.isPresent() ? quoteDeal : arpa.findLatestPortfolioDealByCnpj(quote.payerCnpj());
+        var openDeal = quoteDeal.isPresent() ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
+                : arpa.findLatestOpenDealByCnpj(quote.payerCnpj())
+                        .filter(deal -> !store.dealBoundToOtherQuote(deal.id(), quote.id()));
+        var external = quoteDeal.isPresent() ? quoteDeal : openDeal;
         long organizationId;
         long peopleId;
         long dealId;

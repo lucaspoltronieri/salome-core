@@ -67,6 +67,8 @@ Alteracoes posteriores da mesma cotacao sempre atualizam esse card e so geram
 uma nova timeline quando o hash dos dados mudou. Antes de criar um card, o Hub
 tambem procura o `idCotacao` no campo personalizado `Base de Cotacao`, para
 recuperar o vinculo caso uma chamada externa tenha concluido antes da gravacao
-local. Um novo card de cotacao so pode ser criado para outro `idCotacao`; a
-busca apenas por CNPJ somente pode reaproveitar um card que ainda esteja no
-estagio Carteira.
+local. Um novo card de cotacao so pode ser criado para outro `idCotacao`. Na
+ausencia de vinculo pelo ID, a busca por CNPJ pode reaproveitar o card aberto
+mais recente em qualquer estagio do funil (Carteira, Lead, Contato,
+Diagnostico, Negociacao ou outro). O card nao sera reaproveitado quando ja
+estiver amarrado no banco do Hub a outra cotacao.
