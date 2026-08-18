@@ -42,6 +42,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         this.client = RestClient.builder()
                 .baseUrl(stripTrailingSlash(properties.arpa().baseUrl()) + "/api")
                 .defaultHeader("X-API-Key", apiKey)
+                .defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
 

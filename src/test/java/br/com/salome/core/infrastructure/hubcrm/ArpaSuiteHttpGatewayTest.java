@@ -25,6 +25,7 @@ class ArpaSuiteHttpGatewayTest {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<byte[]> requestBody = new AtomicReference<>();
         AtomicReference<Long> contentLength = new AtomicReference<>();
+        AtomicReference<String> accept = new AtomicReference<>();
         server.createContext("/api/organizations", exchange -> {
             if ("GET".equals(exchange.getRequestMethod())) {
                 byte[] response = "{\"data\":[]}".getBytes(StandardCharsets.UTF_8);
@@ -36,6 +37,7 @@ class ArpaSuiteHttpGatewayTest {
             }
             requestBody.set(exchange.getRequestBody().readAllBytes());
             contentLength.set(Long.parseLong(exchange.getRequestHeaders().getFirst("Content-Length")));
+            accept.set(exchange.getRequestHeaders().getFirst("Accept"));
             byte[] response = "{\"data\":{\"id\":987}}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/plain;charset=utf-8");
             exchange.sendResponseHeaders(200, response.length);
@@ -50,6 +52,7 @@ class ArpaSuiteHttpGatewayTest {
             assertThat(gateway.createOrganization("CLIENTE SALOMÉ")).isEqualTo(987L);
             assertThat(requestBody.get()).hasSize(contentLength.get().intValue());
             assertThat(new String(requestBody.get(), StandardCharsets.UTF_8)).contains("CLIENTE SALOMÉ");
+            assertThat(accept.get()).contains("application/json");
         } finally {
             server.stop(0);
         }
