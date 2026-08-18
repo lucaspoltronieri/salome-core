@@ -1,10 +1,13 @@
 package br.com.salome.core.application.hubcrm;
 
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
+import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -14,6 +17,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +25,8 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(prefix = "salome.hub-crm", name = "enabled", havingValue = "true")
 public class HubCrmQuotePdfService {
     private static final float MARGIN = 46;
+    private static final String LOGO_RESOURCE = "/hub-crm/logo-salome.png";
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private final HubCrmLegacyRepository legacy;
 
     public HubCrmQuotePdfService(HubCrmLegacyRepository legacy) {
@@ -30,18 +36,24 @@ public class HubCrmQuotePdfService {
     public byte[] generate(long quoteId) {
         LegacyQuote quote = legacy.findQuotesByIds(List.of(quoteId)).stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Cotação não encontrada: " + quoteId));
+        return generate(quote);
+    }
+
+    byte[] generate(LegacyQuote quote) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDImageXObject logo = loadLogo(document);
             List<String> lines = content(quote);
             int cursor = 0;
             while (cursor < lines.size()) {
                 PDPage page = new PDPage(PDRectangle.A4);
                 document.addPage(page);
                 try (PDPageContentStream stream = new PDPageContentStream(document, page)) {
-                    drawHeader(stream, quote.id());
-                    float y = 755;
+                    drawHeader(stream, logo, quote.id());
+                    float y = 704;
                     while (cursor < lines.size() && y > 55) {
                         String line = lines.get(cursor++);
-                        boolean section = line.endsWith(":") && !line.contains("R$");
+                        boolean section = (line.endsWith(":") && !line.contains("R$"))
+                                || line.startsWith("TOTAL DO FRETE:");
                         drawText(stream, line, MARGIN, y, section ? 11 : 9,
                                 section ? Standard14Fonts.FontName.HELVETICA_BOLD
                                         : Standard14Fonts.FontName.HELVETICA);
@@ -54,14 +66,16 @@ public class HubCrmQuotePdfService {
             document.save(output);
             return output.toByteArray();
         } catch (IOException exception) {
-            throw new IllegalStateException("Não foi possível gerar o PDF da cotação " + quoteId, exception);
+            throw new IllegalStateException("Não foi possível gerar o PDF da cotação " + quote.id(), exception);
         }
     }
 
     private List<String> content(LegacyQuote q) {
         List<String> lines = new ArrayList<>();
         lines.add("DADOS DA COTAÇÃO:");
-        lines.add("Data: " + q.createdDate() + "   Responsável: " + value(q.responsible()));
+        lines.add("Número da cotação no legado: " + q.id());
+        lines.add("Data: " + (q.createdDate() == null ? "Não informada" : DATE_FORMAT.format(q.createdDate()))
+                + "   Responsável: " + value(q.responsible()));
         lines.add("Tipo de pagamento: " + value(q.paymentType()));
         lines.add("");
         lines.add("REMETENTE:");
@@ -85,14 +99,26 @@ public class HubCrmQuotePdfService {
         return lines;
     }
 
-    private void drawHeader(PDPageContentStream stream, long quoteId) throws IOException {
-        stream.setNonStrokingColor(155, 18, 37);
-        stream.addRect(0, 792, PDRectangle.A4.getWidth(), 50);
+    private void drawHeader(PDPageContentStream stream, PDImageXObject logo, long quoteId) throws IOException {
+        float logoWidth = 178;
+        float logoHeight = logoWidth * logo.getHeight() / logo.getWidth();
+        stream.drawImage(logo, MARGIN, 750, logoWidth, logoHeight);
+
+        stream.setNonStrokingColor(new Color(155, 18, 37));
+        drawText(stream, "COTAÇÃO DE FRETE", 338, 805, 14, Standard14Fonts.FontName.HELVETICA_BOLD);
+        drawText(stream, "Nº " + quoteId, 338, 773, 24, Standard14Fonts.FontName.HELVETICA_BOLD);
+        stream.addRect(MARGIN, 733, PDRectangle.A4.getWidth() - (2 * MARGIN), 3);
         stream.fill();
-        stream.setNonStrokingColor(255, 255, 255);
-        drawText(stream, "EXPRESSO SALOMÉ", MARGIN, 815, 16, Standard14Fonts.FontName.HELVETICA_BOLD);
-        drawText(stream, "COTAÇÃO DE FRETE Nº " + quoteId, 350, 815, 11, Standard14Fonts.FontName.HELVETICA_BOLD);
-        stream.setNonStrokingColor(30, 41, 59);
+        stream.setNonStrokingColor(new Color(30, 41, 59));
+    }
+
+    private PDImageXObject loadLogo(PDDocument document) throws IOException {
+        try (InputStream input = getClass().getResourceAsStream(LOGO_RESOURCE)) {
+            if (input == null) {
+                throw new IOException("Logotipo não encontrado no classpath: " + LOGO_RESOURCE);
+            }
+            return PDImageXObject.createFromByteArray(document, input.readAllBytes(), "logo-salome");
+        }
     }
 
     private void drawText(PDPageContentStream stream, String text, float x, float y, float size,
