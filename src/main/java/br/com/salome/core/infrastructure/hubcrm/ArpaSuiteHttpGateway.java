@@ -249,15 +249,25 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     private JsonNode post(String path, Object payload) {
+        byte[] body = jsonBytes(payload);
         String response = client.post().uri(path).contentType(MediaType.APPLICATION_JSON)
-                .body(payload).retrieve().body(String.class);
+                .contentLength(body.length).body(body).retrieve().body(String.class);
         return parse(response);
     }
 
     private JsonNode put(String path, Object payload) {
+        byte[] body = jsonBytes(payload);
         String response = client.put().uri(path).contentType(MediaType.APPLICATION_JSON)
-                .body(payload).retrieve().body(String.class);
+                .contentLength(body.length).body(body).retrieve().body(String.class);
         return parse(response);
+    }
+
+    private byte[] jsonBytes(Object payload) {
+        try {
+            return JSON.writeValueAsBytes(payload);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Não foi possível serializar a requisição do ArpaSuite", exception);
+        }
     }
 
     private JsonNode parse(String response) {

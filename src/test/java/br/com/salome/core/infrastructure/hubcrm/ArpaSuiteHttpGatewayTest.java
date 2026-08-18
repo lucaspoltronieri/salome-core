@@ -22,7 +22,11 @@ class ArpaSuiteHttpGatewayTest {
     @Test
     void leJsonDeEndpointDeEscritaQueRespondeComoTexto() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<byte[]> requestBody = new AtomicReference<>();
+        AtomicReference<Long> contentLength = new AtomicReference<>();
         server.createContext("/api/organizations", exchange -> {
+            requestBody.set(exchange.getRequestBody().readAllBytes());
+            contentLength.set(Long.parseLong(exchange.getRequestHeaders().getFirst("Content-Length")));
             byte[] response = "{\"data\":{\"id\":987}}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/plain;charset=utf-8");
             exchange.sendResponseHeaders(200, response.length);
@@ -34,7 +38,9 @@ class ArpaSuiteHttpGatewayTest {
             var gateway = new ArpaSuiteHttpGateway(
                     properties("http://127.0.0.1:" + server.getAddress().getPort()));
 
-            assertThat(gateway.createOrganization("CLIENTE TESTE")).isEqualTo(987L);
+            assertThat(gateway.createOrganization("CLIENTE SALOMÉ")).isEqualTo(987L);
+            assertThat(requestBody.get()).hasSize(contentLength.get().intValue());
+            assertThat(new String(requestBody.get(), StandardCharsets.UTF_8)).contains("CLIENTE SALOMÉ");
         } finally {
             server.stop(0);
         }
