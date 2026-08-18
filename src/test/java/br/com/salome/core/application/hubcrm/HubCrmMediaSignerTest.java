@@ -6,9 +6,25 @@ import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.MapPropertySource;
 
 class HubCrmMediaSignerTest {
+    @Test
+    void springSelecionaConstrutorDeProducao() {
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.getEnvironment().getPropertySources().addFirst(
+                    new MapPropertySource("hub-crm-test", Map.of("salome.hub-crm.enabled", "true")));
+            context.registerBean(HubCrmProperties.class, this::properties);
+            context.register(HubCrmMediaSigner.class);
+            context.refresh();
+
+            assertThat(context.getBean(HubCrmMediaSigner.class)).isNotNull();
+        }
+    }
+
     @Test
     void assinaturaValidaAteExpirarENaoAceitaOutraCotacao() {
         HubCrmProperties properties = properties();

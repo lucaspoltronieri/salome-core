@@ -9,6 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,7 @@ public class HubCrmMediaSigner {
     private final HubCrmProperties properties;
     private final Clock clock;
 
+    @Autowired
     public HubCrmMediaSigner(HubCrmProperties properties) {
         this(properties, Clock.systemUTC());
     }
