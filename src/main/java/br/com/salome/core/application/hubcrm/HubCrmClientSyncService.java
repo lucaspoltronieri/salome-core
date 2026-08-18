@@ -39,8 +39,19 @@ public class HubCrmClientSyncService {
         return syncEligible(100);
     }
 
+    public SyncResult syncClient(long legacyClientId) {
+        List<LegacyCrmClient> source = legacy.findEligibleClients(properties.initialCutoffClientId()).stream()
+                .filter(client -> client.legacyClientId() == legacyClientId)
+                .toList();
+        return syncSource(source, 1);
+    }
+
     SyncResult syncEligible(int maximum) {
         List<LegacyCrmClient> source = legacy.findEligibleClients(properties.initialCutoffClientId());
+        return syncSource(source, maximum);
+    }
+
+    private SyncResult syncSource(List<LegacyCrmClient> source, int maximum) {
         Set<String> cnpjs = new HashSet<>();
         Set<String> legalNames = new HashSet<>();
         int integrated = 0;

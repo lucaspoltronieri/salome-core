@@ -104,6 +104,9 @@ public class HubCrmWebController {
     @ResponseBody
     public Map<String, Object> reprocess(@RequestParam String tipo, @RequestParam long id) {
         store.reprocess(tipo, id);
-        return Map.of("ok", true, "tipo", tipo, "id", id);
+        Object result = "CLIENTE".equalsIgnoreCase(tipo)
+                ? clients.syncClient(id)
+                : Map.of("status", "PENDENTE");
+        return Map.of("ok", true, "tipo", tipo, "id", id, "resultado", result);
     }
 }
