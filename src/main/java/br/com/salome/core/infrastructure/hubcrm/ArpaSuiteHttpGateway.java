@@ -292,8 +292,9 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         return "";
     }
 
-    private String normalized(String value) {
-        return HubCrmNormalization.normalizedText(value);
+    String normalized(String value) {
+        return HubCrmNormalization.normalizedText(value)
+                .replace("CARGA EPECIAL DEDICADA", "CARGA ESPECIAL DEDICADA");
     }
 
     private String stripTrailingSlash(String value) {

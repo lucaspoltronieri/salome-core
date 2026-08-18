@@ -47,6 +47,10 @@ valor `Sim`; zero ou mais de um enviam a cotacao para revisao.
 | `naoAprovacaoInadimplencia` | Inadimplência |
 | `naoAprovacaoConcorrente` | Perda para concorrente |
 
+No catalogo atual do ArpaSuite, `Carga especial/dedicada` esta cadastrado com
+o erro de digitacao `Carga epecial/dedicada`. O adaptador aceita esse alias,
+mas a regra de negocio e as anotacoes mantem a grafia correta.
+
 `naoAprovacaoQualidade` e `naoAprovacaoSemMotivo` sao campos antigos e ficam
 fora da automacao.
 
