@@ -2,6 +2,7 @@ package br.com.salome.core.infrastructure.hubcrm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.salome.core.application.hubcrm.ArpaSuiteGateway;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -79,6 +80,32 @@ class ArpaSuiteHttpGatewayTest {
             assertThat(query.get())
                     .contains("pipe=1", "status=open", "customfields=6:19076738000160")
                     .doesNotContain("orderColumn", "orderDirection");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void buscaCardPeloIdDaCotacaoNoCampoBaseCotacao() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> query = new AtomicReference<>();
+        server.createContext("/api/deals", exchange -> {
+            query.set(exchange.getRequestURI().getRawQuery());
+            byte[] response = "{\"data\":[{\"id\":555,\"organizationId\":77,\"peopleId\":88}]}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+
+            assertThat(gateway.findDealByLegacyQuoteId(15591)).get()
+                    .extracting(ArpaSuiteGateway.ArpaDeal::id).isEqualTo(555L);
+            assertThat(query.get()).contains("pipe=1", "customfields=10:15591");
         } finally {
             server.stop(0);
         }

@@ -60,3 +60,13 @@ Cada cliente e unico por CNPJ e cada cotacao e unica por `idCotacao`. O Hub
 guarda IDs externos, hash do snapshot e eventos com chave unica no schema
 `salome_hub_crm`. Reinicios e repeticoes do polling nao podem criar novamente
 uma organizacao, pessoa, card, timeline ou mensagem ja confirmada.
+
+O vinculo entre as pontas e persistido em `hub_crm_quote` imediatamente depois
+de localizar ou criar o card: `legacy_quote_id` (unico) aponta para `deal_id`.
+Alteracoes posteriores da mesma cotacao sempre atualizam esse card e so geram
+uma nova timeline quando o hash dos dados mudou. Antes de criar um card, o Hub
+tambem procura o `idCotacao` no campo personalizado `Base de Cotacao`, para
+recuperar o vinculo caso uma chamada externa tenha concluido antes da gravacao
+local. Um novo card de cotacao so pode ser criado para outro `idCotacao`; a
+busca apenas por CNPJ somente pode reaproveitar um card que ainda esteja no
+estagio Carteira.

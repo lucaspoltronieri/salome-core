@@ -33,7 +33,7 @@ public class HubCrmQuoteSyncService {
         this.mediaSigner = mediaSigner;
     }
 
-    public QuoteSyncResult syncQuotes() {
+    public synchronized QuoteSyncResult syncQuotes() {
         long checkpoint = store.checkpoint("last_quote_id", 0);
         Map<Long, LegacyQuote> quotes = new LinkedHashMap<>();
         legacy.findQuotesAfter(checkpoint).forEach(quote -> quotes.put(quote.id(), quote));
@@ -89,7 +89,8 @@ public class HubCrmQuoteSyncService {
         long userId = owner(quote.responsible());
         var storedDeal = current.dealId() == null ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
                 : arpa.findDeal(current.dealId());
-        var external = storedDeal.isPresent() ? storedDeal : arpa.findLatestOpenDealByCnpj(quote.payerCnpj());
+        var quoteDeal = storedDeal.isPresent() ? storedDeal : arpa.findDealByLegacyQuoteId(quote.id());
+        var external = quoteDeal.isPresent() ? quoteDeal : arpa.findLatestPortfolioDealByCnpj(quote.payerCnpj());
         long organizationId;
         long peopleId;
         long dealId;
@@ -108,6 +109,9 @@ public class HubCrmQuoteSyncService {
                 dealId = arpa.createQuoteDeal(quote, organizationId, peopleId, userId);
             }
         }
+        // O vínculo é persistido antes das atualizações e da timeline. Assim, uma
+        // falha posterior nunca transforma a mesma cotação em um novo card no retry.
+        store.bindQuote(quote.id(), organizationId, peopleId, dealId, userId);
         arpa.updateOrganization(organizationId, quote.payerName());
         arpa.updatePerson(peopleId, HubCrmNormalization.shortName(quote.payerName()), quote.payerPhone(), organizationId);
         arpa.updateDealFromQuote(dealId, quote, userId);

@@ -166,6 +166,14 @@ public class HubCrmStore {
                 """, Long.class);
     }
 
+    public void bindQuote(long legacyQuoteId, long organizationId, long peopleId,
+            long dealId, long userId) {
+        jdbc.update("""
+                UPDATE hub_crm_quote SET organization_id=?, people_id=?, deal_id=?, assigned_user_id=?,
+                  last_synced_at=NOW() WHERE legacy_quote_id=?
+                """, organizationId, peopleId, dealId, userId, legacyQuoteId);
+    }
+
     public void markQuoteIntegrated(LegacyQuote quote, long organizationId, long peopleId,
             long dealId, long userId, String hash, String whatsappStatus) {
         jdbc.update("""

@@ -96,6 +96,28 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
+    public Optional<ArpaDeal> findDealByLegacyQuoteId(long legacyQuoteId) {
+        long fieldId = properties.arpa().baseCotacaoCustomfieldId();
+        JsonNode response = get("/deals?perPage=100&pipe=" + properties.arpa().pipeId()
+                + "&customfields=" + fieldId + ":" + legacyQuoteId);
+        return dataEntries(response).stream()
+                .max(Comparator.comparing(this::createdAtValue))
+                .map(this::dealFrom);
+    }
+
+    @Override
+    public Optional<ArpaDeal> findLatestPortfolioDealByCnpj(String cnpj) {
+        long fieldId = properties.arpa().cnpjCustomfieldId();
+        JsonNode response = get("/deals?perPage=100&pipe=" + properties.arpa().pipeId()
+                + "&status=open&customfields=" + fieldId + ":" + cnpj);
+        return dataEntries(response).stream()
+                .filter(item -> item.path("status").asText().equalsIgnoreCase("open"))
+                .filter(item -> item.path("stageId").asLong(0) == properties.arpa().carteiraStageId())
+                .max(Comparator.comparing(this::createdAtValue))
+                .map(this::dealFrom);
+    }
+
+    @Override
     public long createOrganization(String legalName) {
         Optional<Long> existing = findOrganizationId(legalName);
         if (existing.isPresent()) return existing.get();
@@ -203,7 +225,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         try {
             return extractId(post("/deals", payload));
         } catch (InvalidArpaResponseException exception) {
-            return findLatestOpenDealByCnpj(quote.payerCnpj()).map(ArpaDeal::id).orElseThrow(() -> exception);
+            return findDealByLegacyQuoteId(quote.id()).map(ArpaDeal::id).orElseThrow(() -> exception);
         }
     }
 
@@ -414,6 +436,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     private String createdAtValue(JsonNode item) {
         String value = item.path("createdAt").asText("");
         return value.isBlank() ? item.path("created_at").asText("") : value;
+    }
+
+    private ArpaDeal dealFrom(JsonNode item) {
+        return new ArpaDeal(item.path("id").asLong(), nullableLong(item, "organizationId"),
+                nullableLong(item, "peopleId"), nullableLong(item, "userId"));
     }
 
     private double amount(BigDecimal value) {

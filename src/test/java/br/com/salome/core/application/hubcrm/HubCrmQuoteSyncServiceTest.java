@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,7 +37,7 @@ class HubCrmQuoteSyncServiceTest {
         arpa = mock(ArpaSuiteGateway.class);
         when(store.checkpoint(anyString(), anyLong())).thenReturn(0L);
         when(store.trackedQuoteIds()).thenReturn(List.of());
-        when(arpa.findLatestOpenDealByCnpj(anyString()))
+        when(arpa.findLatestPortfolioDealByCnpj(anyString()))
                 .thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(99, 77L, 88L, 4L)));
         when(arpa.addAnnotation(anyLong(), anyString())).thenReturn(123L);
         when(arpa.hasWhatsappChannel()).thenReturn(false);
@@ -54,6 +55,52 @@ class HubCrmQuoteSyncServiceTest {
         verify(arpa).updateDealFromQuote(99, quote, 4);
         verify(arpa, never()).markWon(anyLong(), any());
         verify(arpa, never()).markLost(anyLong(), any(), any());
+    }
+
+    @Test
+    void persisteAmarracaoAntesDeAtualizarCardETimeline() {
+        LegacyQuote quote = quote("ABERTA", Map.of());
+        prepare(quote);
+
+        service.syncQuotes();
+
+        var order = inOrder(store, arpa);
+        order.verify(store).bindQuote(quote.id(), 77, 88, 99, 4);
+        order.verify(arpa).updateDealFromQuote(99, quote, 4);
+        order.verify(arpa).addAnnotation(anyLong(), anyString());
+    }
+
+    @Test
+    void recuperaCardPeloIdDaCotacaoSemCriarOutro() {
+        LegacyQuote quote = quote("ABERTA", Map.of());
+        prepare(quote);
+        when(arpa.findDealByLegacyQuoteId(quote.id()))
+                .thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(123, 77L, 88L, 4L)));
+
+        service.syncQuotes();
+
+        verify(store).bindQuote(quote.id(), 77, 88, 123, 4);
+        verify(arpa).updateDealFromQuote(123, quote, 4);
+        verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
+        verify(arpa, never()).findLatestPortfolioDealByCnpj(anyString());
+    }
+
+    @Test
+    void usaIdDoCardPersistidoAoAlterarMesmaCotacao() {
+        LegacyQuote quote = quote("ABERTA", Map.of());
+        when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of());
+        when(store.findQuote(quote.id())).thenReturn(Optional.of(new QuoteIntegration(
+                quote.id(), quote.payerCnpj(), quote.status(), 321L, 77L, 88L, 4L,
+                quote.totalFreight(), "old", "ATUALIZAR", "AGUARDANDO_CANAL")));
+        when(arpa.findDeal(321)).thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(321, 77L, 88L, 4L)));
+
+        service.syncQuotes();
+
+        verify(store).bindQuote(quote.id(), 77, 88, 321, 4);
+        verify(arpa).updateDealFromQuote(321, quote, 4);
+        verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
+        verify(arpa, never()).findDealByLegacyQuoteId(anyLong());
     }
 
     @Test
