@@ -152,9 +152,9 @@ public class HubCrmQuoteSyncService {
     private void applyStatus(LegacyQuote quote, long dealId) {
         String status = HubCrmNormalization.normalizedText(quote.status());
         String eventKey = "quote:" + quote.id() + ":status:" + status + ":" + quote.statusAt();
-        if (store.eventProcessed(eventKey)) return;
         if ("APROVADA".equals(status)) {
             arpa.markWon(dealId, quote.statusAt());
+            if (store.eventProcessed(eventKey)) return;
             arpa.addAnnotation(dealId, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt());
             store.recordEvent(eventKey, "COTACAO", quote.id(), "GANHO", "PROCESSADO", "Card ganho", null);
         } else if ("NAO APROVADA".equals(status)) {
@@ -164,6 +164,7 @@ public class HubCrmQuoteSyncService {
             }
             Map.Entry<LossReason, String> reason = quote.selectedLossReasons().entrySet().iterator().next();
             arpa.markLost(dealId, reason.getKey(), quote.statusAt());
+            if (store.eventProcessed(eventKey)) return;
             arpa.addAnnotation(dealId, "Cotação " + quote.id() + " não aprovada. Motivo: "
                     + reason.getKey().arpaName() + ". Observação: " + safe(reason.getValue()));
             store.recordEvent(eventKey, "COTACAO", quote.id(), "PERDIDO", "PROCESSADO",
