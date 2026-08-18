@@ -308,8 +308,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     private Optional<Long> findOrganizationId(String legalName) {
-        JsonNode response = get(builder -> builder.path("/organizations")
-                .queryParam("perPage", 100).queryParam("name", legalName).build());
+        JsonNode response = get("/organizations?perPage=100&name={name}", legalName);
         String expected = HubCrmNormalization.normalizedText(legalName);
         return dataEntries(response).stream()
                 .filter(item -> HubCrmNormalization.normalizedText(item.path("name").asText()).equals(expected))
@@ -319,9 +318,8 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     private Optional<Long> findPersonId(String name, long organizationId) {
-        JsonNode response = get(builder -> builder.path("/peoples")
-                .queryParam("perPage", 100).queryParam("name", name)
-                .queryParam("organizations", organizationId).build());
+        JsonNode response = get("/peoples?perPage=100&name={name}&organizations={organizationId}",
+                name, organizationId);
         String expected = HubCrmNormalization.normalizedText(name);
         return dataEntries(response).stream()
                 .filter(item -> HubCrmNormalization.normalizedText(item.path("name").asText()).equals(expected))
@@ -330,8 +328,8 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
                 .max(Long::compareTo);
     }
 
-    private JsonNode get(java.util.function.Function<org.springframework.web.util.UriBuilder, java.net.URI> uri) {
-        String response = client.get().uri(uri).retrieve().body(String.class);
+    private JsonNode get(String template, Object... variables) {
+        String response = client.get().uri(template, variables).retrieve().body(String.class);
         return parse(response);
     }
 

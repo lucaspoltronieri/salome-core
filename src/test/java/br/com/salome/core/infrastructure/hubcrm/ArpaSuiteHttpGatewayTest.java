@@ -88,11 +88,13 @@ class ArpaSuiteHttpGatewayTest {
     void recuperaIdDaOrganizacaoQuandoPostRetornaCorpoNaoJson() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicInteger gets = new AtomicInteger();
+        AtomicReference<String> query = new AtomicReference<>();
         server.createContext("/api/organizations", exchange -> {
             byte[] response;
             if ("GET".equals(exchange.getRequestMethod())) {
+                query.set(exchange.getRequestURI().getRawQuery());
                 response = (gets.getAndIncrement() == 0 ? "{\"data\":[]}" :
-                        "{\"data\":[{\"id\":321,\"name\":\"CLIENTE TESTE\"}]}")
+                        "{\"data\":[{\"id\":321,\"name\":\"CLIENTE, TESTE\"}]}")
                         .getBytes(StandardCharsets.UTF_8);
             } else {
                 exchange.getRequestBody().readAllBytes();
@@ -108,8 +110,9 @@ class ArpaSuiteHttpGatewayTest {
             var gateway = new ArpaSuiteHttpGateway(
                     properties("http://127.0.0.1:" + server.getAddress().getPort()));
 
-            assertThat(gateway.createOrganization("CLIENTE TESTE")).isEqualTo(321L);
+            assertThat(gateway.createOrganization("CLIENTE, TESTE")).isEqualTo(321L);
             assertThat(gets).hasValue(2);
+            assertThat(query.get()).contains("name=CLIENTE%2C%20TESTE");
         } finally {
             server.stop(0);
         }
