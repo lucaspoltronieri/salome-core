@@ -6,14 +6,18 @@ import br.com.salome.core.domain.hubcrm.LegacyCrmClient;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
 @ConditionalOnProperty(prefix = "salome.hub-crm", name = "enabled", havingValue = "true")
 public class HubCrmClientSyncService {
+    private static final int BATCH_CONCURRENCY = 4;
     private final HubCrmLegacyRepository legacy;
     private final HubCrmStore store;
     private final ArpaSuiteGateway arpa;
@@ -54,11 +58,8 @@ public class HubCrmClientSyncService {
     private SyncResult syncSource(List<LegacyCrmClient> source, int maximum) {
         Set<String> cnpjs = new HashSet<>();
         Set<String> legalNames = new HashSet<>();
-        int integrated = 0;
-        int updated = 0;
         int skipped = 0;
-        int failed = 0;
-        int attempted = 0;
+        List<ClientWork> work = new ArrayList<>();
         for (LegacyCrmClient client : source) {
             String cnpj = HubCrmNormalization.digits(client.cnpj());
             String normalizedName = HubCrmNormalization.normalizedText(client.legalName());
@@ -77,25 +78,51 @@ public class HubCrmClientSyncService {
                 skipped++;
                 continue;
             }
-            if (attempted >= maximum) continue;
-            attempted++;
-            try {
-                boolean wasIntegrated = current.dealId() != null;
-                integrate(client, current, hash);
-                if (wasIntegrated) updated++; else integrated++;
-            } catch (Exception exception) {
-                failed++;
-                store.markClientError(cnpj, exception);
-                store.recordEvent("client:" + cnpj + ":" + hash, "CLIENTE", client.legacyClientId(),
-                        "SINCRONIZAR", "ERRO", null, exception.getMessage());
+            if (work.size() >= maximum) continue;
+            long userId = current.assignedUserId() != null ? current.assignedUserId()
+                    : store.nextRoundRobinUser(
+                            properties.arpa().fernandaUserId(), properties.arpa().jaciUserId());
+            work.add(new ClientWork(client, current, hash, cnpj, userId));
+        }
+        if (work.isEmpty()) return new SyncResult(0, 0, skipped, 0);
+
+        int integrated = 0;
+        int updated = 0;
+        int failed = 0;
+        int threads = Math.min(BATCH_CONCURRENCY, work.size());
+        try (var executor = Executors.newFixedThreadPool(threads)) {
+            List<Callable<ClientResult>> tasks = work.stream()
+                    .<Callable<ClientResult>>map(item -> () -> process(item))
+                    .toList();
+            for (var future : executor.invokeAll(tasks)) {
+                ClientResult result = future.get();
+                integrated += result.integrated();
+                updated += result.updated();
+                failed += result.failed();
             }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Carga de clientes interrompida", exception);
+        } catch (java.util.concurrent.ExecutionException exception) {
+            throw new IllegalStateException("Falha inesperada na carga de clientes", exception.getCause());
         }
         return new SyncResult(integrated, updated, skipped, failed);
     }
 
-    private void integrate(LegacyCrmClient client, ClientIntegration current, String hash) {
-        long userId = current.assignedUserId() != null ? current.assignedUserId()
-                : store.nextRoundRobinUser(properties.arpa().fernandaUserId(), properties.arpa().jaciUserId());
+    private ClientResult process(ClientWork item) {
+        try {
+            boolean wasIntegrated = item.current().dealId() != null;
+            integrate(item.client(), item.current(), item.hash(), item.userId());
+            return wasIntegrated ? new ClientResult(0, 1, 0) : new ClientResult(1, 0, 0);
+        } catch (Exception exception) {
+            store.markClientError(item.cnpj(), exception);
+            store.recordEvent("client:" + item.cnpj() + ":" + item.hash(), "CLIENTE",
+                    item.client().legacyClientId(), "SINCRONIZAR", "ERRO", null, exception.getMessage());
+            return new ClientResult(0, 0, 1);
+        }
+    }
+
+    private void integrate(LegacyCrmClient client, ClientIntegration current, String hash, long userId) {
         long organizationId;
         long peopleId;
         long dealId;
@@ -158,5 +185,12 @@ public class HubCrmClientSyncService {
     }
 
     public record SyncResult(int integrated, int updated, int skipped, int failed) {
+    }
+
+    private record ClientWork(LegacyCrmClient client, ClientIntegration current, String hash,
+            String cnpj, long userId) {
+    }
+
+    private record ClientResult(int integrated, int updated, int failed) {
     }
 }
