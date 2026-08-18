@@ -135,7 +135,10 @@ public class HubCrmClientSyncService {
         String contactName = HubCrmNormalization.contactName(client.contactName());
         // A company phone/email is not a personal contact.  Without a valid
         // contact name the card must remain linked only to the organization.
-        boolean hasContact = HubCrmNormalization.validContactName(contactName);
+        String companyName = HubCrmNormalization.normalizedText(
+                HubCrmNormalization.shortName(client.legalName()));
+        boolean hasContact = HubCrmNormalization.validContactName(contactName)
+                && !companyName.equals(HubCrmNormalization.normalizedText(contactName));
         String personName = HubCrmNormalization.validContactName(contactName)
                 ? contactName : HubCrmNormalization.shortName(client.legalName());
         String phone = preferredPhone(client.contactPhone(), client.phone());
