@@ -49,6 +49,11 @@ public class HubCrmQuoteSyncService {
             store.discoverQuote(quote, hash);
             var current = store.findQuote(quote.id()).orElseThrow();
             if ("INTEGRADO".equals(current.status()) && hash.equals(current.snapshotHash())) {
+                // O status pode ter falhado anteriormente mesmo quando o snapshot já foi
+                // integrado. Reconciliamos a transição sem criar nova anotação.
+                if (current.dealId() != null && "APROVADA".equals(HubCrmNormalization.normalizedText(quote.status()))) {
+                    arpa.markWon(current.dealId(), quote.statusAt());
+                }
                 trySendPdf(quote, current.peopleId(), current.dealId(), current.whatsappStatus());
                 skipped++;
                 continue;

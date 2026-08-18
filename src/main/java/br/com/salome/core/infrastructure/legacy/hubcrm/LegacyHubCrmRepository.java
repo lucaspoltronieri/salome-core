@@ -70,7 +70,8 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
             FROM cotacao q
             LEFT JOIN cidade remCi ON remCi.idCidade=q.remetenteIdCidade
             LEFT JOIN cidade destCi ON destCi.idCidade=q.destinatarioIdCidade
-            LEFT JOIN naturezacarga nat ON nat.idNaturezaCarga=q.idNaturezaCarga
+            LEFT JOIN naturezacargacliente ncc ON ncc.idNaturezaCargaCliente=q.idNaturezaCargaCliente
+            LEFT JOIN naturezacarga nat ON nat.idNaturezaCarga=COALESCE(q.idNaturezaCarga,ncc.idNaturezaCarga)
             """;
 
     private final JdbcTemplate jdbc;
