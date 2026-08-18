@@ -6,6 +6,7 @@ import br.com.salome.core.application.hubcrm.ArpaSuiteGateway;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -164,6 +165,34 @@ class ArpaSuiteHttpGatewayTest {
 
             assertThat(gateway.addAnnotation(123L, "Data do primeiro CT-e")).isEqualTo(456L);
             assertThat(request.get()).contains("\"type\":\"observation\"", "\"dealId\":123");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void enviaDataDeGanhoComoIsoLocalSemOffset() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> request = new AtomicReference<>();
+        server.createContext("/api/deals/123", exchange -> {
+            request.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"data\":{\"id\":123,\"status\":\"won\"}}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+
+            gateway.markWon(123, LocalDateTime.of(2026, 8, 18, 15, 6, 1));
+
+            assertThat(request.get()).contains("\"status\":\"won\"")
+                    .contains("\"winDate\":\"2026-08-18T15:06:01\"")
+                    .doesNotContain("-03:00");
         } finally {
             server.stop(0);
         }

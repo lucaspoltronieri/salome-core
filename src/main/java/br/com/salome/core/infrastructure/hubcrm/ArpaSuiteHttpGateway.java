@@ -7,7 +7,7 @@ import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.LossReason;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -27,7 +27,6 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 @ConditionalOnProperty(prefix = "salome.hub-crm", name = "enabled", havingValue = "true")
 public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
-    private static final ZoneOffset SAO_PAULO_OFFSET = ZoneOffset.ofHours(-3);
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final RestClient client;
     private final HubCrmProperties properties;
@@ -244,7 +243,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     public void markWon(long dealId, LocalDateTime wonAt) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "won");
-        if (wonAt != null) payload.put("winDate", wonAt.atOffset(SAO_PAULO_OFFSET).toString());
+        if (wonAt != null) payload.put("winDate", apiDateTime(wonAt));
         put("/deals/" + dealId, payload);
     }
 
@@ -254,7 +253,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "lost");
         payload.put("lostReasonId", lostReasonIds.get(reason));
-        if (lostAt != null) payload.put("lostDate", lostAt.atOffset(SAO_PAULO_OFFSET).toString());
+        if (lostAt != null) payload.put("lostDate", apiDateTime(lostAt));
         put("/deals/" + dealId, payload);
     }
 
@@ -433,6 +432,10 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     private double amount(BigDecimal value) {
         return value == null ? 0 : value.doubleValue();
+    }
+
+    private String apiDateTime(LocalDateTime value) {
+        return value.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 
     private String bestPhone(String value) {

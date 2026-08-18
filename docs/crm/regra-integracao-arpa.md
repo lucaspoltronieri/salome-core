@@ -72,3 +72,8 @@ ausencia de vinculo pelo ID, a busca por CNPJ pode reaproveitar o card aberto
 mais recente em qualquer estagio do funil (Carteira, Lead, Contato,
 Diagnostico, Negociacao ou outro). O card nao sera reaproveitado quando ja
 estiver amarrado no banco do Hub a outra cotacao.
+
+As datas de ganho e perda sao enviadas nos campos `winDate` e `lostDate` como
+ISO 8601 local (`yyyy-MM-dd'T'HH:mm:ss`), preservando o horario do legado sem
+acrescentar offset. O ArpaSuite rejeita esses campos quando recebem o sufixo de
+fuso horario.
