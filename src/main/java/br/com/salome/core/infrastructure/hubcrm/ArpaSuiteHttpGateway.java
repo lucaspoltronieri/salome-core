@@ -80,17 +80,29 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     @Override
     public long createOrganization(String legalName) {
-        return extractId(post("/organizations", Map.of("name", legalName)));
+        Optional<Long> existing = findOrganizationId(legalName);
+        if (existing.isPresent()) return existing.get();
+        try {
+            return extractId(post("/organizations", Map.of("name", legalName)));
+        } catch (InvalidArpaResponseException exception) {
+            return findOrganizationId(legalName).orElseThrow(() -> exception);
+        }
     }
 
     @Override
     public long createPerson(String name, String phone, long organizationId) {
+        Optional<Long> existing = findPersonId(name, organizationId);
+        if (existing.isPresent()) return existing.get();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("name", name);
         String normalizedPhone = bestPhone(phone);
         if (!normalizedPhone.isBlank()) payload.put("phone", normalizedPhone);
         payload.put("organizationId", organizationId);
-        return extractId(post("/peoples", payload));
+        try {
+            return extractId(post("/peoples", payload));
+        } catch (InvalidArpaResponseException exception) {
+            return findPersonId(name, organizationId).orElseThrow(() -> exception);
+        }
     }
 
     @Override
@@ -121,7 +133,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
                 properties.arpa().carteiraStageId(), BigDecimal.ZERO);
         payload.put("details", "Cliente destinatário que não paga frete no legado");
         payload.put("customfields", clientFields(item));
-        return extractId(post("/deals", payload));
+        try {
+            return extractId(post("/deals", payload));
+        } catch (InvalidArpaResponseException exception) {
+            return findLatestOpenDealByCnpj(item.cnpj()).map(ArpaDeal::id).orElseThrow(() -> exception);
+        }
     }
 
     @Override
@@ -142,7 +158,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
                 organizationId, peopleId, userId, properties.arpa().propostaStageId(), quote.totalFreight());
         payload.put("details", "Cotação do legado #" + quote.id());
         payload.put("customfields", quoteFields(quote));
-        return extractId(post("/deals", payload));
+        try {
+            return extractId(post("/deals", payload));
+        } catch (InvalidArpaResponseException exception) {
+            return findLatestOpenDealByCnpj(quote.payerCnpj()).map(ArpaDeal::id).orElseThrow(() -> exception);
+        }
     }
 
     @Override
@@ -159,7 +179,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     @Override
     public long addAnnotation(long dealId, String text) {
-        return extractId(post("/annotations", Map.of("dealId", dealId, "text", text)));
+        try {
+            return extractId(post("/annotations", Map.of("dealId", dealId, "text", text)));
+        } catch (InvalidArpaResponseException exception) {
+            return 0L;
+        }
     }
 
     @Override
@@ -277,8 +301,36 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         try {
             return JSON.readTree(response);
         } catch (Exception exception) {
-            throw new IllegalStateException("Resposta inválida do ArpaSuite", exception);
+            throw new InvalidArpaResponseException(response, exception);
         }
+    }
+
+    private Optional<Long> findOrganizationId(String legalName) {
+        JsonNode response = get(builder -> builder.path("/organizations")
+                .queryParam("perPage", 100).queryParam("name", legalName).build());
+        String expected = HubCrmNormalization.normalizedText(legalName);
+        return dataEntries(response).stream()
+                .filter(item -> HubCrmNormalization.normalizedText(item.path("name").asText()).equals(expected))
+                .map(item -> item.path("id").asLong())
+                .filter(id -> id > 0)
+                .max(Long::compareTo);
+    }
+
+    private Optional<Long> findPersonId(String name, long organizationId) {
+        JsonNode response = get(builder -> builder.path("/peoples")
+                .queryParam("perPage", 100).queryParam("name", name)
+                .queryParam("organizations", organizationId).build());
+        String expected = HubCrmNormalization.normalizedText(name);
+        return dataEntries(response).stream()
+                .filter(item -> HubCrmNormalization.normalizedText(item.path("name").asText()).equals(expected))
+                .map(item -> item.path("id").asLong())
+                .filter(id -> id > 0)
+                .max(Long::compareTo);
+    }
+
+    private JsonNode get(java.util.function.Function<org.springframework.web.util.UriBuilder, java.net.URI> uri) {
+        String response = client.get().uri(uri).retrieve().body(String.class);
+        return parse(response);
     }
 
     private long extractId(JsonNode response) {
@@ -330,5 +382,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     private String stripTrailingSlash(String value) {
         return value == null ? "" : value.replaceAll("/+$", "");
+    }
+
+    private static final class InvalidArpaResponseException extends IllegalStateException {
+        private InvalidArpaResponseException(String response, Throwable cause) {
+            super("Resposta inválida do ArpaSuite", cause);
+        }
     }
 }

@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class ArpaSuiteHttpGatewayTest {
@@ -25,6 +26,14 @@ class ArpaSuiteHttpGatewayTest {
         AtomicReference<byte[]> requestBody = new AtomicReference<>();
         AtomicReference<Long> contentLength = new AtomicReference<>();
         server.createContext("/api/organizations", exchange -> {
+            if ("GET".equals(exchange.getRequestMethod())) {
+                byte[] response = "{\"data\":[]}".getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "text/plain;charset=utf-8");
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+                exchange.close();
+                return;
+            }
             requestBody.set(exchange.getRequestBody().readAllBytes());
             contentLength.set(Long.parseLong(exchange.getRequestHeaders().getFirst("Content-Length")));
             byte[] response = "{\"data\":{\"id\":987}}".getBytes(StandardCharsets.UTF_8);
@@ -67,6 +76,37 @@ class ArpaSuiteHttpGatewayTest {
             assertThat(query.get())
                     .contains("pipe=1", "status=open", "customfields=6:19076738000160")
                     .doesNotContain("orderColumn", "orderDirection");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void recuperaIdDaOrganizacaoQuandoPostRetornaCorpoNaoJson() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicInteger gets = new AtomicInteger();
+        server.createContext("/api/organizations", exchange -> {
+            byte[] response;
+            if ("GET".equals(exchange.getRequestMethod())) {
+                response = (gets.getAndIncrement() == 0 ? "{\"data\":[]}" :
+                        "{\"data\":[{\"id\":321,\"name\":\"CLIENTE TESTE\"}]}")
+                        .getBytes(StandardCharsets.UTF_8);
+            } else {
+                exchange.getRequestBody().readAllBytes();
+                response = "created".getBytes(StandardCharsets.UTF_8);
+            }
+            exchange.getResponseHeaders().set("Content-Type", "text/plain;charset=utf-8");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+
+            assertThat(gateway.createOrganization("CLIENTE TESTE")).isEqualTo(321L);
+            assertThat(gets).hasValue(2);
         } finally {
             server.stop(0);
         }
