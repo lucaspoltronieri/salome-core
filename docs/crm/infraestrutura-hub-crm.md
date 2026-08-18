@@ -31,7 +31,8 @@ marcadores da integracao.
 ## Padrao do PDF de cotacao
 
 O PDF e gerado pelo Hub CRM com o logotipo oficial da Expresso Salome no
-cabecalho. O numero exibido em destaque e sempre o `id` da cotacao no legado;
+cabecalho. O titulo, o numero e a barra inferior do cabecalho usam a cor preta.
+O numero exibido em destaque e sempre o `id` da cotacao no legado;
 o mesmo identificador tambem e repetido na secao de dados da cotacao para
 preservar a rastreabilidade em impressao ou recorte do documento.
 

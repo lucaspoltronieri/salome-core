@@ -104,7 +104,7 @@ public class HubCrmQuotePdfService {
         float logoHeight = logoWidth * logo.getHeight() / logo.getWidth();
         stream.drawImage(logo, MARGIN, 750, logoWidth, logoHeight);
 
-        stream.setNonStrokingColor(new Color(155, 18, 37));
+        stream.setNonStrokingColor(Color.BLACK);
         drawText(stream, "COTAÇÃO DE FRETE", 338, 805, 14, Standard14Fonts.FontName.HELVETICA_BOLD);
         drawText(stream, "Nº " + quoteId, 338, 773, 24, Standard14Fonts.FontName.HELVETICA_BOLD);
         stream.addRect(MARGIN, 733, PDRectangle.A4.getWidth() - (2 * MARGIN), 3);
