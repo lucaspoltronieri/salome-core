@@ -127,9 +127,9 @@ public class HubCrmClientSyncService {
         Long peopleId;
         long dealId;
         String contactName = HubCrmNormalization.contactName(client.contactName());
-        boolean hasContact = HubCrmNormalization.validContactName(contactName)
-                || HubCrmNormalization.validEmail(client.contactEmail())
-                || !preferredPhone(client.contactPhone(), client.phone()).isBlank();
+        // A company phone/email is not a personal contact.  Without a valid
+        // contact name the card must remain linked only to the organization.
+        boolean hasContact = HubCrmNormalization.validContactName(contactName);
         String personName = HubCrmNormalization.validContactName(contactName)
                 ? contactName : HubCrmNormalization.shortName(client.legalName());
         String phone = preferredPhone(client.contactPhone(), client.phone());
