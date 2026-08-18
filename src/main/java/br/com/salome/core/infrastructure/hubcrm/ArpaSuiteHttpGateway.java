@@ -244,7 +244,8 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     private JsonNode get(String path) {
-        return client.get().uri(path).retrieve().body(JsonNode.class);
+        String response = client.get().uri(path).retrieve().body(String.class);
+        return parse(response);
     }
 
     private JsonNode post(String path, Object payload) {

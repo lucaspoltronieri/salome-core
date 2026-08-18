@@ -39,6 +39,27 @@ class ArpaSuiteHttpGatewayTest {
         }
     }
 
+    @Test
+    void leJsonDeBuscaDeCardsQueRespondeComoTexto() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/deals", exchange -> {
+            byte[] response = "{\"data\":[]}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "text/plain;charset=utf-8");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+
+            assertThat(gateway.findLatestOpenDealByCnpj("19076738000160")).isEmpty();
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private HubCrmProperties properties(String arpaUrl) {
         return new HubCrmProperties(true, false, 30000, 32001, 10,
                 "https://core.example.com", "12345678901234567890123456789012", 60,
