@@ -3,6 +3,7 @@ package br.com.salome.core.application.hubcrm;
 import br.com.salome.core.domain.hubcrm.HubCrmNormalization;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.LossReason;
+import br.com.salome.core.domain.hubcrm.QuoteIntegration;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
 import java.math.BigDecimal;
@@ -61,7 +62,7 @@ public class HubCrmQuoteSyncService {
                 if (quote.payerCnpj().length() != 14) {
                     throw new ReviewException("CNPJ do pagador inválido: " + quote.payerCnpj());
                 }
-                integrate(quote, hash);
+                integrate(quote, hash, current);
                 integrated++;
             } catch (ReviewException exception) {
                 review++;
@@ -79,9 +80,11 @@ public class HubCrmQuoteSyncService {
         return new QuoteSyncResult(integrated, skipped, review, failed);
     }
 
-    private void integrate(LegacyQuote quote, String hash) {
+    private void integrate(LegacyQuote quote, String hash, QuoteIntegration current) {
         long userId = owner(quote.responsible());
-        var external = arpa.findLatestOpenDealByCnpj(quote.payerCnpj());
+        var storedDeal = current.dealId() == null ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
+                : arpa.findDeal(current.dealId());
+        var external = storedDeal.isPresent() ? storedDeal : arpa.findLatestOpenDealByCnpj(quote.payerCnpj());
         long organizationId;
         long peopleId;
         long dealId;
@@ -100,6 +103,8 @@ public class HubCrmQuoteSyncService {
                 dealId = arpa.createQuoteDeal(quote, organizationId, peopleId, userId);
             }
         }
+        arpa.updateOrganization(organizationId, quote.payerName());
+        arpa.updatePerson(peopleId, HubCrmNormalization.shortName(quote.payerName()), quote.payerPhone(), organizationId);
         arpa.updateDealFromQuote(dealId, quote, userId);
 
         String quoteEvent = "quote:" + quote.id() + ":snapshot:" + hash;
@@ -183,9 +188,12 @@ public class HubCrmQuoteSyncService {
 
     private String quoteHash(LegacyQuote quote) {
         return HubCrmNormalization.sha256(quote.id(), quote.status(), quote.statusAt(), quote.responsible(),
-                quote.paymentType(), quote.senderCnpj(), quote.recipientCnpj(), quote.payerCnpj(),
-                quote.cargoType(), quote.volumes(), quote.weight(), quote.invoiceValue(), quote.cubage(),
-                quote.totalFreight(), quote.selectedLossReasons());
+                quote.paymentType(), quote.senderCnpj(), quote.senderName(), quote.senderCity(),
+                quote.recipientCnpj(), quote.recipientName(), quote.recipientCity(), quote.payerCnpj(),
+                quote.payerName(), quote.payerPhone(), quote.payerEmail(), quote.cargoType(), quote.volumes(),
+                quote.weight(), quote.invoiceValue(), quote.cubage(), quote.freightWeight(), quote.freightValue(),
+                quote.toll(), quote.pickup(), quote.delivery(), quote.dispatch(), quote.gris(), quote.redelivery(),
+                quote.icms(), quote.discount(), quote.addition(), quote.totalFreight(), quote.selectedLossReasons());
     }
 
     private long owner(String responsible) {

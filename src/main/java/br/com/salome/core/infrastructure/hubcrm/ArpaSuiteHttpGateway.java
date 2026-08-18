@@ -20,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -63,6 +64,21 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
                     .map(LossReason::arpaName)
                     .toList();
             throw new IllegalStateException("Motivos de perda ausentes no ArpaSuite: " + missing);
+        }
+    }
+
+    @Override
+    public Optional<ArpaDeal> findDeal(long dealId) {
+        if (dealId <= 0) return Optional.empty();
+        try {
+            JsonNode item = get("/deals/" + dealId);
+            JsonNode data = item.path("data").isObject() ? item.path("data") : item;
+            if (data.path("id").asLong(0) <= 0) return Optional.empty();
+            return Optional.of(new ArpaDeal(data.path("id").asLong(), nullableLong(data, "organizationId"),
+                    nullableLong(data, "peopleId"), nullableLong(data, "userId")));
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404) return Optional.empty();
+            throw exception;
         }
     }
 
@@ -194,6 +210,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     @Override
     public void updateDealFromQuote(long dealId, LegacyQuote quote, long userId) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("title", HubCrmNormalization.shortName(quote.payerName()));
         payload.put("userId", userId);
         payload.put("pipeId", properties.arpa().pipeId());
         payload.put("stageId", properties.arpa().propostaStageId());

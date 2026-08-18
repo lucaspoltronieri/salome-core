@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface ArpaSuiteGateway {
     void validateCatalog();
+    Optional<ArpaDeal> findDeal(long dealId);
     Optional<ArpaDeal> findLatestOpenDealByCnpj(String cnpj);
     long createOrganization(String legalName);
     long createPerson(String name, String phone, long organizationId);
