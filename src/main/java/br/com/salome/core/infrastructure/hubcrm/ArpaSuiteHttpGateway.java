@@ -323,6 +323,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         String expected = HubCrmNormalization.normalizedText(name);
         return dataEntries(response).stream()
                 .filter(item -> HubCrmNormalization.normalizedText(item.path("name").asText()).equals(expected))
+                .filter(item -> item.path("organizationId").asLong(0) == organizationId)
                 .map(item -> item.path("id").asLong())
                 .filter(id -> id > 0)
                 .max(Long::compareTo);

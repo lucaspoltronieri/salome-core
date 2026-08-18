@@ -132,10 +132,11 @@ public class HubCrmClientSyncService {
 
         if (current.dealId() != null && current.organizationId() != null && current.peopleId() != null) {
             organizationId = current.organizationId();
-            peopleId = current.peopleId();
             dealId = current.dealId();
             arpa.updateOrganization(organizationId, client.legalName());
+            peopleId = arpa.createPerson(personName, phone, organizationId);
             arpa.updatePerson(peopleId, personName, phone, organizationId);
+            arpa.linkDeal(dealId, organizationId, peopleId, userId);
             arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
         } else {
             var external = arpa.findLatestOpenDealByCnpj(client.cnpj());
