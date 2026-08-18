@@ -7,6 +7,10 @@ O Hub CRM sera implementado dentro do mesmo processo Spring Boot do
 execucao do Core Financeiro. A separacao sera feita por modulo e por rotas
 web, sem criar uma segunda aplicacao ou uma segunda porta.
 
+Na VPS, o Spring Boot escuta internamente em `127.0.0.1:8788` e a entrada publica
+existente do Core Financeiro continua em `:8787`. Assim, o endereço público do painel é
+`http://corefinanceiro.salome.com.br:8787/hub-crm/`, sem expor uma nova porta do Java.
+
 Rotas futuras do Hub CRM devem ficar sob um contexto proprio, por exemplo
 `/hub-crm/...`, enquanto as rotas financeiras existentes permanecem
 inalteradas. O agendador de leitura do legado, a integracao com a API do Cubo

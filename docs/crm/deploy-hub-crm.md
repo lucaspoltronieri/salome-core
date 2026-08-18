@@ -25,10 +25,18 @@ Nextcloud.
    homologacao; depois da promocao, voltar ao padrao `origin/main`.
 5. Abrir `/hub-crm/`, validar o catálogo ArpaSuite e executar o piloto de 10 clientes.
 6. Conferir organizações, pessoas, cards, responsáveis e ausência de duplicações no ArpaSuite.
-7. Somente após a conferência, executar o lote completo e então ativar o polling.
-   O servico processa 10 itens primeiro e so continua se o piloto nao falhar.
-6. Conferir organizacoes, pessoas, cards, responsaveis e timelines.
-7. Ativar `SALOME_HUB_CRM_POLLING_ENABLED=true` e reiniciar `salome-web`.
+7. Somente após a conferência, executar separadamente o lote completo. A carga usa no
+   máximo quatro integrações simultâneas e mantém a atribuição round-robin na ordem dos IDs.
+8. Conferir organizações, cards, responsáveis, campos personalizados e timelines. A API
+   pode reaproveitar uma pessoa quando entende que o contato já existe; a unicidade obrigatória
+   da carga é por CNPJ, organização e card.
+9. Antes do primeiro polling, gravar `last_quote_id` com o maior `idCotacao` existente no
+   legado. Isso impede importação histórica e faz o Hub iniciar nas próximas cotações.
+10. Ativar `SALOME_HUB_CRM_POLLING_ENABLED=true` e reiniciar `salome-web`.
+
+As anotações na timeline usam `POST /api/annotations` com `type=observation`, `dealId` e
+`text`. O campo `type` é obrigatório na API mesmo quando não aparece no schema de entrada
+da documentação OpenAPI.
 
 ## Rollback
 
