@@ -78,7 +78,13 @@ public class HubCrmWebController {
     @PostMapping("/api/hub-crm/acoes/carga-inicial")
     @ResponseBody
     public Object initialLoad() {
-        return clients.initialPilotAndBatch();
+        return clients.initialPilot();
+    }
+
+    @PostMapping("/api/hub-crm/acoes/carga-completa")
+    @ResponseBody
+    public Object fullLoad() {
+        return clients.initialBatch();
     }
 
     @PostMapping("/api/hub-crm/acoes/sincronizar")

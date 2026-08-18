@@ -27,10 +27,12 @@ public class HubCrmClientSyncService {
         this.properties = properties;
     }
 
-    public SyncResult initialPilotAndBatch() {
-        SyncResult pilot = syncEligible(properties.pilotSize());
-        if (pilot.failed() > 0) return pilot;
-        return pilot.plus(syncEligible(Integer.MAX_VALUE));
+    public SyncResult initialPilot() {
+        return syncEligible(properties.pilotSize());
+    }
+
+    public SyncResult initialBatch() {
+        return syncEligible(Integer.MAX_VALUE);
     }
 
     public SyncResult syncNewClients() {
@@ -145,9 +147,5 @@ public class HubCrmClientSyncService {
     }
 
     public record SyncResult(int integrated, int updated, int skipped, int failed) {
-        SyncResult plus(SyncResult other) {
-            return new SyncResult(integrated + other.integrated, updated + other.updated,
-                    skipped + other.skipped, failed + other.failed);
-        }
     }
 }

@@ -11,5 +11,6 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelect
 $('#validate').onclick=()=>action('/api/hub-crm/acoes/validar-arpa');
 $('#sync').onclick=()=>action('/api/hub-crm/acoes/sincronizar');
 $('#retry').onclick=()=>{const tipo=prompt('Tipo: CLIENTE ou COTACAO');if(!tipo)return;const id=prompt('ID no legado');if(!id)return;action(`/api/hub-crm/acoes/reprocessar?tipo=${encodeURIComponent(tipo)}&id=${encodeURIComponent(id)}`)};
-$('#load').onclick=()=>action('/api/hub-crm/acoes/carga-inicial','A carga cria organizações, pessoas e cards reais no ArpaSuite. Continuar?');
+$('#load').onclick=()=>action('/api/hub-crm/acoes/carga-inicial','O piloto cria até 10 organizações, pessoas e cards reais no ArpaSuite. Continuar?');
+$('#loadAll').onclick=()=>action('/api/hub-crm/acoes/carga-completa','O lote completo cria todos os registros pendentes no ArpaSuite. Execute somente após validar o piloto. Continuar?');
 status();table();setInterval(()=>{status();table()},30000);

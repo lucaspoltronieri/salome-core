@@ -23,7 +23,9 @@ Nextcloud.
 3. Aplicar a configuracao nginx para o PDF assinado e recarregar o nginx.
 4. Implantar o commit desejado com `DEPLOY_REF=origin/feat/hub-crm` durante a
    homologacao; depois da promocao, voltar ao padrao `origin/main`.
-5. Abrir `/hub-crm/`, validar o catalogo ArpaSuite e executar a carga inicial.
+5. Abrir `/hub-crm/`, validar o catálogo ArpaSuite e executar o piloto de 10 clientes.
+6. Conferir organizações, pessoas, cards, responsáveis e ausência de duplicações no ArpaSuite.
+7. Somente após a conferência, executar o lote completo e então ativar o polling.
    O servico processa 10 itens primeiro e so continua se o piloto nao falhar.
 6. Conferir organizacoes, pessoas, cards, responsaveis e timelines.
 7. Ativar `SALOME_HUB_CRM_POLLING_ENABLED=true` e reiniciar `salome-web`.
