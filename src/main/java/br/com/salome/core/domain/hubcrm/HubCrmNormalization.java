@@ -41,7 +41,23 @@ public final class HubCrmNormalization {
     }
 
     public static boolean validContactName(String value) {
-        return !valueIsBlank(value) && !normalizedText(value).equals("ERICK");
+        String name = contactName(value);
+        return !valueIsBlank(name) && !normalizedText(name).equals("ERICK");
+    }
+
+    /**
+     * The legacy contact field may be stored as "phone || name".  The phone
+     * belongs in the phone field and must never become part of the Arpa person
+     * name.
+     */
+    public static String contactName(String value) {
+        if (valueIsBlank(value)) return "";
+        String candidate = value.trim();
+        int separator = candidate.indexOf("||");
+        if (separator >= 0 && digits(candidate.substring(0, separator)).length() >= 8) {
+            candidate = candidate.substring(separator + 2).trim();
+        }
+        return candidate;
     }
 
     public static boolean validEmail(String value) {

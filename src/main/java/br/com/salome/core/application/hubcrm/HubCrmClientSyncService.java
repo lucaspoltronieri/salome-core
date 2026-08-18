@@ -126,8 +126,9 @@ public class HubCrmClientSyncService {
         long organizationId;
         long peopleId;
         long dealId;
-        String personName = HubCrmNormalization.validContactName(client.contactName())
-                ? client.contactName().trim() : HubCrmNormalization.shortName(client.legalName());
+        String contactName = HubCrmNormalization.contactName(client.contactName());
+        String personName = HubCrmNormalization.validContactName(contactName)
+                ? contactName : HubCrmNormalization.shortName(client.legalName());
         String phone = preferredPhone(client.contactPhone(), client.phone());
 
         if (current.dealId() != null && current.organizationId() != null && current.peopleId() != null) {
@@ -174,7 +175,7 @@ public class HubCrmClientSyncService {
 
     private String clientHash(LegacyCrmClient client) {
         return HubCrmNormalization.sha256(client.legalName(), client.cnpj(), client.city(), client.state(),
-                client.email(), client.phone(), client.segment(), client.contactName(),
+                client.email(), client.phone(), client.segment(), HubCrmNormalization.contactName(client.contactName()),
                 client.contactDepartment(), client.contactEmail(), client.contactPhone(),
                 client.firstCteWithoutFreight());
     }

@@ -16,6 +16,8 @@ class HubCrmNormalizationTest {
     void descartaContatoErickEEmailsOperacionaisInvalidos() {
         assertThat(HubCrmNormalization.validContactName("Erick")).isFalse();
         assertThat(HubCrmNormalization.validContactName("Fernanda Silva")).isTrue();
+        assertThat(HubCrmNormalization.contactName("1111111111 || VANIA")).isEqualTo("VANIA");
+        assertThat(HubCrmNormalization.validContactName("1111111111 || VANIA")).isTrue();
         assertThat(HubCrmNormalization.validEmail("ti@ti.com.br")).isFalse();
         assertThat(HubCrmNormalization.validEmail("compras@cliente.com.br")).isTrue();
     }
