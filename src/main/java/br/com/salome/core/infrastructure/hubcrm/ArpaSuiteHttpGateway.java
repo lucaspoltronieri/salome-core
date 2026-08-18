@@ -181,7 +181,8 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     @Override
     public long addAnnotation(long dealId, String text) {
         try {
-            return extractId(post("/annotations", Map.of("dealId", dealId, "text", text)));
+            return extractId(post("/annotations", Map.of(
+                    "type", "observation", "dealId", dealId, "text", text)));
         } catch (InvalidArpaResponseException exception) {
             return 0L;
         }

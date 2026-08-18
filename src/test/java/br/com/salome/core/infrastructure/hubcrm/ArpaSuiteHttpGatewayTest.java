@@ -115,6 +115,30 @@ class ArpaSuiteHttpGatewayTest {
         }
     }
 
+    @Test
+    void criaAnotacaoComoObservacao() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> request = new AtomicReference<>();
+        server.createContext("/api/annotations", exchange -> {
+            request.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"id\":456}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(201, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+
+            assertThat(gateway.addAnnotation(123L, "Data do primeiro CT-e")).isEqualTo(456L);
+            assertThat(request.get()).contains("\"type\":\"observation\"", "\"dealId\":123");
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private HubCrmProperties properties(String arpaUrl) {
         return new HubCrmProperties(true, false, 30000, 32001, 10,
                 "https://core.example.com", "12345678901234567890123456789012", 60,
