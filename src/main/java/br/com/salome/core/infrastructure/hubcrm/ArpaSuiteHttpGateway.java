@@ -7,7 +7,6 @@ import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.LossReason;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -243,7 +242,6 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     public void markWon(long dealId, LocalDateTime wonAt) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "won");
-        if (wonAt != null) payload.put("winDate", apiDateTime(wonAt));
         put("/deals/" + dealId, payload);
     }
 
@@ -253,7 +251,6 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "lost");
         payload.put("lostReasonId", lostReasonIds.get(reason));
-        if (lostAt != null) payload.put("lostDate", apiDateTime(lostAt));
         put("/deals/" + dealId, payload);
     }
 
@@ -432,10 +429,6 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     private double amount(BigDecimal value) {
         return value == null ? 0 : value.doubleValue();
-    }
-
-    private String apiDateTime(LocalDateTime value) {
-        return value.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 
     private String bestPhone(String value) {

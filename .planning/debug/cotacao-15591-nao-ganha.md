@@ -15,10 +15,10 @@ updated: 2026-08-18
 
 ## Current Focus
 
-- hypothesis: A chamada de ganho foi rejeitada pelo formato da data enviado a API.
-- test: Consultar status, last_error e logs da cotacao 15591.
-- expecting: Erro 422 relacionado ao campo winDate ou falha equivalente da API.
-- next_action: Alterar winDate/lostDate para ISO local, testar, publicar e reprocessar 15591.
+- hypothesis: A versao atual da API rejeita o proprio campo winDate; a transicao deve omiti-lo.
+- test: Enviar somente status=won e verificar o card 2232585.
+- expecting: Card ganho, com data tecnica definida pelo ArpaSuite.
+- next_action: Omitir winDate/lostDate, testar, publicar e reprocessar 15591.
 - reasoning_checkpoint:
 - tdd_checkpoint:
 
@@ -28,12 +28,14 @@ updated: 2026-08-18
   finding: hub_crm_quote 15591 esta APROVADA/ERRO, vinculada ao deal 2232585.
 - timestamp: 2026-08-18T15:10:00-03:00
   finding: API rejeitou winDate com offset e respondeu HTTP 422.
+- timestamp: 2026-08-18T15:14:00-03:00
+  finding: API tambem rejeitou ISO local, UTC Z, formato SQL e formato brasileiro.
 
 ## Eliminated
 
 ## Resolution
 
-- root_cause: O Hub enviava LocalDateTime convertido para OffsetDateTime com sufixo -03:00; o validador do ArpaSuite rejeitou o campo.
-- fix: Formatar winDate e lostDate como ISO_LOCAL_DATE_TIME, sem offset.
+- root_cause: A versao atual da API rejeita o campo winDate com HTTP 422 em todos os formatos documentados; enviar esse campo impede a transicao.
+- fix: Omitir winDate/lostDate, enviar status e motivo, e preservar a data real do legado na timeline.
 - verification:
 - files_changed:

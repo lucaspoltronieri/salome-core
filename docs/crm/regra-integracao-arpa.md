@@ -73,7 +73,8 @@ mais recente em qualquer estagio do funil (Carteira, Lead, Contato,
 Diagnostico, Negociacao ou outro). O card nao sera reaproveitado quando ja
 estiver amarrado no banco do Hub a outra cotacao.
 
-As datas de ganho e perda sao enviadas nos campos `winDate` e `lostDate` como
-ISO 8601 local (`yyyy-MM-dd'T'HH:mm:ss`), preservando o horario do legado sem
-acrescentar offset. O ArpaSuite rejeita esses campos quando recebem o sufixo de
-fuso horario.
+Ao marcar ganho ou perda, o Hub envia o `status` e, na perda, o motivo. A versao
+atual da API rejeita `winDate` e `lostDate` com erro HTTP 422 mesmo nos formatos
+descritos na documentacao; por isso esses campos nao sao enviados. O ArpaSuite
+grava sua data tecnica no momento da integracao, enquanto a data e hora reais
+do legado permanecem registradas na anotacao da timeline.

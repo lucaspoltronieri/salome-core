@@ -171,7 +171,7 @@ class ArpaSuiteHttpGatewayTest {
     }
 
     @Test
-    void enviaDataDeGanhoComoIsoLocalSemOffset() throws Exception {
+    void marcaGanhoSemEnviarCampoDeDataRejeitadoPelaApi() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> request = new AtomicReference<>();
         server.createContext("/api/deals/123", exchange -> {
@@ -191,8 +191,7 @@ class ArpaSuiteHttpGatewayTest {
             gateway.markWon(123, LocalDateTime.of(2026, 8, 18, 15, 6, 1));
 
             assertThat(request.get()).contains("\"status\":\"won\"")
-                    .contains("\"winDate\":\"2026-08-18T15:06:01\"")
-                    .doesNotContain("-03:00");
+                    .doesNotContain("winDate");
         } finally {
             server.stop(0);
         }
