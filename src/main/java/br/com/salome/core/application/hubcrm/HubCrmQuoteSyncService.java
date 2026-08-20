@@ -49,11 +49,9 @@ public class HubCrmQuoteSyncService {
             store.discoverQuote(quote, hash);
             var current = store.findQuote(quote.id()).orElseThrow();
             if ("INTEGRADO".equals(current.status()) && hash.equals(current.snapshotHash())) {
-                // O status pode ter falhado anteriormente mesmo quando o snapshot já foi
-                // integrado. Reconciliamos a transição sem criar nova anotação.
-                if (current.dealId() != null && "APROVADA".equals(HubCrmNormalization.normalizedText(quote.status()))) {
-                    arpa.markWon(current.dealId(), quote.statusAt());
-                }
+                // Reprocessa somente transições que ainda não possuem evento concluído.
+                // Nunca envia novamente um ganho/perda confirmado a cada polling.
+                if (current.dealId() != null) applyStatus(quote, current.dealId());
                 trySendPdf(quote, current.peopleId(), current.dealId(), current.whatsappStatus());
                 skipped++;
                 continue;
@@ -120,7 +118,7 @@ public class HubCrmQuoteSyncService {
         arpa.updateDealFromQuote(dealId, quote, userId);
 
         String quoteEvent = "quote:" + quote.id() + ":snapshot:" + hash;
-        if (!store.eventProcessed(quoteEvent)) {
+        if (hasCalculatedFreight(quote) && !store.eventProcessed(quoteEvent)) {
             long annotationId = arpa.addAnnotation(dealId, quoteAnnotation(quote));
             store.recordEvent(quoteEvent, "COTACAO", quote.id(), "COTACAO_SALVA",
                     "PROCESSADO", "Anotação " + annotationId, null);
@@ -156,12 +154,12 @@ public class HubCrmQuoteSyncService {
         }
     }
 
-    private void applyStatus(LegacyQuote quote, long dealId) {
+    void applyStatus(LegacyQuote quote, long dealId) {
         String status = HubCrmNormalization.normalizedText(quote.status());
         String eventKey = "quote:" + quote.id() + ":status:" + status + ":" + quote.statusAt();
         if ("APROVADA".equals(status)) {
-            arpa.markWon(dealId, quote.statusAt());
             if (store.eventProcessed(eventKey)) return;
+            arpa.markWon(dealId, quote.statusAt());
             arpa.addAnnotation(dealId, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt());
             store.recordEvent(eventKey, "COTACAO", quote.id(), "GANHO", "PROCESSADO", "Card ganho", null);
         } else if ("NAO APROVADA".equals(status)) {
@@ -170,8 +168,8 @@ public class HubCrmQuoteSyncService {
                         + quote.selectedLossReasons().size());
             }
             Map.Entry<LossReason, String> reason = quote.selectedLossReasons().entrySet().iterator().next();
-            arpa.markLost(dealId, reason.getKey(), quote.statusAt());
             if (store.eventProcessed(eventKey)) return;
+            arpa.markLost(dealId, reason.getKey(), quote.statusAt());
             arpa.addAnnotation(dealId, "Cotação " + quote.id() + " não aprovada. Motivo: "
                     + reason.getKey().arpaName() + ". Observação: " + safe(reason.getValue()));
             store.recordEvent(eventKey, "COTACAO", quote.id(), "PERDIDO", "PROCESSADO",
@@ -197,6 +195,10 @@ public class HubCrmQuoteSyncService {
                 money(q.freightWeight()), money(q.freightValue()), money(q.toll()), money(q.pickup()),
                 money(q.delivery()), money(q.dispatch()), money(q.gris()), money(q.redelivery()), money(q.icms()),
                 money(q.discount()), money(q.addition()), money(q.totalFreight()));
+    }
+
+    private boolean hasCalculatedFreight(LegacyQuote quote) {
+        return quote.totalFreight() != null && quote.totalFreight().compareTo(BigDecimal.ZERO) > 0;
     }
 
     private String quoteHash(LegacyQuote quote) {

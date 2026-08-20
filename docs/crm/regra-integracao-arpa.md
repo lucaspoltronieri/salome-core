@@ -78,3 +78,13 @@ atual da API rejeita `winDate` e `lostDate` com erro HTTP 422 mesmo nos formatos
 descritos na documentacao; por isso esses campos nao sao enviados. O ArpaSuite
 grava sua data tecnica no momento da integracao, enquanto a data e hora reais
 do legado permanecem registradas na anotacao da timeline.
+
+As transicoes de ganho e perda sao idempotentes: depois que o evento de status
+fica `PROCESSADO`, o polling nao envia novamente a mesma alteracao ao
+ArpaSuite. Isso evita que o historico do card receba uma linha a cada 30
+segundos.
+
+A observacao detalhada da cotacao somente e criada quando `totalFrete` for
+maior que zero. Salvar a cotacao antes de calcular o frete pode atualizar o
+controle interno e o card, mas nao gera timeline sem valores. Quando o frete
+for calculado e salvo, a mudanca do snapshot cria a observacao completa.

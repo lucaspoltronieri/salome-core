@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -129,6 +130,31 @@ class HubCrmQuoteSyncServiceTest {
     }
 
     @Test
+    void ganhoJaProcessadoNaoEhReenviadoAoArpa() {
+        LegacyQuote quote = quote("APROVADA", Map.of());
+        String eventKey = "quote:" + quote.id() + ":status:APROVADA:" + quote.statusAt();
+        when(store.eventProcessed(eventKey)).thenReturn(false, true);
+
+        service.applyStatus(quote, 99);
+        service.applyStatus(quote, 99);
+
+        verify(arpa, times(1)).markWon(99, quote.statusAt());
+        verify(arpa, times(1)).addAnnotation(99,
+                "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt());
+    }
+
+    @Test
+    void cotacaoSemFreteCalculadoNaoCriaTimeline() {
+        LegacyQuote quote = quote("ABERTA", Map.of(), BigDecimal.ZERO);
+        prepare(quote);
+
+        service.syncQuotes();
+
+        verify(arpa, never()).addAnnotation(anyLong(), anyString());
+        verify(arpa).updateDealFromQuote(99, quote, 4);
+    }
+
+    @Test
     void naoAprovadaComUmMotivoMarcaComoPerdida() {
         LegacyQuote quote = quote("NÃO APROVADA", Map.of(LossReason.HIGH_PRICE, "Cliente achou caro"));
         prepare(quote);
@@ -159,6 +185,10 @@ class HubCrmQuoteSyncServiceTest {
     }
 
     private LegacyQuote quote(String status, Map<LossReason, String> reasons) {
+        return quote(status, reasons, new BigDecimal("150"));
+    }
+
+    private LegacyQuote quote(String status, Map<LossReason, String> reasons, BigDecimal totalFreight) {
         BigDecimal zero = BigDecimal.ZERO;
         return new LegacyQuote(15580, LocalDate.of(2026, 8, 17), "10:30", "FERNANDA", status,
                 LocalDateTime.of(2026, 8, 17, 11, 0), "Emitente (CIF)",
@@ -167,7 +197,7 @@ class HubCrmQuoteSyncServiceTest {
                 "12345678000190", "REMETENTE LTDA", "11999999999", "vendas@remetente.com",
                 "DIVERSOS", 2, new BigDecimal("50"), new BigDecimal("1000"), new BigDecimal("0.5"),
                 new BigDecimal("100"), new BigDecimal("20"), new BigDecimal("10"), zero, zero,
-                zero, zero, zero, new BigDecimal("20"), zero, zero, new BigDecimal("150"),
+                zero, zero, zero, new BigDecimal("20"), zero, zero, totalFreight,
                 "Maria", reasons);
     }
 
