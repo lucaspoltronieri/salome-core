@@ -88,3 +88,9 @@ A observacao detalhada da cotacao somente e criada quando `totalFrete` for
 maior que zero. Salvar a cotacao antes de calcular o frete pode atualizar o
 controle interno e o card, mas nao gera timeline sem valores. Quando o frete
 for calculado e salvo, a mudanca do snapshot cria a observacao completa.
+
+A chave idempotente da observacao usa apenas o conteudo visivel da propria
+timeline. Alteracoes de status, data de aprovacao ou outros campos tecnicos que
+nao mudem esse texto nao criam uma segunda observacao. O snapshot tecnico do
+card e o evento de ganho/perda continuam separados. Registros anteriores a
+essa regra sao indexados no primeiro polling sem republicar a observacao.

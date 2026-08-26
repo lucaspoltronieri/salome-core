@@ -256,6 +256,22 @@ public class HubCrmStore {
         return count != null && count > 0;
     }
 
+    public boolean hasProcessedQuoteContentEvent(long quoteId) {
+        return hasProcessedEventPrefix("quote:" + quoteId + ":content:");
+    }
+
+    public boolean hasProcessedLegacyQuoteSnapshotEvent(long quoteId) {
+        return hasProcessedEventPrefix("quote:" + quoteId + ":snapshot:");
+    }
+
+    private boolean hasProcessedEventPrefix(String prefix) {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM hub_crm_event
+                WHERE event_key LIKE ? AND status='PROCESSADO'
+                """, Long.class, prefix + "%");
+        return count != null && count > 0;
+    }
+
     public Map<String, Object> summary() {
         return Map.of(
                 "clientes", count("hub_crm_client"),

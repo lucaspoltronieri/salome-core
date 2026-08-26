@@ -51,7 +51,10 @@ public class HubCrmQuoteSyncService {
             if ("INTEGRADO".equals(current.status()) && hash.equals(current.snapshotHash())) {
                 // Reprocessa somente transições que ainda não possuem evento concluído.
                 // Nunca envia novamente um ganho/perda confirmado a cada polling.
-                if (current.dealId() != null) applyStatus(quote, current.dealId());
+                if (current.dealId() != null) {
+                    applyQuoteAnnotation(quote, current.dealId());
+                    applyStatus(quote, current.dealId());
+                }
                 trySendPdf(quote, current.peopleId(), current.dealId(), current.whatsappStatus());
                 skipped++;
                 continue;
@@ -117,12 +120,7 @@ public class HubCrmQuoteSyncService {
         arpa.updatePerson(peopleId, HubCrmNormalization.shortName(quote.payerName()), quote.payerPhone(), organizationId);
         arpa.updateDealFromQuote(dealId, quote, userId);
 
-        String quoteEvent = "quote:" + quote.id() + ":snapshot:" + hash;
-        if (hasCalculatedFreight(quote) && !store.eventProcessed(quoteEvent)) {
-            long annotationId = arpa.addAnnotation(dealId, quoteAnnotation(quote));
-            store.recordEvent(quoteEvent, "COTACAO", quote.id(), "COTACAO_SALVA",
-                    "PROCESSADO", "Anotação " + annotationId, null);
-        }
+        applyQuoteAnnotation(quote, dealId);
         applyStatus(quote, dealId);
         store.markQuoteIntegrated(quote, organizationId, peopleId, dealId, userId, hash,
                 arpa.hasWhatsappChannel() ? "PENDENTE" : "AGUARDANDO_CANAL");
@@ -195,6 +193,26 @@ public class HubCrmQuoteSyncService {
                 money(q.freightWeight()), money(q.freightValue()), money(q.toll()), money(q.pickup()),
                 money(q.delivery()), money(q.dispatch()), money(q.gris()), money(q.redelivery()), money(q.icms()),
                 money(q.discount()), money(q.addition()), money(q.totalFreight()));
+    }
+
+    void applyQuoteAnnotation(LegacyQuote quote, long dealId) {
+        if (!hasCalculatedFreight(quote)) return;
+        String annotation = quoteAnnotation(quote);
+        String eventKey = "quote:" + quote.id() + ":content:" + HubCrmNormalization.sha256(annotation);
+        if (store.eventProcessed(eventKey)) return;
+
+        // Compatibilidade dos registros criados antes do hash de conteúdo: no
+        // primeiro ciclo, memoriza a observação já existente sem publicá-la de novo.
+        if (!store.hasProcessedQuoteContentEvent(quote.id())
+                && store.hasProcessedLegacyQuoteSnapshotEvent(quote.id())) {
+            store.recordEvent(eventKey, "COTACAO", quote.id(), "COTACAO_SALVA",
+                    "PROCESSADO", "Conteúdo existente indexado sem nova anotação", null);
+            return;
+        }
+
+        long annotationId = arpa.addAnnotation(dealId, annotation);
+        store.recordEvent(eventKey, "COTACAO", quote.id(), "COTACAO_SALVA",
+                "PROCESSADO", "Anotação " + annotationId, null);
     }
 
     private boolean hasCalculatedFreight(LegacyQuote quote) {

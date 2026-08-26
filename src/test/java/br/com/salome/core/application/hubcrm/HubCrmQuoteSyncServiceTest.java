@@ -155,6 +155,31 @@ class HubCrmQuoteSyncServiceTest {
     }
 
     @Test
+    void mudancaSomenteDeStatusNaoDuplicaObservacaoDaCotacao() {
+        LegacyQuote open = quote("ABERTA", Map.of());
+        LegacyQuote approved = quote("APROVADA", Map.of());
+        when(store.eventProcessed(anyString())).thenReturn(false, true);
+
+        service.applyQuoteAnnotation(open, 99);
+        service.applyQuoteAnnotation(approved, 99);
+
+        verify(arpa, times(1)).addAnnotation(anyLong(), anyString());
+    }
+
+    @Test
+    void primeiraLeituraDoNovoHashIndexaObservacaoAntigaSemDuplicar() {
+        LegacyQuote quote = quote("APROVADA", Map.of());
+        when(store.hasProcessedQuoteContentEvent(quote.id())).thenReturn(false);
+        when(store.hasProcessedLegacyQuoteSnapshotEvent(quote.id())).thenReturn(true);
+
+        service.applyQuoteAnnotation(quote, 99);
+
+        verify(arpa, never()).addAnnotation(anyLong(), anyString());
+        verify(store).recordEvent(anyString(), anyString(), anyLong(), anyString(), anyString(),
+                org.mockito.ArgumentMatchers.contains("indexado sem nova anotação"), any());
+    }
+
+    @Test
     void naoAprovadaComUmMotivoMarcaComoPerdida() {
         LegacyQuote quote = quote("NÃO APROVADA", Map.of(LossReason.HIGH_PRICE, "Cliente achou caro"));
         prepare(quote);
