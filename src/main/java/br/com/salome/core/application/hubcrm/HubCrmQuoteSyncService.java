@@ -103,7 +103,7 @@ public class HubCrmQuoteSyncService {
             peopleId = external.get().peopleId();
             dealId = external.get().id();
         } else {
-            organizationId = arpa.createOrganization(quote.payerName());
+            organizationId = arpa.createOrganization(HubCrmNormalization.businessName(quote.payerName()));
             peopleId = arpa.createPerson(HubCrmNormalization.shortName(quote.payerName()),
                     quote.payerPhone(), organizationId);
             if (external.isPresent()) {
@@ -116,7 +116,7 @@ public class HubCrmQuoteSyncService {
         // O vínculo é persistido antes das atualizações e da timeline. Assim, uma
         // falha posterior nunca transforma a mesma cotação em um novo card no retry.
         store.bindQuote(quote.id(), organizationId, peopleId, dealId, userId);
-        arpa.updateOrganization(organizationId, quote.payerName());
+        arpa.updateOrganization(organizationId, HubCrmNormalization.businessName(quote.payerName()));
         arpa.updatePerson(peopleId, HubCrmNormalization.shortName(quote.payerName()), quote.payerPhone(), organizationId);
         arpa.updateDealFromQuote(dealId, quote, userId);
 
@@ -188,7 +188,8 @@ public class HubCrmQuoteSyncService {
                 Entrega: %s | Despacho: %s | GRIS: %s | Redespacho: %s | ICMS: %s
                 Desconto: %s | Acréscimo: %s | Total: %s
                 """.formatted(q.id(), safe(q.responsible()), safe(q.paymentType()),
-                safe(q.senderName()), safe(q.senderCnpj()), safe(q.recipientName()), safe(q.recipientCnpj()),
+                safe(HubCrmNormalization.businessName(q.senderName())), safe(q.senderCnpj()),
+                safe(HubCrmNormalization.businessName(q.recipientName())), safe(q.recipientCnpj()),
                 safe(q.cargoType()), q.volumes(), decimal(q.weight()), decimal(q.cubage()), money(q.invoiceValue()),
                 money(q.freightWeight()), money(q.freightValue()), money(q.toll()), money(q.pickup()),
                 money(q.delivery()), money(q.dispatch()), money(q.gris()), money(q.redelivery()), money(q.icms()),
@@ -221,9 +222,10 @@ public class HubCrmQuoteSyncService {
 
     private String quoteHash(LegacyQuote quote) {
         return HubCrmNormalization.sha256(quote.id(), quote.status(), quote.statusAt(), quote.responsible(),
-                quote.paymentType(), quote.senderCnpj(), quote.senderName(), quote.senderCity(),
-                quote.recipientCnpj(), quote.recipientName(), quote.recipientCity(), quote.payerCnpj(),
-                quote.payerName(), quote.payerPhone(), quote.payerEmail(), quote.cargoType(), quote.volumes(),
+                quote.paymentType(), quote.senderCnpj(), HubCrmNormalization.businessName(quote.senderName()),
+                quote.senderCity(), quote.recipientCnpj(), HubCrmNormalization.businessName(quote.recipientName()),
+                quote.recipientCity(), quote.payerCnpj(), HubCrmNormalization.businessName(quote.payerName()),
+                quote.payerPhone(), quote.payerEmail(), quote.cargoType(), quote.volumes(),
                 quote.weight(), quote.invoiceValue(), quote.cubage(), quote.freightWeight(), quote.freightValue(),
                 quote.toll(), quote.pickup(), quote.delivery(), quote.dispatch(), quote.gris(), quote.redelivery(),
                 quote.icms(), quote.discount(), quote.addition(), quote.totalFreight(), quote.selectedLossReasons());

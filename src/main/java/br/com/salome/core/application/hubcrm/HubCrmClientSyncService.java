@@ -62,7 +62,8 @@ public class HubCrmClientSyncService {
         List<ClientWork> work = new ArrayList<>();
         for (LegacyCrmClient client : source) {
             String cnpj = HubCrmNormalization.digits(client.cnpj());
-            String normalizedName = HubCrmNormalization.normalizedText(client.legalName());
+            String normalizedName = HubCrmNormalization.normalizedText(
+                    HubCrmNormalization.businessName(client.legalName()));
             if (cnpj.length() != 14 || !cnpjs.add(cnpj) || !legalNames.add(normalizedName)) {
                 skipped++;
                 continue;
@@ -142,26 +143,32 @@ public class HubCrmClientSyncService {
         String personName = HubCrmNormalization.validContactName(contactName)
                 ? contactName : HubCrmNormalization.shortName(client.legalName());
         String phone = preferredPhone(client.contactPhone(), client.phone());
+        String organizationName = HubCrmNormalization.businessName(client.legalName());
 
         if (current.dealId() != null && current.organizationId() != null && current.peopleId() != null) {
             organizationId = current.organizationId();
+            peopleId = current.peopleId();
             dealId = current.dealId();
-            arpa.updateOrganization(organizationId, client.legalName());
-            peopleId = hasContact ? arpa.createPerson(personName, phone, organizationId) : null;
-            if (peopleId != null) arpa.updatePerson(peopleId, personName, phone, organizationId);
-            arpa.linkDeal(dealId, organizationId, peopleId, userId);
-            arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
+            arpa.updateOrganization(organizationId, organizationName);
+            if (hasContact) {
+                arpa.updatePerson(peopleId, personName, phone, organizationId);
+                arpa.linkDeal(dealId, organizationId, peopleId, userId);
+                arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
+            } else {
+                peopleId = null;
+                arpa.updatePortfolioDealWithoutPerson(dealId, client, organizationId, userId);
+            }
         } else {
             var external = arpa.findLatestOpenDealByCnpj(client.cnpj());
             if (external.isPresent() && external.get().organizationId() != null && external.get().peopleId() != null) {
                 organizationId = external.get().organizationId();
                 peopleId = external.get().peopleId();
                 dealId = external.get().id();
-                arpa.updateOrganization(organizationId, client.legalName());
+                arpa.updateOrganization(organizationId, organizationName);
                 arpa.updatePerson(peopleId, personName, phone, organizationId);
                 arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
             } else {
-                organizationId = arpa.createOrganization(client.legalName());
+                organizationId = arpa.createOrganization(organizationName);
                 peopleId = hasContact ? arpa.createPerson(personName, phone, organizationId) : null;
                 if (external.isPresent()) {
                     dealId = external.get().id();
@@ -192,7 +199,8 @@ public class HubCrmClientSyncService {
     }
 
     private String clientHash(LegacyCrmClient client) {
-        return HubCrmNormalization.sha256(client.legalName(), client.cnpj(), client.city(), client.state(),
+        return HubCrmNormalization.sha256(HubCrmNormalization.businessName(client.legalName()),
+                client.cnpj(), client.city(), client.state(),
                 client.email(), client.phone(), client.segment(), HubCrmNormalization.contactName(client.contactName()),
                 client.contactDepartment(), client.contactEmail(), client.contactPhone(),
                 client.firstCteWithoutFreight());

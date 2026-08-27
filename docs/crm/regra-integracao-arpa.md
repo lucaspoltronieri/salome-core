@@ -11,6 +11,15 @@ A data historica enviada para a timeline e sempre `MIN(conhecimento.cteEmissao)`
 dos CT-es em que o cliente aparece como destinatario sem pagar o frete. A data
 de cadastro do cliente nao e usada pelo Hub CRM.
 
+Quando a razao social de um empresario individual comecar por uma inscricao
+numerica de 8, 11 ou 14 digitos, com ou sem mascara, o Hub remove essa inscricao
+do nome apresentado no ArpaSuite. A regra vale para organizacao, pessoa, titulo
+do card e nomes exibidos na observacao da cotacao. Por exemplo,
+`63.110.705 REYNALDO LUIZ CERQUEIRA DE SOUZA` passa a ser
+`REYNALDO LUIZ CERQUEIRA DE SOUZA`. Numeros que fazem parte de uma marca, como
+`3M DO BRASIL` e `1001 FESTAS`, sao preservados. O CNPJ continua sendo enviado
+integralmente no campo personalizado proprio e nao e alterado por essa regra.
+
 ## Cotacoes
 
 Origem funcional observada no legado:

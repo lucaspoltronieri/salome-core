@@ -6,10 +6,13 @@ import java.text.Normalizer;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class HubCrmNormalization {
     private static final Set<String> LEGAL_SUFFIXES = Set.of(
             "LTDA", "LIMITADA", "SA", "S/A", "EIRELI", "ME", "EPP", "MEI");
+    private static final Pattern LEADING_REGISTRATION = Pattern.compile(
+            "^([0-9][0-9\\s.\\-/]*)\\s+(.+)$", Pattern.UNICODE_CHARACTER_CLASS);
 
     private HubCrmNormalization() {}
 
@@ -27,7 +30,7 @@ public final class HubCrmNormalization {
     }
 
     public static String shortName(String legalName) {
-        String prepared = legalName == null ? "" : legalName
+        String prepared = businessName(legalName)
                 .replaceAll("(?i)\\bS\\.?\\s*/?\\s*A\\.?\\b", " ");
         String[] words = normalizedText(prepared).split(" ");
         StringBuilder result = new StringBuilder();
@@ -38,6 +41,17 @@ public final class HubCrmNormalization {
             if (result.toString().length() >= 28 || result.toString().split(" ").length == 3) break;
         }
         return result.isEmpty() ? "CLIENTE" : result.toString();
+    }
+
+    public static String businessName(String legalName) {
+        if (valueIsBlank(legalName)) return "";
+        String prepared = legalName.trim().replaceAll("\\s+", " ");
+        var matcher = LEADING_REGISTRATION.matcher(prepared);
+        if (!matcher.matches()) return prepared;
+        int identifierLength = digits(matcher.group(1)).length();
+        if (identifierLength != 8 && identifierLength != 11 && identifierLength != 14) return prepared;
+        String name = matcher.group(2).trim();
+        return name.matches(".*\\p{L}.*") ? name : prepared;
     }
 
     public static boolean validContactName(String value) {

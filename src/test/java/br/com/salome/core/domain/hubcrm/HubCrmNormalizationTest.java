@@ -13,6 +13,26 @@ class HubCrmNormalizationTest {
     }
 
     @Test
+    void removeIdentificadorNumericoDeEmpresarioIndividual() {
+        assertThat(HubCrmNormalization.businessName("63.110.705 REYNALDO LUIZ CERQUEIRA DE SOUZA"))
+                .isEqualTo("REYNALDO LUIZ CERQUEIRA DE SOUZA");
+        assertThat(HubCrmNormalization.shortName("63.110.705 REYNALDO LUIZ CERQUEIRA DE SOUZA"))
+                .isEqualTo("REYNALDO LUIZ CERQUEIRA");
+        assertThat(HubCrmNormalization.businessName("123.456.789-00 MARIA DA SILVA"))
+                .isEqualTo("MARIA DA SILVA");
+        assertThat(HubCrmNormalization.businessName("12.345.678/0001-90 JOAO COMERCIO"))
+                .isEqualTo("JOAO COMERCIO");
+    }
+
+    @Test
+    void preservaNomeComercialAlfanumericoOuNumeroCurto() {
+        assertThat(HubCrmNormalization.businessName("3M DO BRASIL LTDA"))
+                .isEqualTo("3M DO BRASIL LTDA");
+        assertThat(HubCrmNormalization.businessName("1001 FESTAS LTDA"))
+                .isEqualTo("1001 FESTAS LTDA");
+    }
+
+    @Test
     void descartaContatoErickEEmailsOperacionaisInvalidos() {
         assertThat(HubCrmNormalization.validContactName("Erick")).isFalse();
         assertThat(HubCrmNormalization.validContactName("Fernanda Silva")).isTrue();
