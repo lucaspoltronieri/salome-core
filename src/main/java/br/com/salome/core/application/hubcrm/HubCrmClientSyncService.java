@@ -71,8 +71,11 @@ public class HubCrmClientSyncService {
             String hash = clientHash(client);
             store.discoverClient(client, normalizedName, hash);
             ClientIntegration current = store.findClient(cnpj).orElseThrow();
-            if (("INTEGRADO".equals(current.status()) || "SEM_CONTATO".equals(current.status()))
-                    && hash.equals(current.snapshotHash())) {
+            boolean unchangedIntegrated = "INTEGRADO".equals(current.status())
+                    && hash.equals(current.snapshotHash());
+            boolean unchangedWithoutContact = "SEM_CONTATO".equals(current.status())
+                    && current.dealId() == null && hash.equals(current.snapshotHash());
+            if (unchangedIntegrated || unchangedWithoutContact) {
                 skipped++;
                 continue;
             }
