@@ -197,6 +197,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("title", HubCrmNormalization.shortName(item.legalName()));
         payload.put("userId", userId);
+        payload.put("peopleId", null);
         payload.put("organizationId", organizationId);
         payload.put("customfields", clientFields(item));
         put("/deals/" + dealId, payload);
