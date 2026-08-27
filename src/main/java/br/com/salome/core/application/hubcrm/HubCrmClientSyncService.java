@@ -113,8 +113,9 @@ public class HubCrmClientSyncService {
 
     private ClientResult process(ClientWork item) {
         try {
-            if (!HubCrmNormalization.validContactName(
-                    HubCrmNormalization.contactName(item.client().contactName()))) {
+            boolean hasValidContact = HubCrmNormalization.validContactName(
+                    HubCrmNormalization.contactName(item.client().contactName()));
+            if (!hasValidContact && item.current().dealId() == null) {
                 store.markClientWithoutContact(item.cnpj(), item.hash());
                 return new ClientResult(0, 0, 0);
             }
@@ -145,12 +146,13 @@ public class HubCrmClientSyncService {
         String phone = preferredPhone(client.contactPhone(), client.phone());
         String organizationName = HubCrmNormalization.businessName(client.legalName());
 
-        if (current.dealId() != null && current.organizationId() != null && current.peopleId() != null) {
+        if (current.dealId() != null && current.organizationId() != null) {
             organizationId = current.organizationId();
             peopleId = current.peopleId();
             dealId = current.dealId();
             arpa.updateOrganization(organizationId, organizationName);
             if (hasContact) {
+                if (peopleId == null) peopleId = arpa.createPerson(personName, phone, organizationId);
                 arpa.updatePerson(peopleId, personName, phone, organizationId);
                 arpa.linkDeal(dealId, organizationId, peopleId, userId);
                 arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
@@ -160,13 +162,19 @@ public class HubCrmClientSyncService {
             }
         } else {
             var external = arpa.findLatestOpenDealByCnpj(client.cnpj());
-            if (external.isPresent() && external.get().organizationId() != null && external.get().peopleId() != null) {
+            if (external.isPresent() && external.get().organizationId() != null) {
                 organizationId = external.get().organizationId();
-                peopleId = external.get().peopleId();
                 dealId = external.get().id();
                 arpa.updateOrganization(organizationId, organizationName);
-                arpa.updatePerson(peopleId, personName, phone, organizationId);
-                arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
+                peopleId = hasContact ? external.get().peopleId() : null;
+                if (hasContact) {
+                    if (peopleId == null) peopleId = arpa.createPerson(personName, phone, organizationId);
+                    arpa.updatePerson(peopleId, personName, phone, organizationId);
+                    arpa.linkDeal(dealId, organizationId, peopleId, userId);
+                    arpa.updatePortfolioDeal(dealId, client, organizationId, peopleId, userId);
+                } else {
+                    arpa.updatePortfolioDealWithoutPerson(dealId, client, organizationId, userId);
+                }
             } else {
                 organizationId = arpa.createOrganization(organizationName);
                 peopleId = hasContact ? arpa.createPerson(personName, phone, organizationId) : null;

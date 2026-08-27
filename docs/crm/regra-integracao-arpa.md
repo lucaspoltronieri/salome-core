@@ -19,6 +19,9 @@ do card e nomes exibidos na observacao da cotacao. Por exemplo,
 `REYNALDO LUIZ CERQUEIRA DE SOUZA`. Numeros que fazem parte de uma marca, como
 `3M DO BRASIL` e `1001 FESTAS`, sao preservados. O CNPJ continua sendo enviado
 integralmente no campo personalizado proprio e nao e alterado por essa regra.
+Cards ja existentes tambem recebem a correcao, inclusive quando o cadastro nao
+possui contato pessoal valido; nesse caso o Hub atualiza organizacao e card sem
+criar uma pessoa artificial com o nome da empresa.
 
 ## Cotacoes
 
