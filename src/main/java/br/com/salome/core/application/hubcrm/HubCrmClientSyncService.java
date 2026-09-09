@@ -73,9 +73,7 @@ public class HubCrmClientSyncService {
             ClientIntegration current = store.findClient(cnpj).orElseThrow();
             boolean unchangedIntegrated = "INTEGRADO".equals(current.status())
                     && hash.equals(current.snapshotHash());
-            boolean unchangedWithoutContact = "SEM_CONTATO".equals(current.status())
-                    && current.dealId() == null && hash.equals(current.snapshotHash());
-            if (unchangedIntegrated || unchangedWithoutContact) {
+            if (unchangedIntegrated) {
                 skipped++;
                 continue;
             }
@@ -116,12 +114,9 @@ public class HubCrmClientSyncService {
 
     private ClientResult process(ClientWork item) {
         try {
-            boolean hasValidContact = HubCrmNormalization.validContactName(
-                    HubCrmNormalization.contactName(item.client().contactName()));
-            if (!hasValidContact && item.current().dealId() == null) {
-                store.markClientWithoutContact(item.cnpj(), item.hash());
-                return new ClientResult(0, 0, 0);
-            }
+            // Todo cadastro elegível (destinatário que não paga frete) vira card na
+            // Carteira, com ou sem contato pessoal no legado. Sem contato válido o card
+            // fica ligado só à organização — nunca a uma pessoa com o nome da empresa.
             boolean wasIntegrated = item.current().dealId() != null;
             integrate(item.client(), item.current(), item.hash(), item.userId());
             return wasIntegrated ? new ClientResult(0, 1, 0) : new ClientResult(1, 0, 0);
@@ -149,7 +144,20 @@ public class HubCrmClientSyncService {
         String phone = preferredPhone(client.contactPhone(), client.phone());
         String organizationName = HubCrmNormalization.businessName(client.legalName());
 
-        if (current.dealId() != null && current.organizationId() != null) {
+        if (current.dealId() != null && current.organizationId() != null
+                && arpa.findDeal(current.dealId()).isEmpty()) {
+            // Card apagado no ArpaSuite: recria na Carteira reaproveitando a organização,
+            // em vez de repetir 404 a cada polling e deixar o cadastro sem card.
+            organizationId = current.organizationId();
+            arpa.updateOrganization(organizationId, organizationName);
+            peopleId = !hasContact ? null
+                    : current.peopleId() != null ? current.peopleId()
+                            : arpa.createPerson(personName, phone, organizationId);
+            if (peopleId != null) arpa.updatePerson(peopleId, personName, phone, organizationId);
+            dealId = peopleId == null
+                    ? arpa.createPortfolioDealWithoutPerson(client, organizationId, userId)
+                    : arpa.createPortfolioDeal(client, organizationId, peopleId, userId);
+        } else if (current.dealId() != null && current.organizationId() != null) {
             organizationId = current.organizationId();
             peopleId = current.peopleId();
             dealId = current.dealId();

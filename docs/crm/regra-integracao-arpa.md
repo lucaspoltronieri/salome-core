@@ -23,6 +23,17 @@ Cards ja existentes tambem recebem a correcao, inclusive quando o cadastro nao
 possui contato pessoal valido; nesse caso o Hub atualiza organizacao e card sem
 criar uma pessoa artificial com o nome da empresa.
 
+**Todo cadastro elegivel vira card na Carteira**, tenha ou nao contato pessoal
+no legado. Havendo contato valido, o Hub cria a pessoa e amarra ao card; sem
+contato (ausente, so numerico ou o contato interno `ERICK`), o card e criado
+ligado somente a organizacao. Ate 09/09/2026 a regra era outra — cadastro novo
+sem contato ficava com `sync_status=SEM_CONTATO` e sem card — o que deixou 81
+cadastros qualificados fora da Carteira.
+
+Quando o card gravado no Hub nao existe mais no ArpaSuite (apagado na mao, a API
+responde 404), o Hub recria o card reaproveitando a organizacao e a pessoa ja
+conhecidas, em vez de repetir o erro a cada polling.
+
 ## Cotacoes
 
 Origem funcional observada no legado:
