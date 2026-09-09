@@ -148,3 +148,18 @@ pagador), sem a inscricao numerica que alguns cadastros trazem na frente do nome
 curto (`shortName`, no maximo tres palavras e 28 caracteres), que cortava nomes
 como `AGROCENTER AGROPECUARIA E PET SHOP`. O nome curto continua valendo apenas
 para a pessoa, nao para o card.
+
+## Estagio do card de cotacao
+
+O card de cotacao vive em **Proposta Enviada**: criado, ganho ou perdido. A
+criacao e as atualizacoes ja gravavam `stageId`, mas o ganho e a perda enviavam
+so o `status` — entao um card arrastado a mao para Negociacao era fechado como
+ganho fora do lugar (visto em 09/09/2026 no card 2268977). Agora `markWon` e
+`markLost` tambem enviam o estagio de proposta e trazem o card de volta.
+
+Cards criados manualmente pelo time nao tem o campo personalizado de CNPJ nem o
+de `Base de Cotacao`, entao o Hub nao consegue encontra-los: a busca por card
+aberto usa o CNPJ do campo personalizado. Quando alguem cria o card na mao para
+uma cotacao que o Hub tambem vai integrar, o funil fica com dois cards do mesmo
+cliente — um manual e um da automacao. Isso nao e duplicacao gerada pelo Hub,
+que mantem um card por `idCotacao`.

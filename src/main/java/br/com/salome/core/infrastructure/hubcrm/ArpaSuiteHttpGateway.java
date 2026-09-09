@@ -262,6 +262,9 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     public void markWon(long dealId, LocalDateTime wonAt) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "won");
+        // O card de cotação vive em Proposta Enviada: criado, ganho ou perdido. Se alguém
+        // arrastou o card para outro estágio, o ganho/perda o traz de volta.
+        payload.put("stageId", properties.arpa().propostaStageId());
         put("/deals/" + dealId, payload);
     }
 
@@ -271,6 +274,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "lost");
         payload.put("lostReasonId", lostReasonIds.get(reason));
+        payload.put("stageId", properties.arpa().propostaStageId());
         put("/deals/" + dealId, payload);
     }
 

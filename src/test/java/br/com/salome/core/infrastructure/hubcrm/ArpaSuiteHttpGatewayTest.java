@@ -53,6 +53,32 @@ class ArpaSuiteHttpGatewayTest {
     }
 
     @Test
+    void ganhoDevolveOCardParaPropostaEnviada() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/api/deals/555", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"data\":{\"id\":555}}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+
+            gateway.markWon(555, LocalDateTime.of(2026, 9, 9, 10, 0));
+
+            // propostaStageId do properties() de teste = 3.
+            assertThat(requestBody.get()).contains("\"status\":\"won\"").contains("\"stageId\":3");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void cardSemContatoEnviaRazaoSocialComoPeopleName() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> requestBody = new AtomicReference<>();
