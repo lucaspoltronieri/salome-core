@@ -51,12 +51,23 @@ public class HubCrmQuoteSyncService {
             if ("INTEGRADO".equals(current.status()) && hash.equals(current.snapshotHash())) {
                 // Reprocessa somente transições que ainda não possuem evento concluído.
                 // Nunca envia novamente um ganho/perda confirmado a cada polling.
-                if (current.dealId() != null) {
-                    applyQuoteAnnotation(quote, current.dealId());
-                    applyStatus(quote, current.dealId());
+                // A falha aqui fica isolada nesta cotação: sem o try/catch, um erro no
+                // reprocesso de uma cotação antiga abortava o polling inteiro antes do
+                // checkpoint e nenhuma cotação nova subia (incidente de 09/2026).
+                try {
+                    if (current.dealId() != null) {
+                        applyQuoteAnnotation(quote, current.dealId());
+                        applyStatus(quote, current.dealId());
+                    }
+                    trySendPdf(quote, current.peopleId(), current.dealId(), current.whatsappStatus());
+                    skipped++;
+                } catch (Exception exception) {
+                    // Não muda o status da cotação: ela continua INTEGRADO e o
+                    // reprocesso é tentado de novo no próximo polling.
+                    failed++;
+                    store.recordEvent("quote:" + quote.id() + ":reprocesso:" + hash, "COTACAO",
+                            quote.id(), "REPROCESSAR", "ERRO", null, exception.getMessage());
                 }
-                trySendPdf(quote, current.peopleId(), current.dealId(), current.whatsappStatus());
-                skipped++;
                 continue;
             }
             if ("REVISAO".equals(current.status())

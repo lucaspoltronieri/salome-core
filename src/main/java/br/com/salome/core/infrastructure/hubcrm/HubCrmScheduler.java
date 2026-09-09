@@ -32,15 +32,25 @@ public class HubCrmScheduler {
         if (!running.compareAndSet(false, true)) return;
         lastStarted.set(Instant.now());
         try {
-            clients.syncNewClients();
-            quotes.syncQuotes();
-            lastError.set(null);
-        } catch (Exception exception) {
-            lastError.set(exception.getMessage());
-            log.error("Falha no polling do Hub CRM", exception);
+            // As duas sincronizações são independentes: uma falha na de clientes não pode
+            // impedir a de cotações de rodar (e vice-versa).
+            String clientError = run("clientes", clients::syncNewClients);
+            String quoteError = run("cotações", quotes::syncQuotes);
+            lastError.set(clientError == null ? quoteError
+                    : quoteError == null ? clientError : clientError + " | " + quoteError);
         } finally {
             lastFinished.set(Instant.now());
             running.set(false);
+        }
+    }
+
+    private String run(String etapa, Runnable step) {
+        try {
+            step.run();
+            return null;
+        } catch (Exception exception) {
+            log.error("Falha no polling do Hub CRM ({})", etapa, exception);
+            return etapa + ": " + exception.getMessage();
         }
     }
 

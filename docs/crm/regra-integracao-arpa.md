@@ -106,3 +106,21 @@ timeline. Alteracoes de status, data de aprovacao ou outros campos tecnicos que
 nao mudem esse texto nao criam uma segunda observacao. O snapshot tecnico do
 card e o evento de ganho/perda continuam separados. Registros anteriores a
 essa regra sao indexados no primeiro polling sem republicar a observacao.
+
+## Resiliencia do polling
+
+O cliente HTTP do ArpaSuite tem timeout de conexao (15s) e de leitura (60s). Sem
+esses limites o JDK espera para sempre: em 09/09/2026 uma resposta que nunca
+chegou em `GET /api/channels` deixou a thread `scheduling-1` parada por quatro
+dias, sem erro novo no log e com o servico marcado como ativo. O checkpoint
+ficou em 15765 e nenhuma cotacao de 05/09 em diante subiu.
+
+Cada cotacao e isolada no laco, inclusive no ramo de reprocesso das que ja estao
+integradas. Uma falha ali conta como `failed`, registra evento e nao muda o
+status da cotacao (segue `INTEGRADO`, tenta de novo no proximo polling), mas nao
+interrompe as demais nem impede o checkpoint de avancar. A sincronizacao de
+clientes e a de cotacoes tambem sao independentes: uma falhando nao impede a
+outra.
+
+A consulta do canal de WhatsApp e cacheada por 5 minutos, em vez de uma chamada
+por cotacao a cada polling.

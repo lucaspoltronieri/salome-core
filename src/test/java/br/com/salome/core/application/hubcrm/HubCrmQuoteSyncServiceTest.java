@@ -201,6 +201,38 @@ class HubCrmQuoteSyncServiceTest {
         verify(arpa, never()).markLost(anyLong(), any(), any());
     }
 
+    @Test
+    void falhaNoReprocessoNaoAbortaOPollingNemSeguraOCheckpoint() {
+        LegacyQuote integrada = quote("ABERTA", Map.of());
+        LegacyQuote nova = quote("ABERTA", Map.of(), new BigDecimal("300"), 15781);
+        when(legacy.findQuotesAfter(0)).thenReturn(List.of(integrada, nova));
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of());
+        // A cotação já integrada volta com o hash do próprio snapshot, então cai no
+        // ramo de reprocesso — onde o ArpaSuite falha (indisponível).
+        java.util.concurrent.atomic.AtomicReference<String> hash = new java.util.concurrent.atomic.AtomicReference<>();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            hash.set(invocation.getArgument(1));
+            return null;
+        }).when(store).discoverQuote(org.mockito.ArgumentMatchers.eq(integrada), anyString());
+        when(store.findQuote(integrada.id())).thenAnswer(invocation -> Optional.of(new QuoteIntegration(
+                integrada.id(), integrada.payerCnpj(), integrada.status(), 555L, 77L, 88L, 4L,
+                integrada.totalFreight(), hash.get(), "INTEGRADO", "AGUARDANDO_CANAL")));
+        when(store.findQuote(nova.id())).thenReturn(Optional.of(new QuoteIntegration(
+                nova.id(), nova.payerCnpj(), nova.status(), null, null, null, null,
+                nova.totalFreight(), "old", "PENDENTE", "AGUARDANDO_CANAL")));
+        when(arpa.addAnnotation(org.mockito.ArgumentMatchers.eq(555L), anyString()))
+                .thenThrow(new IllegalStateException("503 Service Unavailable"));
+
+        var result = service.syncQuotes();
+
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.integrated()).isEqualTo(1);
+        verify(arpa).updateDealFromQuote(99, nova, 4);
+        verify(store).setCheckpoint("last_quote_id", nova.id());
+        // A cotação que falhou continua INTEGRADO: o reprocesso é tentado no próximo polling.
+        verify(store, never()).markQuoteError(anyLong(), any());
+    }
+
     private void prepare(LegacyQuote quote) {
         when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
         when(legacy.findQuotesByIds(any())).thenReturn(List.of());
@@ -214,8 +246,13 @@ class HubCrmQuoteSyncServiceTest {
     }
 
     private LegacyQuote quote(String status, Map<LossReason, String> reasons, BigDecimal totalFreight) {
+        return quote(status, reasons, totalFreight, 15580);
+    }
+
+    private LegacyQuote quote(String status, Map<LossReason, String> reasons, BigDecimal totalFreight,
+            long id) {
         BigDecimal zero = BigDecimal.ZERO;
-        return new LegacyQuote(15580, LocalDate.of(2026, 8, 17), "10:30", "FERNANDA", status,
+        return new LegacyQuote(id, LocalDate.of(2026, 8, 17), "10:30", "FERNANDA", status,
                 LocalDateTime.of(2026, 8, 17, 11, 0), "Emitente (CIF)",
                 "12345678000190", "REMETENTE LTDA", "SÃO PAULO-SP",
                 "98765432000110", "DESTINATÁRIO LTDA", "CAMPINAS-SP",

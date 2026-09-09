@@ -13,7 +13,7 @@
 
     <groupId>br.com.salome</groupId>
     <artifactId>salome-core</artifactId>
-    <version>1.4.0</version>
+    <version>1.4.1</version>
     <name>salome-core</name>
     <description>Salome Core - financeiro, Torre, automacao de manifestos e Hub CRM (Spring Boot)</description>
     <packaging>jar</packaging>

@@ -6,6 +6,9 @@ import br.com.salome.core.domain.hubcrm.LegacyCrmClient;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.LossReason;
 import java.math.BigDecimal;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -17,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -27,10 +31,17 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnProperty(prefix = "salome.hub-crm", name = "enabled", havingValue = "true")
 public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    // Sem estes limites o RestClient herda o timeout infinito do JDK: em 09/2026 uma
+    // resposta que nunca chegou pendurou a thread do polling por dias, sem erro no log.
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(15);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(60);
+    // O canal de WhatsApp muda raramente; sem cache era uma chamada por cotação a cada polling.
+    private static final Duration CHANNEL_CACHE_TTL = Duration.ofMinutes(5);
     private final RestClient client;
     private final HubCrmProperties properties;
     private final Map<LossReason, Long> lostReasonIds = new EnumMap<>(LossReason.class);
     private final AtomicReference<Long> whatsappChannelId = new AtomicReference<>();
+    private final AtomicReference<Instant> whatsappChannelCheckedAt = new AtomicReference<>();
 
     public ArpaSuiteHttpGateway(HubCrmProperties properties) {
         this.properties = properties;
@@ -38,7 +49,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("SALOME_HUB_CRM_ARPA_API_KEY não configurada");
         }
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+        requestFactory.setReadTimeout(READ_TIMEOUT);
         this.client = RestClient.builder()
+                .requestFactory(requestFactory)
                 .baseUrl(stripTrailingSlash(properties.arpa().baseUrl()) + "/api")
                 .defaultHeader("X-API-Key", apiKey)
                 .defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
@@ -257,9 +272,14 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     @Override
     public boolean hasWhatsappChannel() {
+        Instant checkedAt = whatsappChannelCheckedAt.get();
+        if (checkedAt != null && checkedAt.isAfter(Instant.now().minus(CHANNEL_CACHE_TTL))) {
+            return whatsappChannelId.get() != null;
+        }
         JsonNode response = get("/channels?perPage=100&status=active");
         Optional<JsonNode> channel = dataEntries(response).stream().findFirst();
         whatsappChannelId.set(channel.map(item -> item.path("id").asLong()).orElse(null));
+        whatsappChannelCheckedAt.set(Instant.now());
         return channel.isPresent();
     }
 
