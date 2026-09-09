@@ -26,7 +26,10 @@ criar uma pessoa artificial com o nome da empresa.
 **Todo cadastro elegivel vira card na Carteira**, tenha ou nao contato pessoal
 no legado. Havendo contato valido, o Hub cria a pessoa e amarra ao card; sem
 contato (ausente, so numerico ou o contato interno `ERICK`), o card e criado
-ligado somente a organizacao. Ate 09/09/2026 a regra era outra — cadastro novo
+com `peopleName` igual a razao social curta do cliente — a API do ArpaSuite
+recusa a criacao sem esse campo (`422 peopleName e obrigatorio`), entao a pessoa
+do card e a propria empresa. Atualizacoes posteriores desse card continuam
+usando `peopleId: null`, sem criar pessoa a partir do contato. Ate 09/09/2026 a regra era outra — cadastro novo
 sem contato ficava com `sync_status=SEM_CONTATO` e sem card — o que deixou 81
 cadastros qualificados fora da Carteira.
 

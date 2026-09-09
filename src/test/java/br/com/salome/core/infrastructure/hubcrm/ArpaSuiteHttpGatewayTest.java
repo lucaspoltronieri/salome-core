@@ -23,6 +23,35 @@ class ArpaSuiteHttpGatewayTest {
     }
 
     @Test
+    void cardSemContatoEnviaRazaoSocialComoPeopleName() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/api/deals", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"data\":{\"id\":4321}}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+            var client = new br.com.salome.core.domain.hubcrm.LegacyCrmClient(33500,
+                    "ACME INDUSTRIA LTDA", "12345678000190", "BAURU", "SP", "contato@acme.com.br",
+                    "1133334444", "COMERCIO", "", "", "", "", java.time.LocalDate.of(2026, 8, 12));
+
+            assertThat(gateway.createPortfolioDealWithoutPerson(client, 77, 4)).isEqualTo(4321L);
+            // Sem peopleName a API recusa a criação com 422 e o cadastro fica sem card.
+            // shortName tira o sufixo societário: a pessoa fica com o nome curto da empresa.
+            assertThat(requestBody.get()).contains("\"peopleName\":\"ACME INDUSTRIA\"");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void leJsonDeEndpointDeEscritaQueRespondeComoTexto() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<byte[]> requestBody = new AtomicReference<>();

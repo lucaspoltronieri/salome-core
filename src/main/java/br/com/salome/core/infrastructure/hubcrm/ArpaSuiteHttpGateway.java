@@ -185,6 +185,10 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         Map<String, Object> payload = baseDealWithoutPerson(
                 HubCrmNormalization.shortName(item.legalName()), organizationId, userId,
                 properties.arpa().carteiraStageId(), BigDecimal.ZERO);
+        // A API exige `peopleName` na criação do card (422 "peopleName é obrigatório").
+        // Sem contato pessoal no legado, entra a própria razão social — é o que permite
+        // o cadastro qualificado existir na Carteira mesmo sem contato.
+        payload.put("peopleName", HubCrmNormalization.shortName(item.legalName()));
         payload.put("details", "Cliente destinatário que não paga frete no legado");
         payload.put("customfields", clientFields(item));
         try {
