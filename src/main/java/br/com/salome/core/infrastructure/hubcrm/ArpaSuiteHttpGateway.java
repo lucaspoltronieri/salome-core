@@ -169,7 +169,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     @Override
     public long createPortfolioDeal(LegacyCrmClient item, long organizationId, long peopleId, long userId) {
         Map<String, Object> payload = baseDeal(
-                HubCrmNormalization.shortName(item.legalName()), organizationId, peopleId, userId,
+                HubCrmNormalization.businessName(item.legalName()), organizationId, peopleId, userId,
                 properties.arpa().carteiraStageId(), BigDecimal.ZERO);
         payload.put("details", "Cliente destinatário que não paga frete no legado");
         payload.put("customfields", clientFields(item));
@@ -183,7 +183,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     @Override
     public long createPortfolioDealWithoutPerson(LegacyCrmClient item, long organizationId, long userId) {
         Map<String, Object> payload = baseDealWithoutPerson(
-                HubCrmNormalization.shortName(item.legalName()), organizationId, userId,
+                HubCrmNormalization.businessName(item.legalName()), organizationId, userId,
                 properties.arpa().carteiraStageId(), BigDecimal.ZERO);
         // A API exige `peopleName` na criação do card (422 "peopleName é obrigatório").
         // Sem contato pessoal no legado, entra a própria razão social — é o que permite
@@ -202,7 +202,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     public void updatePortfolioDeal(long dealId, LegacyCrmClient item, long organizationId,
             long peopleId, long userId) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("title", HubCrmNormalization.shortName(item.legalName()));
+        payload.put("title", HubCrmNormalization.businessName(item.legalName()));
         payload.put("userId", userId);
         payload.put("peopleId", peopleId);
         payload.put("organizationId", organizationId);
@@ -214,7 +214,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     public void updatePortfolioDealWithoutPerson(long dealId, LegacyCrmClient item,
             long organizationId, long userId) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("title", HubCrmNormalization.shortName(item.legalName()));
+        payload.put("title", HubCrmNormalization.businessName(item.legalName()));
         payload.put("userId", userId);
         payload.put("peopleId", null);
         payload.put("organizationId", organizationId);
@@ -224,7 +224,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     @Override
     public long createQuoteDeal(LegacyQuote quote, long organizationId, long peopleId, long userId) {
-        Map<String, Object> payload = baseDeal(HubCrmNormalization.shortName(quote.payerName()),
+        Map<String, Object> payload = baseDeal(HubCrmNormalization.businessName(quote.payerName()),
                 organizationId, peopleId, userId, properties.arpa().propostaStageId(), quote.totalFreight());
         payload.put("details", "Cotação do legado #" + quote.id());
         payload.put("customfields", quoteFields(quote));
@@ -238,7 +238,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     @Override
     public void updateDealFromQuote(long dealId, LegacyQuote quote, long userId) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("title", HubCrmNormalization.shortName(quote.payerName()));
+        payload.put("title", HubCrmNormalization.businessName(quote.payerName()));
         payload.put("userId", userId);
         payload.put("pipeId", properties.arpa().pipeId());
         payload.put("stageId", properties.arpa().propostaStageId());
@@ -304,6 +304,9 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         post("/messages/send", payload);
     }
 
+    // O título do card é a razão social completa, sem a inscrição numérica do CNPJ/CPF
+    // que alguns cadastros trazem na frente do nome (businessName). O nome curto continua
+    // valendo só para a pessoa, não para o card.
     private Map<String, Object> baseDeal(String title, long organizationId, long peopleId,
             long userId, long stageId, BigDecimal price) {
         Map<String, Object> payload = new LinkedHashMap<>();

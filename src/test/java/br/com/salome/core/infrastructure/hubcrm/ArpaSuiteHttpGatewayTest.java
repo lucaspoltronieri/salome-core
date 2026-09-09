@@ -23,6 +23,36 @@ class ArpaSuiteHttpGatewayTest {
     }
 
     @Test
+    void tituloDoCardUsaRazaoSocialSemAInscricaoNumerica() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/api/deals", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"data\":{\"id\":4322}}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+            var client = new br.com.salome.core.domain.hubcrm.LegacyCrmClient(33501,
+                    "63.110.705 REYNALDO LUIZ CERQUEIRA DE SOUZA", "63110705000100", "BAURU", "SP",
+                    "", "1133334444", "COMERCIO", "JOAO", "COMPRAS", "", "11988887777",
+                    java.time.LocalDate.of(2026, 8, 12));
+
+            gateway.createPortfolioDeal(client, 77, 88, 4);
+
+            assertThat(requestBody.get())
+                    .contains("\"title\":\"REYNALDO LUIZ CERQUEIRA DE SOUZA\"");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void cardSemContatoEnviaRazaoSocialComoPeopleName() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> requestBody = new AtomicReference<>();
@@ -46,6 +76,8 @@ class ArpaSuiteHttpGatewayTest {
             // Sem peopleName a API recusa a criação com 422 e o cadastro fica sem card.
             // shortName tira o sufixo societário: a pessoa fica com o nome curto da empresa.
             assertThat(requestBody.get()).contains("\"peopleName\":\"ACME INDUSTRIA\"");
+            // O título do card leva a razão social completa.
+            assertThat(requestBody.get()).contains("\"title\":\"ACME INDUSTRIA LTDA\"");
         } finally {
             server.stop(0);
         }

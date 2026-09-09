@@ -138,3 +138,13 @@ outra.
 
 A consulta do canal de WhatsApp e cacheada por 5 minutos, em vez de uma chamada
 por cotacao a cada polling.
+
+## Titulo do card
+
+O titulo do card e a razao social completa do cliente (no card de cotacao, a do
+pagador), sem a inscricao numerica que alguns cadastros trazem na frente do nome
+— `63.110.705 REYNALDO LUIZ CERQUEIRA DE SOUZA` vira
+`REYNALDO LUIZ CERQUEIRA DE SOUZA`. Ate a versao 1.4.3 o titulo usava o nome
+curto (`shortName`, no maximo tres palavras e 28 caracteres), que cortava nomes
+como `AGROCENTER AGROPECUARIA E PET SHOP`. O nome curto continua valendo apenas
+para a pessoa, nao para o card.
