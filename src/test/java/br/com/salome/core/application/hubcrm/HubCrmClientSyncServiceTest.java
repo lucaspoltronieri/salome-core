@@ -82,7 +82,7 @@ class HubCrmClientSyncServiceTest {
     }
 
     @Test
-    void cardApagadoNoArpaSuiteERecriadoEmVezDeRepetir404() {
+    void cardApagadoNoArpaSuiteNaoERecriado() {
         LegacyCrmClient client = client("MARIA SILVA");
         prepare(client, new ClientIntegration(client.legacyClientId(), client.cnpj(), 77L, 88L,
                 2231912L, 4L, client.firstCteWithoutFreight(), "outro", "ERRO"));
@@ -93,9 +93,25 @@ class HubCrmClientSyncServiceTest {
         var result = service.syncNewClients();
 
         assertThat(result.failed()).isZero();
-        verify(arpa).createPortfolioDeal(client, 77, 88, 4);
+        assertThat(result.integrated()).isZero();
+        verify(store).markClientRemoved("12345678000190");
+        // Quem apagou decidiu que o card não deve existir: nada é recriado.
+        verify(arpa, never()).createPortfolioDeal(any(), anyLong(), anyLong(), anyLong());
+        verify(arpa, never()).createPortfolioDealWithoutPerson(any(), anyLong(), anyLong());
         verify(arpa, never()).updatePortfolioDeal(anyLong(), any(), anyLong(), anyLong(), anyLong());
-        verify(store).markClientIntegrated("12345678000190", 77, 88L, 99L, 4, hashOf(client));
+    }
+
+    @Test
+    void cadastroComCardRemovidoNaoEReprocessado() {
+        LegacyCrmClient client = client("MARIA SILVA");
+        prepare(client, new ClientIntegration(client.legacyClientId(), client.cnpj(), 77L, 88L,
+                null, 4L, client.firstCteWithoutFreight(), "outro", "REMOVIDO"));
+
+        var result = service.syncNewClients();
+
+        assertThat(result.skipped()).isEqualTo(1);
+        assertThat(result.integrated()).isZero();
+        verify(arpa, never()).createPortfolioDeal(any(), anyLong(), anyLong(), anyLong());
     }
 
     @Test

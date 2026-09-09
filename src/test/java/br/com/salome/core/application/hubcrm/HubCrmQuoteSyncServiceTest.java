@@ -233,6 +233,41 @@ class HubCrmQuoteSyncServiceTest {
         verify(store, never()).markQuoteError(anyLong(), any());
     }
 
+    @Test
+    void cardDeCotacaoApagadoNaoERecriado() {
+        LegacyQuote quote = quote("ABERTA", Map.of());
+        when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of());
+        // Cotação já integrada, com o card guardado, mas o card foi apagado no ArpaSuite.
+        when(store.findQuote(quote.id())).thenReturn(Optional.of(new QuoteIntegration(
+                quote.id(), quote.payerCnpj(), quote.status(), 555L, 77L, 88L, 4L,
+                quote.totalFreight(), "hash-antigo", "INTEGRADO", "AGUARDANDO_CANAL")));
+        when(arpa.findDeal(555L)).thenReturn(Optional.empty());
+
+        var result = service.syncQuotes();
+
+        assertThat(result.integrated()).isZero();
+        assertThat(result.failed()).isZero();
+        verify(store).markQuoteRemoved(quote.id());
+        verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
+        verify(arpa, never()).updateDealFromQuote(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void cotacaoComCardRemovidoNaoEReprocessada() {
+        LegacyQuote quote = quote("ABERTA", Map.of());
+        when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of());
+        when(store.findQuote(quote.id())).thenReturn(Optional.of(new QuoteIntegration(
+                quote.id(), quote.payerCnpj(), quote.status(), null, null, null, null,
+                quote.totalFreight(), "hash-antigo", "REMOVIDO", "AGUARDANDO_CANAL")));
+
+        var result = service.syncQuotes();
+
+        assertThat(result.skipped()).isEqualTo(1);
+        verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
+    }
+
     private void prepare(LegacyQuote quote) {
         when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
         when(legacy.findQuotesByIds(any())).thenReturn(List.of());

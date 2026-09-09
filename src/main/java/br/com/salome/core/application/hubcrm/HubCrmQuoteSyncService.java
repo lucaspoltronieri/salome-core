@@ -70,6 +70,11 @@ public class HubCrmQuoteSyncService {
                 }
                 continue;
             }
+            if ("REMOVIDO".equals(current.status())) {
+                // Card apagado no ArpaSuite: não recria e não fica tentando.
+                skipped++;
+                continue;
+            }
             if ("REVISAO".equals(current.status())
                     || ("ERRO".equals(current.status()) && !store.canRetryQuote(quote.id()))) {
                 skipped++;
@@ -81,6 +86,11 @@ public class HubCrmQuoteSyncService {
                 }
                 integrate(quote, hash, current);
                 integrated++;
+            } catch (DealRemovedException exception) {
+                skipped++;
+                store.markQuoteRemoved(quote.id());
+                store.recordEvent("quote:" + quote.id() + ":removido", "COTACAO", quote.id(),
+                        "CARD_REMOVIDO", "PROCESSADO", "Card apagado no ArpaSuite; não recriado", null);
             } catch (ReviewException exception) {
                 review++;
                 store.markQuoteReview(quote.id(), exception.getMessage());
@@ -101,6 +111,9 @@ public class HubCrmQuoteSyncService {
         long userId = owner(quote.responsible());
         var storedDeal = current.dealId() == null ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
                 : arpa.findDeal(current.dealId());
+        // Card que já existiu e sumiu foi apagado no ArpaSuite: registra a remoção em vez
+        // de criar outro. Só cotação que nunca teve card entra no fluxo de criação.
+        if (current.dealId() != null && storedDeal.isEmpty()) throw new DealRemovedException();
         var quoteDeal = storedDeal.isPresent() ? storedDeal : arpa.findDealByLegacyQuoteId(quote.id());
         var openDeal = quoteDeal.isPresent() ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
                 : arpa.findLatestOpenDealByCnpj(quote.payerCnpj())
@@ -262,6 +275,10 @@ public class HubCrmQuoteSyncService {
     }
 
     public record QuoteSyncResult(int integrated, int skipped, int review, int failed) {}
+
+    private static final class DealRemovedException extends RuntimeException {
+        private DealRemovedException() { super("Card apagado no ArpaSuite"); }
+    }
 
     private static final class ReviewException extends RuntimeException {
         private ReviewException(String message) { super(message); }

@@ -185,6 +185,24 @@ public class HubCrmStore {
                 hash, whatsappStatus, quote.id());
     }
 
+    // Card apagado no ArpaSuite: o Hub registra a remoção e não recria. Quem apagou
+    // decidiu que o card não deve existir; recriar viraria enxuga-gelo.
+    public void markQuoteRemoved(long quoteId) {
+        jdbc.update("""
+                UPDATE hub_crm_quote SET sync_status='REMOVIDO', deal_id=NULL, attempt_count=0,
+                  next_attempt_at=NULL, last_error='Card apagado no ArpaSuite; não recriado',
+                  last_synced_at=NOW() WHERE legacy_quote_id=?
+                """, quoteId);
+    }
+
+    public void markClientRemoved(String cnpj) {
+        jdbc.update("""
+                UPDATE hub_crm_client SET sync_status='REMOVIDO', deal_id=NULL, attempt_count=0,
+                  next_attempt_at=NULL, last_error='Card apagado no ArpaSuite; não recriado',
+                  last_synced_at=NOW() WHERE cnpj=?
+                """, cnpj);
+    }
+
     public void markQuoteReview(long quoteId, String error) {
         jdbc.update("""
                 UPDATE hub_crm_quote SET sync_status='REVISAO', last_error=? WHERE legacy_quote_id=?

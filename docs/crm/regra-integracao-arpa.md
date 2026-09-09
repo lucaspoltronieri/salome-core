@@ -34,8 +34,11 @@ sem contato ficava com `sync_status=SEM_CONTATO` e sem card — o que deixou 81
 cadastros qualificados fora da Carteira.
 
 Quando o card gravado no Hub nao existe mais no ArpaSuite (apagado na mao, a API
-responde 404), o Hub recria o card reaproveitando a organizacao e a pessoa ja
-conhecidas, em vez de repetir o erro a cada polling.
+responde 404), o Hub **respeita a exclusao**: grava `sync_status=REMOVIDO`, limpa
+o `deal_id`, registra o evento `CARD_REMOVIDO` e nao recria. Cadastro ou cotacao
+nesse estado sai do fluxo — nao e reprocessado nem fica repetindo o 404. Quem
+apagou decidiu que o card nao deve existir. Vale para os dois lados: cadastro
+(carteira) e cotacao.
 
 ## Cotacoes
 

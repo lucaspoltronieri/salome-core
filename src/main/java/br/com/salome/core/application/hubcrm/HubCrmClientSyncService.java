@@ -77,6 +77,11 @@ public class HubCrmClientSyncService {
                 skipped++;
                 continue;
             }
+            if ("REMOVIDO".equals(current.status())) {
+                // Card apagado no ArpaSuite: não recria e não fica tentando.
+                skipped++;
+                continue;
+            }
             if ("ERRO".equals(current.status()) && !store.canRetryClient(cnpj)) {
                 skipped++;
                 continue;
@@ -120,6 +125,12 @@ public class HubCrmClientSyncService {
             boolean wasIntegrated = item.current().dealId() != null;
             integrate(item.client(), item.current(), item.hash(), item.userId());
             return wasIntegrated ? new ClientResult(0, 1, 0) : new ClientResult(1, 0, 0);
+        } catch (DealRemovedException exception) {
+            store.markClientRemoved(item.cnpj());
+            store.recordEvent("client:" + item.cnpj() + ":removido", "CLIENTE",
+                    item.client().legacyClientId(), "CARD_REMOVIDO", "PROCESSADO",
+                    "Card apagado no ArpaSuite; não recriado", null);
+            return new ClientResult(0, 0, 0);
         } catch (Exception exception) {
             store.markClientError(item.cnpj(), exception);
             store.recordEvent("client:" + item.cnpj() + ":" + item.hash(), "CLIENTE",
@@ -144,20 +155,12 @@ public class HubCrmClientSyncService {
         String phone = preferredPhone(client.contactPhone(), client.phone());
         String organizationName = HubCrmNormalization.businessName(client.legalName());
 
-        if (current.dealId() != null && current.organizationId() != null
-                && arpa.findDeal(current.dealId()).isEmpty()) {
-            // Card apagado no ArpaSuite: recria na Carteira reaproveitando a organização,
-            // em vez de repetir 404 a cada polling e deixar o cadastro sem card.
-            organizationId = current.organizationId();
-            arpa.updateOrganization(organizationId, organizationName);
-            peopleId = !hasContact ? null
-                    : current.peopleId() != null ? current.peopleId()
-                            : arpa.createPerson(personName, phone, organizationId);
-            if (peopleId != null) arpa.updatePerson(peopleId, personName, phone, organizationId);
-            dealId = peopleId == null
-                    ? arpa.createPortfolioDealWithoutPerson(client, organizationId, userId)
-                    : arpa.createPortfolioDeal(client, organizationId, peopleId, userId);
-        } else if (current.dealId() != null && current.organizationId() != null) {
+        if (current.dealId() != null && arpa.findDeal(current.dealId()).isEmpty()) {
+            // Card apagado no ArpaSuite. Quem apagou decidiu que ele não deve existir:
+            // o Hub registra a remoção e não recria (nem fica repetindo o 404).
+            throw new DealRemovedException();
+        }
+        if (current.dealId() != null && current.organizationId() != null) {
             organizationId = current.organizationId();
             peopleId = current.peopleId();
             dealId = current.dealId();
@@ -229,6 +232,10 @@ public class HubCrmClientSyncService {
         String contactDigits = HubCrmNormalization.digits(contact);
         if (contactDigits.length() == 10 || contactDigits.length() == 11) return contactDigits;
         return company;
+    }
+
+    static final class DealRemovedException extends RuntimeException {
+        DealRemovedException() { super("Card apagado no ArpaSuite"); }
     }
 
     public record SyncResult(int integrated, int updated, int skipped, int failed) {
