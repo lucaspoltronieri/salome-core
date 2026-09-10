@@ -4,6 +4,7 @@ import br.com.salome.core.application.hubcrm.HubCrmLegacyRepository;
 import br.com.salome.core.domain.hubcrm.HubCrmNormalization;
 import br.com.salome.core.domain.hubcrm.LegacyCrmClient;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
+import br.com.salome.core.domain.hubcrm.LegacyQuotePrint;
 import br.com.salome.core.domain.hubcrm.LossReason;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -15,6 +16,7 @@ import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -74,6 +76,24 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
             LEFT JOIN naturezacarga nat ON nat.idNaturezaCarga=COALESCE(q.idNaturezaCarga,ncc.idNaturezaCarga)
             """;
 
+    // Mesmas colunas do QUOTE_SELECT (para reaproveitar mapQuote) mais o que a impressão
+    // no formato do legado precisa: UF das cidades e o bloco do consignatário.
+    private static final String PRINT_SELECT = """
+            SELECT q.*, remCi.descricao remetenteCidade, destCi.descricao destinatarioCidade,
+                   consCi.descricao consignatarioCidade, remEs.uf remetenteUf, destEs.uf destinatarioUf,
+                   consEs.uf consignatarioUf, nat.descricao naturezaCarga
+            FROM cotacao q
+            LEFT JOIN cidade remCi ON remCi.idCidade=q.remetenteIdCidade
+            LEFT JOIN estado remEs ON remEs.idEstado=remCi.idEstado
+            LEFT JOIN cidade destCi ON destCi.idCidade=q.destinatarioIdCidade
+            LEFT JOIN estado destEs ON destEs.idEstado=destCi.idEstado
+            LEFT JOIN cidade consCi ON consCi.idCidade=q.consignatarioIdCidade
+            LEFT JOIN estado consEs ON consEs.idEstado=consCi.idEstado
+            LEFT JOIN naturezacargacliente ncc ON ncc.idNaturezaCargaCliente=q.idNaturezaCargaCliente
+            LEFT JOIN naturezacarga nat ON nat.idNaturezaCarga=COALESCE(q.idNaturezaCarga,ncc.idNaturezaCarga)
+            WHERE q.idCotacao=?
+            """;
+
     private final JdbcTemplate jdbc;
 
     public LegacyHubCrmRepository(@Qualifier("legacyJdbcTemplate") JdbcTemplate jdbc) {
@@ -106,6 +126,34 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
                     (rs, row) -> mapQuote(rs), batch.toArray()));
         }
         return result;
+    }
+
+    @Override
+    public Optional<LegacyQuotePrint> findQuotePrint(long quoteId) {
+        return jdbc.query(PRINT_SELECT, (rs, row) -> new LegacyQuotePrint(
+                mapQuote(rs), party(rs, "remetente"), party(rs, "destinatario"), party(rs, "consignatario"),
+                localDate(rs, "dataPrevistaEntrega"), rs.getString("dadosAdicionais")), quoteId)
+                .stream().findFirst();
+    }
+
+    private LegacyQuotePrint.Party party(ResultSet rs, String prefix) throws SQLException {
+        String number = trim(rs.getString(prefix + "Numero"));
+        String street = trim(rs.getString(prefix + "Endereco"));
+        String city = trim(rs.getString(prefix + "Cidade"));
+        String uf = trim(rs.getString(prefix + "Uf"));
+        String phone = trim(rs.getString(prefix + "Telefone"));
+        return new LegacyQuotePrint.Party(
+                trim(rs.getString(prefix + "Cnpj")), trim(rs.getString(prefix + "RazaoSocial")),
+                number.isEmpty() ? street : (street + " " + number).trim(),
+                trim(rs.getString(prefix + "Complemento")), trim(rs.getString(prefix + "Bairro")),
+                city.isEmpty() || uf.isEmpty() ? city : city + "-" + uf,
+                trim(rs.getString(prefix + "Cep")),
+                phone.isEmpty() ? trim(rs.getString(prefix + "Celular")) : phone,
+                trim(rs.getString(prefix + "Email")));
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private LegacyCrmClient mapClient(ResultSet rs) throws SQLException {
