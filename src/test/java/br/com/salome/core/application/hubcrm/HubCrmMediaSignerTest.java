@@ -40,6 +40,23 @@ class HubCrmMediaSignerTest {
         assertThat(expired.valid(15580, signed.expires(), signed.signature())).isFalse();
     }
 
+    @Test
+    void linkDoClienteInativoValeSoParaOClienteEAnoAssinados() {
+        Instant now = Instant.parse("2026-09-11T12:00:00Z");
+        HubCrmMediaSigner signer = new HubCrmMediaSigner(properties(), Clock.fixed(now, ZoneOffset.UTC));
+        var signed = signer.inactiveClientUrl(26055, 2025, 365);
+
+        assertThat(signed.url()).startsWith("https://core.example.com/api/hub-crm/public/inativos/26055/pdf?ano=2025");
+        assertThat(signer.validInactiveClient(26055, 2025, signed.expires(), signed.signature())).isTrue();
+        assertThat(signer.validInactiveClient(26056, 2025, signed.expires(), signed.signature())).isFalse();
+        assertThat(signer.validInactiveClient(26055, 2024, signed.expires(), signed.signature())).isFalse();
+        assertThat(signer.valid(26055, signed.expires(), signed.signature())).isFalse();
+
+        HubCrmMediaSigner later = new HubCrmMediaSigner(properties(),
+                Clock.fixed(now.plusSeconds(364L * 24 * 3600), ZoneOffset.UTC));
+        assertThat(later.validInactiveClient(26055, 2025, signed.expires(), signed.signature())).isTrue();
+    }
+
     private HubCrmProperties properties() {
         return new HubCrmProperties(true, false, 30000, 32001, 10,
                 "https://core.example.com", "12345678901234567890123456789012", 60,

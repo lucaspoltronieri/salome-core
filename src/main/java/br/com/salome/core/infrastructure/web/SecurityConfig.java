@@ -52,7 +52,7 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .authorizeHttpRequests(req -> req
                         .requestMatchers("/login.html", "/login", "/logout", "/api/versao", "/favicon.ico",
-                                "/api/hub-crm/public/cotacoes/*/pdf").permitAll()
+                                "/api/hub-crm/public/cotacoes/*/pdf", "/api/hub-crm/public/inativos/*/pdf").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login.html")
