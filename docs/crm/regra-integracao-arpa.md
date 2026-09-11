@@ -58,6 +58,13 @@ nao altera o codigo nem o schema legado.
 O pagador e o remetente quando `tipoPagamento` representa CIF e o destinatario
 quando contem simultaneamente `DESTINAT` e `FOB`.
 
+A partir da v1.6.0 a aprovacao da cotacao no legado pode vir do proprio Hub:
+quando o CT-e correspondente e emitido, `HubCrmCteApprovalService` aprova a
+cotacao com o usuario `crm_api` (regras em `regra-amarracao-cotacao-cte.md`).
+Para o ArpaSuite nada muda: o Hub ve a cotacao `APROVADA` e marca o card como
+ganho, com a anotacao "aprovada automaticamente pelo CT-e X". A nao aprovada de
+Fernanda/Jaci que recebe CT-e depois volta para ganho do mesmo jeito.
+
 ## Motivos de perda
 
 Somente os dez campos ativos sao considerados. Deve existir exatamente um com

@@ -3,6 +3,7 @@ package br.com.salome.core.infrastructure.legacy.hubcrm;
 import br.com.salome.core.application.hubcrm.HubCrmLegacyRepository;
 import br.com.salome.core.domain.hubcrm.HubCrmNormalization;
 import br.com.salome.core.domain.hubcrm.LegacyCrmClient;
+import br.com.salome.core.domain.hubcrm.LegacyCte;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.LegacyQuotePrint;
 import br.com.salome.core.domain.hubcrm.LossReason;
@@ -94,6 +95,30 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
             WHERE q.idCotacao=?
             """;
 
+    // Peso, valor e volumes vêm das notas do CT-e (conhecimentonotasfiscais), como na Torre.
+    // cteCancelado é data no legado: preenchida = cancelado. situacao é enum
+    // (Finalizada, Armazém, Em Viagem, Pendente, Aberta, Cancelada, Inutilizada).
+    private static final String CTE_SQL = """
+            SELECT c.idConhecimento, c.cte, c.cteSerie, c.cteChave, c.cteEmissao, c.cteHora,
+                   c.tipoPagamento, c.valorTotal,
+                   REGEXP_REPLACE(COALESCE(em.cnpj_cpf,''),'[^0-9]','') emitenteCnpj,
+                   REGEXP_REPLACE(COALESCE(de.cnpj_cpf,''),'[^0-9]','') destinatarioCnpj,
+                   (SELECT SUM(IFNULL(nf.pesoNf,0)) FROM conhecimentonotasfiscais nf
+                     WHERE nf.idConhecimento=c.idConhecimento) peso,
+                   (SELECT SUM(IFNULL(nf.valorNF,0)) FROM conhecimentonotasfiscais nf
+                     WHERE nf.idConhecimento=c.idConhecimento) valorNf,
+                   (SELECT SUM(IFNULL(nf.quantidadeVolumes,0)) FROM conhecimentonotasfiscais nf
+                     WHERE nf.idConhecimento=c.idConhecimento) volumes
+            FROM conhecimento c
+            LEFT JOIN cliente em ON em.idCliente=c.idClienteEmitente
+            LEFT JOIN cliente de ON de.idCliente=c.idClienteDestinatario
+            WHERE c.cte IS NOT NULL AND c.cteEmissao >= ?
+              AND (c.cteCancelado IS NULL OR CAST(c.cteCancelado AS CHAR) IN ('','0','0000-00-00'))
+              AND UPPER(COALESCE(c.situacao,'')) NOT LIKE '%CANCEL%'
+              AND UPPER(COALESCE(c.situacao,'')) NOT LIKE '%INUTILIZ%'
+            ORDER BY c.idConhecimento
+            """;
+
     private final JdbcTemplate jdbc;
 
     public LegacyHubCrmRepository(@Qualifier("legacyJdbcTemplate") JdbcTemplate jdbc) {
@@ -134,6 +159,33 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
                 mapQuote(rs), party(rs, "remetente"), party(rs, "destinatario"), party(rs, "consignatario"),
                 localDate(rs, "dataPrevistaEntrega"), rs.getString("dadosAdicionais")), quoteId)
                 .stream().findFirst();
+    }
+
+    @Override
+    public List<LegacyCte> findRecentCtes(LocalDate since) {
+        return jdbc.query(CTE_SQL, (rs, row) -> mapCte(rs), java.sql.Date.valueOf(since));
+    }
+
+    @Override
+    public List<LegacyQuote> findApprovableQuotes(LocalDate from) {
+        return jdbc.query(QUOTE_SELECT + """
+                WHERE q.data >= ?
+                  AND UPPER(TRIM(COALESCE(q.status,''))) <> 'APROVADA'
+                ORDER BY q.idCotacao
+                """, (rs, row) -> mapQuote(rs), java.sql.Date.valueOf(from));
+    }
+
+    private LegacyCte mapCte(ResultSet rs) throws SQLException {
+        String payment = rs.getString("tipoPagamento");
+        boolean fob = normalized(payment).contains("DESTINAT") && normalized(payment).contains("FOB");
+        String sender = rs.getString("emitenteCnpj");
+        String recipient = rs.getString("destinatarioCnpj");
+        return new LegacyCte(rs.getLong("idConhecimento"), trim(rs.getString("cte")),
+                trim(rs.getString("cteSerie")), trim(rs.getString("cteChave")),
+                localDate(rs, "cteEmissao"), trim(rs.getString("cteHora")), payment,
+                sender, recipient, fob ? recipient : sender,
+                rs.getBigDecimal("peso"), rs.getBigDecimal("valorNf"), rs.getInt("volumes"),
+                rs.getBigDecimal("valorTotal"));
     }
 
     private LegacyQuotePrint.Party party(ResultSet rs, String prefix) throws SQLException {

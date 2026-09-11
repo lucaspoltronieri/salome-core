@@ -85,6 +85,17 @@ salome:
     public-base-url: ${SALOME_HUB_CRM_PUBLIC_BASE_URL:}
     media-signing-key: ${SALOME_HUB_CRM_MEDIA_SIGNING_KEY:}
     media-url-ttl-minutes: ${SALOME_HUB_CRM_MEDIA_TTL_MINUTES:60}
+    # Aprovação automática da cotação no legado quando o CT-e correspondente é emitido
+    # (docs/crm/regra-amarracao-cotacao-cte.md). Única escrita do Hub no legado: usuário crm_api.
+    auto-approval:
+      enabled: ${SALOME_HUB_CRM_AUTO_APPROVAL_ENABLED:false}
+      window-days: ${SALOME_HUB_CRM_AUTO_APPROVAL_WINDOW_DAYS:30}
+      lookback-days: ${SALOME_HUB_CRM_AUTO_APPROVAL_LOOKBACK_DAYS:3}
+      legacy-url: ${SALOME_HUB_CRM_LEGACY_WRITE_URL:${SALOME_LEGACY_DB_URL:}}
+      legacy-username: ${SALOME_HUB_CRM_LEGACY_WRITE_USERNAME:crm_api}
+      legacy-password: ${SALOME_HUB_CRM_LEGACY_WRITE_PASSWORD:}
+      # Valor do combo "Tipo" da aprovação no legado (Telefone / E-mail / Outro).
+      approval-type: ${SALOME_HUB_CRM_AUTO_APPROVAL_TYPE:Outro}
     datasource:
       url: ${SALOME_HUB_CRM_DB_URL:}
       username: ${SALOME_HUB_CRM_DB_USERNAME:}

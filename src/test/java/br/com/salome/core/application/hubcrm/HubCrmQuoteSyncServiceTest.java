@@ -144,6 +144,18 @@ class HubCrmQuoteSyncServiceTest {
     }
 
     @Test
+    void ganhoPorCteInformaOCteNaTimeline() {
+        LegacyQuote quote = quote("APROVADA", Map.of());
+        when(store.cteApprovalNote(quote.id())).thenReturn(Optional.of("CT-e 5000/1 emitido em 17/08/2026"));
+
+        service.applyStatus(quote, 99);
+
+        verify(arpa).markWon(99, quote.statusAt());
+        verify(arpa).addAnnotation(99, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt()
+                + " automaticamente pelo CT-e 5000/1 emitido em 17/08/2026");
+    }
+
+    @Test
     void cotacaoSemFreteCalculadoNaoCriaTimeline() {
         LegacyQuote quote = quote("ABERTA", Map.of(), BigDecimal.ZERO);
         prepare(quote);

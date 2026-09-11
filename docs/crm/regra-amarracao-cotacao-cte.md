@@ -14,6 +14,54 @@ Peso, quantidade, valor da NF, frete e filial podem ser alterados entre a
 cotação e a emissão. Por isso não são critérios obrigatórios quando as partes
 coincidem.
 
+## Aprovação automática da cotação pelo CT-e (a partir da v1.6.0)
+
+O Hub deixa de depender do clique em "Aprovar" no legado. A cada polling (30s)
+`HubCrmCteApprovalService` lê os CT-es emitidos nos últimos 3 dias e, quando um
+deles casa com uma cotação, aprova a cotação **no legado** com o usuário MySQL
+`crm_api` (única escrita do Hub no legado). O ganho no ArpaSuite continua saindo
+pelo fluxo normal de cotações, no mesmo ciclo.
+
+Critérios (`CteQuoteMatcher`), decididos com o Lucas em 10/09/2026:
+
+1. **Pagador igual** — obrigatório. No CT-e, pagador é o destinatário quando
+   `tipoPagamento` contém DESTINAT e FOB; senão o emitente. Remetente e
+   destinatário podem ser diferentes dos da cotação (ficam só como divergência).
+2. CT-e emitido **no dia da cotação ou até 30 dias depois**, não cancelado
+   (`cteCancelado` vazio e `situacao` diferente de Cancelada/Inutilizada).
+3. **Peso** (soma de `conhecimentonotasfiscais.pesoNf`) igual ao da cotação.
+4. **Valor da NF** (soma de `valorNF`) igual ao da cotação.
+5. **Frete** (`conhecimento.valorTotal`) igual ao `totalFrete` da cotação.
+   Exceção: se a cotação tem cubagem e o frete do CT-e é **menor** (cubagem
+   esquecida na emissão), aprova mesmo assim quando peso e NF batem.
+
+"Igual" aceita diferença de até 1% ou 1 unidade (kg / R$), o que for maior.
+Volumes e natureza não são critério.
+
+Quais cotações podem ser aprovadas:
+
+| Responsável | Status | O que acontece |
+|---|---|---|
+| Fernanda/Jaci | ABERTA | aprova no legado; card vira ganho no ArpaSuite |
+| Fernanda/Jaci | NÃO APROVADA | reverte para APROVADA; card sai de perdido para ganho |
+| Carlos e demais | ABERTA | aprova só no legado; nada vai ao ArpaSuite |
+
+A gravação replica a tela `CotacaoAprovacao`: `status='APROVADA'`, `statusData`,
+`statusHora`, `tipoAprovacao='Outro'`, `contatoAprovacao='HUB CRM - CT-e <número>/<série>'` e uma linha no
+`log` no formato do legado com o usuário `crm_api`. O `UPDATE` só vale se o status
+ainda for o lido (`AND status=?`); se alguém mexeu no meio, registra
+`CONCORRENCIA` e não sobrescreve.
+
+Um CT-e aprova no máximo uma cotação e uma cotação é aprovada por no máximo um
+CT-e. Havendo mais de uma candidata, vence a de data mais próxima da emissão e
+depois a de frete mais parecido; empate exato fica `AMBIGUO` para conferência.
+Cancelamento do CT-e depois da aprovação não desfaz nada.
+
+O resultado fica em `salome_hub_crm.hub_crm_cte_match` e no `hub_crm_event`
+(`entity_type='CTE'`), e aparece na tela do Hub nas abas **Aprovação por CT-e**
+e **Logs**. Liga/desliga por `SALOME_HUB_CRM_AUTO_APPROVAL_ENABLED`; senha do
+`crm_api` em `SALOME_HUB_CRM_LEGACY_WRITE_PASSWORD`.
+
 ## Fallback com destinatário divergente
 
 Quando não houver candidato com os dois CNPJs, permitir uma segunda busca por:

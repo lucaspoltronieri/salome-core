@@ -2,6 +2,7 @@ package br.com.salome.core.infrastructure.web.hubcrm;
 
 import br.com.salome.core.application.hubcrm.ArpaSuiteGateway;
 import br.com.salome.core.application.hubcrm.HubCrmClientSyncService;
+import br.com.salome.core.application.hubcrm.HubCrmCteApprovalService;
 import br.com.salome.core.application.hubcrm.HubCrmQuoteSyncService;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmScheduler;
@@ -26,16 +27,18 @@ public class HubCrmWebController {
     private final ArpaSuiteGateway arpa;
     private final HubCrmProperties properties;
     private final Optional<HubCrmScheduler> scheduler;
+    private final Optional<HubCrmCteApprovalService> cteApproval;
 
     public HubCrmWebController(HubCrmStore store, HubCrmClientSyncService clients,
             HubCrmQuoteSyncService quotes, ArpaSuiteGateway arpa, HubCrmProperties properties,
-            Optional<HubCrmScheduler> scheduler) {
+            Optional<HubCrmScheduler> scheduler, Optional<HubCrmCteApprovalService> cteApproval) {
         this.store = store;
         this.clients = clients;
         this.quotes = quotes;
         this.arpa = arpa;
         this.properties = properties;
         this.scheduler = scheduler;
+        this.cteApproval = cteApproval;
     }
 
     @GetMapping({"/hub-crm", "/hub-crm/"})
@@ -50,6 +53,7 @@ public class HubCrmWebController {
         result.put("enabled", properties.enabled());
         result.put("pollingEnabled", properties.pollingEnabled());
         result.put("pollingDelayMs", properties.pollingDelayMs());
+        result.put("autoApprovalEnabled", cteApproval.isPresent());
         result.put("summary", store.summary());
         result.put("scheduler", scheduler.<Object>map(HubCrmScheduler::status).orElse(Map.of(
                 "running", false, "lastStarted", "", "lastFinished", "", "lastError", "polling desativado")));
@@ -73,6 +77,27 @@ public class HubCrmWebController {
     @ResponseBody
     public Object events(@RequestParam(defaultValue = "100") int limit) {
         return store.events(limit);
+    }
+
+    @GetMapping("/api/hub-crm/aprovacoes-cte")
+    @ResponseBody
+    public Object cteMatches(@RequestParam(defaultValue = "100") int limit) {
+        return store.cteMatches(limit);
+    }
+
+    @GetMapping("/api/hub-crm/logs")
+    @ResponseBody
+    public Object logs(@RequestParam(defaultValue = "200") int limit,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(defaultValue = "false") boolean erros) {
+        return store.logs(limit, tipo, erros);
+    }
+
+    @PostMapping("/api/hub-crm/acoes/aprovar-por-cte")
+    @ResponseBody
+    public Object approveFromCtes() {
+        return cteApproval.<Object>map(HubCrmCteApprovalService::approveFromCtes)
+                .orElse(Map.of("ok", false, "message", "Aprovação automática por CT-e desligada"));
     }
 
     @PostMapping("/api/hub-crm/acoes/carga-inicial")

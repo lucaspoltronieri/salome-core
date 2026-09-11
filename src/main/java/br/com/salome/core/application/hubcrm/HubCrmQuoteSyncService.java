@@ -182,7 +182,9 @@ public class HubCrmQuoteSyncService {
         if ("APROVADA".equals(status)) {
             if (store.eventProcessed(eventKey)) return;
             arpa.markWon(dealId, quote.statusAt());
-            arpa.addAnnotation(dealId, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt());
+            String viaCte = store.cteApprovalNote(quote.id())
+                    .map(note -> " automaticamente pelo " + note).orElse("");
+            arpa.addAnnotation(dealId, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt() + viaCte);
             store.recordEvent(eventKey, "COTACAO", quote.id(), "GANHO", "PROCESSADO", "Card ganho", null);
         } else if ("NAO APROVADA".equals(status)) {
             if (quote.selectedLossReasons().size() != 1) {

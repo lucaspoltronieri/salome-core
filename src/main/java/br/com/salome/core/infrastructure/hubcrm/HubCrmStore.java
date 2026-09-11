@@ -2,14 +2,18 @@ package br.com.salome.core.infrastructure.hubcrm;
 
 import br.com.salome.core.domain.hubcrm.ClientIntegration;
 import br.com.salome.core.domain.hubcrm.LegacyCrmClient;
+import br.com.salome.core.domain.hubcrm.LegacyCte;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.QuoteIntegration;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -282,12 +286,87 @@ public class HubCrmStore {
         return count != null && count > 0;
     }
 
+    // ---- Aprovação automática pelo CT-e -------------------------------------------------
+
+    public Set<Long> cteMatchIdsSince(LocalDate since) {
+        return new HashSet<>(jdbc.queryForList(
+                "SELECT id_conhecimento FROM hub_crm_cte_match WHERE cte_emissao >= ?",
+                Long.class, Date.valueOf(since)));
+    }
+
+    public Set<Long> quotesApprovedByCte() {
+        return new HashSet<>(jdbc.queryForList(
+                "SELECT legacy_quote_id FROM hub_crm_cte_match WHERE legacy_quote_id IS NOT NULL",
+                Long.class));
+    }
+
+    public void recordCteMatch(LegacyCte cte, LegacyQuote quote, String status, String criteria,
+            String divergences) {
+        jdbc.update("""
+                INSERT INTO hub_crm_cte_match
+                  (id_conhecimento, cte_numero, cte_serie, cte_chave, cte_emissao, cte_frete, pagador_cnpj,
+                   legacy_quote_id, quote_responsavel, quote_status_anterior, quote_frete, status,
+                   criterios, divergencias)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE status=VALUES(status), criterios=VALUES(criterios),
+                  divergencias=VALUES(divergencias)
+                """, cte.id(), cte.number(), cte.series(), cte.accessKey(),
+                cte.issueDate() == null ? null : Date.valueOf(cte.issueDate()), cte.totalFreight(),
+                cte.payerCnpj(),
+                "APROVADA_AUTO".equals(status) && quote != null ? quote.id() : null,
+                quote == null ? null : quote.responsible(), quote == null ? null : quote.status(),
+                quote == null ? null : quote.totalFreight(), status,
+                truncate(criteria, 1000), truncate(divergences, 1000));
+    }
+
+    /** Texto para a timeline do card quando a cotação foi aprovada pelo CT-e. */
+    public Optional<String> cteApprovalNote(long legacyQuoteId) {
+        return jdbc.query("""
+                SELECT cte_numero, cte_serie, cte_emissao FROM hub_crm_cte_match
+                WHERE legacy_quote_id=? AND status='APROVADA_AUTO'
+                """, (rs, row) -> {
+                    String serie = rs.getString("cte_serie");
+                    Date emissao = rs.getDate("cte_emissao");
+                    return "CT-e " + rs.getString("cte_numero")
+                            + (serie == null || serie.isBlank() ? "" : "/" + serie)
+                            + (emissao == null ? "" : " emitido em "
+                                    + emissao.toLocalDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+                }, legacyQuoteId).stream().findFirst();
+    }
+
+    public List<Map<String, Object>> cteMatches(int limit) {
+        return jdbc.queryForList("""
+                SELECT created_at, status, legacy_quote_id, quote_responsavel, quote_status_anterior,
+                       cte_numero, cte_serie, cte_emissao, pagador_cnpj, quote_frete, cte_frete,
+                       criterios, divergencias, id_conhecimento
+                FROM hub_crm_cte_match ORDER BY id DESC LIMIT ?
+                """, Math.min(Math.max(limit, 1), 500));
+    }
+
+    public List<Map<String, Object>> logs(int limit, String entityType, boolean onlyErrors) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT created_at, processed_at, entity_type, entity_id, event_type, status,
+                       response_summary, last_error
+                FROM hub_crm_event WHERE 1=1
+                """);
+        List<Object> args = new java.util.ArrayList<>();
+        if (entityType != null && !entityType.isBlank()) {
+            sql.append(" AND entity_type=?");
+            args.add(entityType.trim().toUpperCase(java.util.Locale.ROOT));
+        }
+        if (onlyErrors) sql.append(" AND status IN ('ERRO','REVISAO')");
+        sql.append(" ORDER BY id DESC LIMIT ?");
+        args.add(Math.min(Math.max(limit, 1), 1000));
+        return jdbc.queryForList(sql.toString(), args.toArray());
+    }
+
     public Map<String, Object> summary() {
         return Map.of(
                 "clientes", count("hub_crm_client"),
                 "clientesIntegrados", countWhere("hub_crm_client", "sync_status='INTEGRADO'"),
                 "cotacoes", count("hub_crm_quote"),
                 "cotacoesIntegradas", countWhere("hub_crm_quote", "sync_status='INTEGRADO'"),
+                "aprovadasPorCte", countWhere("hub_crm_cte_match", "status='APROVADA_AUTO'"),
                 "erros", countWhere("hub_crm_event", "status IN ('ERRO','REVISAO')"));
     }
 
@@ -332,7 +411,11 @@ public class HubCrmStore {
     }
 
     private static String truncate(String value) {
+        return truncate(value, 2000);
+    }
+
+    private static String truncate(String value, int max) {
         if (value == null) return null;
-        return value.length() <= 2000 ? value : value.substring(0, 2000);
+        return value.length() <= max ? value : value.substring(0, max);
     }
 }
