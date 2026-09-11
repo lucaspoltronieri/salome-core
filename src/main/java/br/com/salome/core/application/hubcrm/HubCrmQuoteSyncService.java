@@ -80,6 +80,14 @@ public class HubCrmQuoteSyncService {
                 skipped++;
                 continue;
             }
+            if (current.dealId() == null && store.changedByHub(quote.id())) {
+                // Status alterado pelo próprio Hub (lote/aprovação por CT-e) numa cotação que
+                // não tem card: não cria card, para não contaminar o ArpaSuite (regra do Lucas).
+                skipped++;
+                store.recordEvent("quote:" + quote.id() + ":sem-card", "COTACAO", quote.id(), "SEM_CARD_ARPA",
+                        "PROCESSADO", "Alterada pelo Hub no legado; sem card no ArpaSuite, não incluída", null);
+                continue;
+            }
             try {
                 if (quote.payerCnpj().length() != 14) {
                     throw new ReviewException("CNPJ do pagador inválido: " + quote.payerCnpj());

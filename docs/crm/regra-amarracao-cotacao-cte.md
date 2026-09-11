@@ -75,6 +75,14 @@ histórico:
    `log`). As da Fernanda/Jaci viram **Perdido — Preço alto** no ArpaSuite nos
    ciclos seguintes.
 
+**ArpaSuite só é atualizado, nunca contaminado (v1.8.1):** quando o status foi
+alterado pelo próprio Hub (lote ou aprovação pelo CT-e), a cotação só mexe no
+ArpaSuite se **já tiver card**: ganho ou perdido no card existente. Sem card, o
+Hub não cria organização, pessoa nem card; registra `SEM_CARD_ARPA` e segue. O
+lote também pode ser disparado uma única vez na inicialização definindo
+`SALOME_HUB_CRM_BATCH_TOKEN` (o token executado fica em
+`hub_crm_checkpoint('lote_token')` e não roda de novo).
+
 Cotações empatadas no mesmo CT-e (AMBIGUO) não são aprovadas nem marcadas como
 perdidas. Cotações a partir de 31/08/2026 sem CT-e ficam como estão. O botão
 **Simular** mostra a lista sem gravar nada; **Executar** grava.

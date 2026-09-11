@@ -319,6 +319,31 @@ public class HubCrmStore {
                 truncate(criteria, 1000), truncate(divergences, 1000));
     }
 
+    /**
+     * A mudança de status veio do próprio Hub (lote ou aprovação pelo CT-e)? Nesses casos
+     * cotação sem card no ArpaSuite não ganha card novo — só se atualiza quem já está lá.
+     */
+    public boolean changedByHub(long legacyQuoteId) {
+        Long count = jdbc.queryForObject("""
+                SELECT (SELECT COUNT(*) FROM hub_crm_event WHERE event_key IN (?, ?) AND status='PROCESSADO')
+                     + (SELECT COUNT(*) FROM hub_crm_cte_match WHERE legacy_quote_id=? AND status='APROVADA_AUTO')
+                """, Long.class, "quote:" + legacyQuoteId + ":lote:nao-aprovada",
+                "quote:" + legacyQuoteId + ":lote:aprovada", legacyQuoteId);
+        return count != null && count > 0;
+    }
+
+    public Optional<String> textCheckpoint(String key) {
+        return jdbc.queryForList("SELECT text_value FROM hub_crm_checkpoint WHERE checkpoint_key=?",
+                String.class, key).stream().filter(java.util.Objects::nonNull).findFirst();
+    }
+
+    public void setTextCheckpoint(String key, String value) {
+        jdbc.update("""
+                INSERT INTO hub_crm_checkpoint (checkpoint_key, text_value) VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE text_value=VALUES(text_value)
+                """, key, value);
+    }
+
     /** Texto para a timeline do card quando a cotação foi aprovada pelo CT-e. */
     public Optional<String> cteApprovalNote(long legacyQuoteId) {
         return jdbc.query("""

@@ -96,6 +96,11 @@ salome:
       legacy-password: ${SALOME_HUB_CRM_LEGACY_WRITE_PASSWORD:}
       # Valor do combo "Tipo" da aprovação no legado (Telefone / E-mail / Outro).
       approval-type: ${SALOME_HUB_CRM_AUTO_APPROVAL_TYPE:Outro}
+    # Lote de limpeza das cotações executado uma vez na inicialização quando o token
+    # é definido (o mesmo token nunca roda de novo). Vazio = só pelo botão da aba Lote.
+    batch:
+      execute-token: ${SALOME_HUB_CRM_BATCH_TOKEN:}
+      cutoff: ${SALOME_HUB_CRM_BATCH_CUTOFF:2026-08-31}
     datasource:
       url: ${SALOME_HUB_CRM_DB_URL:}
       username: ${SALOME_HUB_CRM_DB_USERNAME:}

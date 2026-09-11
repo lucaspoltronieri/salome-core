@@ -144,6 +144,41 @@ class HubCrmQuoteSyncServiceTest {
     }
 
     @Test
+    void cotacaoAlteradaPeloHubSemCardNaoCriaCardNoArpa() {
+        LegacyQuote quote = quote("NÃO APROVADA", Map.of(LossReason.HIGH_PRICE, "Sem CT-e"));
+        prepare(quote);
+        when(store.changedByHub(quote.id())).thenReturn(true);
+
+        var result = service.syncQuotes();
+
+        assertThat(result.skipped()).isEqualTo(1);
+        verify(arpa, never()).createOrganization(anyString());
+        verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
+        verify(arpa, never()).findLatestOpenDealByCnpj(anyString());
+        verify(arpa, never()).markLost(anyLong(), any(), any());
+        verify(store).recordEvent(org.mockito.ArgumentMatchers.eq("quote:" + quote.id() + ":sem-card"),
+                anyString(), anyLong(), org.mockito.ArgumentMatchers.eq("SEM_CARD_ARPA"), anyString(),
+                anyString(), any());
+    }
+
+    @Test
+    void cotacaoAlteradaPeloHubComCardViraPerdida() {
+        LegacyQuote quote = quote("NÃO APROVADA", Map.of(LossReason.HIGH_PRICE, "Sem CT-e"));
+        when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of());
+        when(store.changedByHub(quote.id())).thenReturn(true);
+        when(store.findQuote(quote.id())).thenReturn(Optional.of(new QuoteIntegration(
+                quote.id(), quote.payerCnpj(), "ABERTA", 321L, 77L, 88L, 4L,
+                quote.totalFreight(), "hash-antigo", "ATUALIZAR", "AGUARDANDO_CANAL")));
+        when(arpa.findDeal(321)).thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(321, 77L, 88L, 4L)));
+
+        service.syncQuotes();
+
+        verify(arpa).markLost(321, LossReason.HIGH_PRICE, quote.statusAt());
+        verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
     void ganhoPorCteInformaOCteNaTimeline() {
         LegacyQuote quote = quote("APROVADA", Map.of());
         when(store.cteApprovalNote(quote.id())).thenReturn(Optional.of("CT-e 5000/1 emitido em 17/08/2026"));

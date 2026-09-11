@@ -125,6 +125,8 @@ public class HubCrmBatchService {
                         store.recordEvent("cte:" + cte.id() + ":aprovacao", "CTE", cte.id(), "APROVACAO_CTE",
                                 "PROCESSADO", "Lote: cotação " + quote.id() + " (" + quote.responsible() + ") "
                                         + quote.status() + " → APROVADA pelo CT-e " + cte.label(), null);
+                        store.recordEvent("quote:" + quote.id() + ":lote:aprovada", "COTACAO", quote.id(),
+                                "LOTE_APROVADA", "PROCESSADO", "Lote: APROVADA pelo CT-e " + cte.label(), null);
                         add(items, totals, "APROVAR", quote, cte, match.criteria(), "APROVADA");
                     } else {
                         store.recordCteMatch(cte, quote, "CONCORRENCIA", match.criteria(),
@@ -160,6 +162,7 @@ public class HubCrmBatchService {
                 }
             }
             state.set(state.get().finish(totals, items, null, Instant.now(clock)));
+            log.info("Lote do Hub CRM concluído ({}): {}", execute ? "execução" : "simulação", totals);
         } catch (Exception exception) {
             log.error("Falha no lote do Hub CRM", exception);
             state.set(state.get().finish(totals, items, exception.getMessage(), Instant.now(clock)));

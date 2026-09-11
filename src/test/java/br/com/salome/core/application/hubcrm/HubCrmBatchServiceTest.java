@@ -80,6 +80,10 @@ class HubCrmBatchServiceTest {
 
         verify(writer).approve(eq(comCte), eq(cte), any());
         verify(store).recordCteMatch(eq(cte), eq(comCte), eq("APROVADA_AUTO"), anyString(), any());
+        verify(store).recordEvent(eq("quote:1:lote:aprovada"), eq("COTACAO"), eq(1L), eq("LOTE_APROVADA"),
+                eq("PROCESSADO"), anyString(), any());
+        verify(store).recordEvent(eq("quote:2:lote:nao-aprovada"), eq("COTACAO"), eq(2L), eq("LOTE_NAO_APROVADA"),
+                eq("PROCESSADO"), anyString(), any());
         verify(writer).rejectForPrice(eq(antigaSemCte), anyString(), any());
         verify(writer, never()).rejectForPrice(eq(recenteSemCte), anyString(), any());
         verify(writer, never()).rejectForPrice(eq(jaPerdida), anyString(), any());
