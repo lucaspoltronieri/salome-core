@@ -42,6 +42,7 @@ public class HubCrmBatchService {
     private static final Logger log = LoggerFactory.getLogger(HubCrmBatchService.class);
     static final LocalDate CTE_SINCE = LocalDate.of(2021, 1, 1);
     static final LocalDate QUOTES_SINCE = LocalDate.of(2000, 1, 1);
+    static final LocalDate MANUAL_CTE_SINCE = LocalDate.of(2025, 1, 1);
     private static final DateTimeFormatter BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final HubCrmLegacyRepository legacy;
@@ -165,6 +166,86 @@ public class HubCrmBatchService {
             log.info("Lote do Hub CRM concluído ({}): {}", execute ? "execução" : "simulação", totals);
         } catch (Exception exception) {
             log.error("Falha no lote do Hub CRM", exception);
+            state.set(state.get().finish(totals, items, exception.getMessage(), Instant.now(clock)));
+        }
+    }
+
+    /**
+     * Ajuste manual de uma vez (decisão do Lucas para os casos que o lote não resolve):
+     * aprova as cotações indicadas citando o CT-e de cada uma e marca as outras como NÃO
+     * APROVADA por Preço. Só mexe em cotação ABERTA (ou NÃO APROVADA, na aprovação).
+     */
+    public void runManual(Map<Long, String> approveWithCte, Set<Long> reject) {
+        List<BatchItem> items = new ArrayList<>();
+        Map<String, Integer> totals = new LinkedHashMap<>();
+        state.set(BatchState.started(true, null, Instant.now(clock)));
+        try {
+            LocalDateTime now = LocalDateTime.now(clock);
+            List<Long> ids = new ArrayList<>(approveWithCte.keySet());
+            ids.addAll(reject);
+            Map<Long, LegacyQuote> quotes = legacy.findQuotesByIds(ids).stream()
+                    .collect(Collectors.toMap(LegacyQuote::id, quote -> quote, (a, b) -> a));
+            List<LegacyCte> ctes = approveWithCte.isEmpty() ? List.of() : legacy.findRecentCtes(MANUAL_CTE_SINCE);
+            for (var entry : approveWithCte.entrySet()) {
+                LegacyQuote quote = quotes.get(entry.getKey());
+                if (quote == null) {
+                    totals.merge("APROVAR:NAO_ENCONTRADA", 1, Integer::sum);
+                    continue;
+                }
+                String status = HubCrmNormalization.normalizedText(quote.status());
+                if (!"ABERTA".equals(status) && !"NAO APROVADA".equals(status)) {
+                    add(items, totals, "APROVAR", quote, null, "já estava " + quote.status(), "IGNORADA");
+                    continue;
+                }
+                LegacyCte cte = ctes.stream()
+                        .filter(c -> entry.getValue().equals(c.number()) && quote.payerCnpj().equals(c.payerCnpj()))
+                        .findFirst().orElse(null);
+                if (cte == null) {
+                    add(items, totals, "APROVAR", quote, null, "CT-e " + entry.getValue() + " não encontrado", "ERRO");
+                    continue;
+                }
+                try {
+                    if (writer.approve(quote, cte, now)) {
+                        store.recordEvent("quote:" + quote.id() + ":lote:aprovada", "COTACAO", quote.id(),
+                                "LOTE_APROVADA", "PROCESSADO",
+                                "Ajuste manual (decisão do Lucas): APROVADA pelo CT-e " + cte.label(), null);
+                        store.markCteMatchStatus(cte.id(), "RESOLVIDO_MANUAL");
+                        add(items, totals, "APROVAR", quote, cte, "ajuste manual", "APROVADA");
+                    } else {
+                        add(items, totals, "APROVAR", quote, cte, "status mudou antes da gravação", "CONCORRENCIA");
+                    }
+                } catch (Exception exception) {
+                    add(items, totals, "APROVAR", quote, cte, exception.getMessage(), "ERRO");
+                }
+            }
+            String description = "Sem CT-e emitido para a cotação (ajuste Hub CRM " + BR.format(now.toLocalDate()) + ")";
+            for (Long id : reject) {
+                LegacyQuote quote = quotes.get(id);
+                if (quote == null) {
+                    totals.merge("NAO_APROVAR:NAO_ENCONTRADA", 1, Integer::sum);
+                    continue;
+                }
+                if (!"ABERTA".equals(HubCrmNormalization.normalizedText(quote.status()))) {
+                    add(items, totals, "NAO_APROVAR", quote, null, "já estava " + quote.status(), "IGNORADA");
+                    continue;
+                }
+                try {
+                    if (writer.rejectForPrice(quote, description, now)) {
+                        store.recordEvent("quote:" + quote.id() + ":lote:nao-aprovada", "COTACAO", quote.id(),
+                                "LOTE_NAO_APROVADA", "PROCESSADO",
+                                "Ajuste manual: " + quote.status() + " → NÃO APROVADA (Preço)", null);
+                        add(items, totals, "NAO_APROVAR", quote, null, "motivo Preço", "NAO_APROVADA");
+                    } else {
+                        add(items, totals, "NAO_APROVAR", quote, null, "status mudou antes da gravação", "CONCORRENCIA");
+                    }
+                } catch (Exception exception) {
+                    add(items, totals, "NAO_APROVAR", quote, null, exception.getMessage(), "ERRO");
+                }
+            }
+            state.set(state.get().finish(totals, items, null, Instant.now(clock)));
+            log.info("Ajuste manual do Hub CRM concluído: {}", totals);
+        } catch (Exception exception) {
+            log.error("Falha no ajuste manual do Hub CRM", exception);
             state.set(state.get().finish(totals, items, exception.getMessage(), Instant.now(clock)));
         }
     }

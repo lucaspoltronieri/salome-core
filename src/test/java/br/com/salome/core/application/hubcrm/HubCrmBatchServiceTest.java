@@ -122,6 +122,43 @@ class HubCrmBatchServiceTest {
                 .containsEntry("NAO_APROVAR:ERRO", 1).containsEntry("NAO_APROVAR:NAO_APROVADA", 1);
     }
 
+    @Test
+    void ajusteManualAprovaComOCteIndicadoENaoAprovaAsDemais() {
+        LegacyQuote par1 = quote(20, "ABERTA", "CARLOS", LocalDate.of(2025, 6, 12), "A");
+        LegacyQuote par2 = quote(21, "ABERTA", "CARLOS", LocalDate.of(2025, 6, 12), "A");
+        LegacyQuote dia31 = quote(22, "ABERTA", "JACI", LocalDate.of(2026, 8, 31), "F");
+        LegacyQuote jaAprovada = quote(23, "APROVADA", "CARLOS", LocalDate.of(2026, 8, 31), "G");
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of(par1, par2, dia31, jaAprovada));
+        when(legacy.findRecentCtes(HubCrmBatchService.MANUAL_CTE_SINCE)).thenReturn(List.of(cte));
+        when(writer.approve(any(), eq(cte), any())).thenReturn(true);
+        when(writer.rejectForPrice(eq(dia31), anyString(), any())).thenReturn(true);
+
+        service.runManual(new java.util.LinkedHashMap<>(Map.of(20L, "5000", 21L, "5000")),
+                new java.util.LinkedHashSet<>(List.of(22L, 23L)));
+
+        verify(writer).approve(eq(par1), eq(cte), any());
+        verify(writer).approve(eq(par2), eq(cte), any());
+        verify(store, org.mockito.Mockito.times(2)).markCteMatchStatus(900, "RESOLVIDO_MANUAL");
+        verify(writer).rejectForPrice(eq(dia31), anyString(), any());
+        verify(writer, never()).rejectForPrice(eq(jaAprovada), anyString(), any());
+        assertThat(service.status().totals())
+                .containsEntry("APROVAR:APROVADA", 2)
+                .containsEntry("NAO_APROVAR:NAO_APROVADA", 1)
+                .containsEntry("NAO_APROVAR:IGNORADA", 1);
+    }
+
+    @Test
+    void ajusteManualNaoAprovaSemAchaOCte() {
+        LegacyQuote par1 = quote(20, "ABERTA", "CARLOS", LocalDate.of(2025, 6, 12), "A");
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of(par1));
+        when(legacy.findRecentCtes(HubCrmBatchService.MANUAL_CTE_SINCE)).thenReturn(List.of(cte));
+
+        service.runManual(Map.of(20L, "9999"), Set.of());
+
+        verify(writer, never()).approve(any(), any(), any());
+        assertThat(service.status().totals()).containsEntry("APROVAR:ERRO", 1);
+    }
+
     private static LegacyQuote quote(long id, String status, String responsible, LocalDate created, String payer) {
         BigDecimal zero = BigDecimal.ZERO;
         return new LegacyQuote(id, created, "10:30", responsible, status,

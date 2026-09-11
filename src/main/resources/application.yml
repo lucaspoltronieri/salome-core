@@ -101,6 +101,10 @@ salome:
     batch:
       execute-token: ${SALOME_HUB_CRM_BATCH_TOKEN:}
       cutoff: ${SALOME_HUB_CRM_BATCH_CUTOFF:2026-08-31}
+      # Ajuste manual de uma vez: "cotação:CT-e,..." para aprovar; "cotação,..." para não aprovar.
+      adjust-token: ${SALOME_HUB_CRM_ADJUST_TOKEN:}
+      adjust-approve: ${SALOME_HUB_CRM_ADJUST_APPROVE:}
+      adjust-reject: ${SALOME_HUB_CRM_ADJUST_REJECT:}
     datasource:
       url: ${SALOME_HUB_CRM_DB_URL:}
       username: ${SALOME_HUB_CRM_DB_USERNAME:}

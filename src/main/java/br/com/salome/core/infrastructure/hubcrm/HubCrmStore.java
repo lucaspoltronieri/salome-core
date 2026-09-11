@@ -332,6 +332,12 @@ public class HubCrmStore {
         return count != null && count > 0;
     }
 
+    /** Ex.: AMBIGUO resolvido manualmente — some da lista de pendências da aba. */
+    public void markCteMatchStatus(long idConhecimento, String status) {
+        jdbc.update("UPDATE hub_crm_cte_match SET status=? WHERE id_conhecimento=? AND status='AMBIGUO'",
+                status, idConhecimento);
+    }
+
     public Optional<String> textCheckpoint(String key) {
         return jdbc.queryForList("SELECT text_value FROM hub_crm_checkpoint WHERE checkpoint_key=?",
                 String.class, key).stream().filter(java.util.Objects::nonNull).findFirst();
