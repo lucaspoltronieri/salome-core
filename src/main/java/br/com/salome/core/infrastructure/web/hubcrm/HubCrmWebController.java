@@ -1,6 +1,7 @@
 package br.com.salome.core.infrastructure.web.hubcrm;
 
 import br.com.salome.core.application.hubcrm.ArpaSuiteGateway;
+import br.com.salome.core.application.hubcrm.HubCrmBatchService;
 import br.com.salome.core.application.hubcrm.HubCrmClientSyncService;
 import br.com.salome.core.application.hubcrm.HubCrmCteApprovalService;
 import br.com.salome.core.application.hubcrm.HubCrmQuoteSyncService;
@@ -28,10 +29,12 @@ public class HubCrmWebController {
     private final HubCrmProperties properties;
     private final Optional<HubCrmScheduler> scheduler;
     private final Optional<HubCrmCteApprovalService> cteApproval;
+    private final Optional<HubCrmBatchService> batch;
 
     public HubCrmWebController(HubCrmStore store, HubCrmClientSyncService clients,
             HubCrmQuoteSyncService quotes, ArpaSuiteGateway arpa, HubCrmProperties properties,
-            Optional<HubCrmScheduler> scheduler, Optional<HubCrmCteApprovalService> cteApproval) {
+            Optional<HubCrmScheduler> scheduler, Optional<HubCrmCteApprovalService> cteApproval,
+            Optional<HubCrmBatchService> batch) {
         this.store = store;
         this.clients = clients;
         this.quotes = quotes;
@@ -39,6 +42,28 @@ public class HubCrmWebController {
         this.properties = properties;
         this.scheduler = scheduler;
         this.cteApproval = cteApproval;
+        this.batch = batch;
+    }
+
+    @PostMapping("/api/hub-crm/acoes/lote")
+    @ResponseBody
+    public Object startBatch(@RequestParam(defaultValue = "false") boolean executar,
+            @RequestParam(defaultValue = "2026-08-31") String ate) {
+        return batch.<Object>map(service -> service.start(executar, java.time.LocalDate.parse(ate)).summary())
+                .orElse(Map.of("ok", false, "message", "Aprovação automática por CT-e desligada"));
+    }
+
+    @GetMapping("/api/hub-crm/lote/status")
+    @ResponseBody
+    public Object batchStatus() {
+        return batch.<Object>map(service -> service.status().summary())
+                .orElse(Map.of("running", false, "phase", "Aprovação automática por CT-e desligada"));
+    }
+
+    @GetMapping("/api/hub-crm/lote")
+    @ResponseBody
+    public Object batchItems() {
+        return batch.<Object>map(service -> service.status().items()).orElse(java.util.List.of());
     }
 
     @GetMapping({"/hub-crm", "/hub-crm/"})

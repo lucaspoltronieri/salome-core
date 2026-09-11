@@ -62,6 +62,23 @@ O resultado fica em `salome_hub_crm.hub_crm_cte_match` e no `hub_crm_event`
 e **Logs**. Liga/desliga por `SALOME_HUB_CRM_AUTO_APPROVAL_ENABLED`; senha do
 `crm_api` em `SALOME_HUB_CRM_LEGACY_WRITE_PASSWORD`.
 
+### Lote de limpeza (v1.8.0, pedido do Lucas em 11/09/2026)
+
+Na aba **Lote** da tela do Hub, `HubCrmBatchService` roda uma vez sobre todo o
+histórico:
+
+1. aprova toda cotação ABERTA (ou NÃO APROVADA da Fernanda/Jaci) que tenha CT-e
+   correspondente pelas mesmas regras acima, procurando CT-es desde 01/01/2021;
+2. toda cotação **ABERTA criada antes de 31/08/2026 sem CT-e** vira **NÃO
+   APROVADA** com o motivo **Preço** (`naoAprovacaoPreco='Sim'`, descrição "Sem
+   CT-e emitido para a cotação (lote Hub CRM dd/mm/aaaa)", linha do `crm_api` no
+   `log`). As da Fernanda/Jaci viram **Perdido — Preço alto** no ArpaSuite nos
+   ciclos seguintes.
+
+Cotações empatadas no mesmo CT-e (AMBIGUO) não são aprovadas nem marcadas como
+perdidas. Cotações a partir de 31/08/2026 sem CT-e ficam como estão. O botão
+**Simular** mostra a lista sem gravar nada; **Executar** grava.
+
 ## Fallback com destinatário divergente
 
 Quando não houver candidato com os dois CNPJs, permitir uma segunda busca por:

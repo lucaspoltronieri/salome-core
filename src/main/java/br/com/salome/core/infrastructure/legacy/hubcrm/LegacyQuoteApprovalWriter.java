@@ -57,4 +57,22 @@ public class LegacyQuoteApprovalWriter {
                         quote.id(), quote.status()};
         return jdbc.update(sql, args) == 1;
     }
+
+    /**
+     * Marca a cotação como NÃO APROVADA com o motivo Preço (lote de limpeza das cotações
+     * abertas sem CT-e). Mesmos campos da tela de não aprovação e mesma trava de status.
+     */
+    public boolean rejectForPrice(LegacyQuote quote, String description, LocalDateTime now) {
+        String prefix = "[" + LOG_TIME.format(now) + "] [" + USER + "]";
+        String log = prefix + " [status] [" + quote.status() + "] [NÃO APROVADA] && "
+                + prefix + " [statusData] [" + (quote.statusAt() == null ? null : LOG_DATE.format(quote.statusAt()))
+                + "] [" + LOG_DATE.format(now) + "] && "
+                + prefix + " [naoAprovacaoPreco] [null] [Sim] && "
+                + prefix + " [naoAprovacaoPrecoDescricao] [null] [" + description + "] && ";
+        return jdbc.update("""
+                UPDATE cotacao SET status='NÃO APROVADA', statusData=?, statusHora=?,
+                  naoAprovacaoPreco='Sim', naoAprovacaoPrecoDescricao=?, log=CONCAT(IFNULL(log,''), ?)
+                WHERE idCotacao=? AND status=?
+                """, Timestamp.valueOf(now), HOUR.format(now), description, log, quote.id(), quote.status()) == 1;
+    }
 }

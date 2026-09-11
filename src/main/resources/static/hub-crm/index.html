@@ -30,6 +30,7 @@
         <button class="tab" data-view="eventos">Eventos</button>
         <button class="tab" data-view="aprovacoes-cte">Aprovação por CT-e</button>
         <button class="tab" data-view="logs">Logs</button>
+        <button class="tab" data-view="lote">Lote</button>
       </div>
       <div class="toolbar">
         <input id="search" type="search" placeholder="Filtrar nesta aba (cotação, CT-e, CNPJ, texto)...">
@@ -41,6 +42,8 @@
         </select>
         <label id="logErrorsWrap" hidden><input id="logErrors" type="checkbox"> Só erros/revisão</label>
         <button id="approveNow" hidden>Aprovar por CT-e agora</button>
+        <button id="batchSimulate" hidden>Simular lote</button>
+        <button id="batchRun" class="danger" hidden>Executar lote</button>
         <span id="hint" class="hint"></span>
       </div>
       <div class="table-wrap"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>

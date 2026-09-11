@@ -29,7 +29,9 @@ public final class CteQuoteMatcher {
 
     public enum Outcome { APROVAR, SEM_COTACAO, AMBIGUO }
 
-    public record Match(Outcome outcome, LegacyQuote quote, String criteria, String divergences) {}
+    /** {@code tiedQuoteIds}: no AMBIGUO, as cotações empatadas (têm CT-e, só não se sabe qual é a certa). */
+    public record Match(Outcome outcome, LegacyQuote quote, String criteria, String divergences,
+            List<Long> tiedQuoteIds) {}
 
     private record Candidate(LegacyQuote quote, BigDecimal freightDiff, boolean cubageException) {}
 
@@ -40,7 +42,7 @@ public final class CteQuoteMatcher {
         for (LegacyQuote quote : quotes) {
             candidate(cte, quote, windowDays).ifPresent(candidates::add);
         }
-        if (candidates.isEmpty()) return new Match(Outcome.SEM_COTACAO, null, null, null);
+        if (candidates.isEmpty()) return new Match(Outcome.SEM_COTACAO, null, null, null, List.of());
 
         // Mais próxima da emissão primeiro; depois a de frete mais parecido; depois a mais nova.
         Comparator<Candidate> order = Comparator
@@ -53,12 +55,18 @@ public final class CteQuoteMatcher {
             Candidate second = candidates.get(1);
             if (second.quote().createdDate().equals(best.quote().createdDate())
                     && second.freightDiff().compareTo(best.freightDiff()) == 0) {
-                List<String> ids = candidates.stream().map(c -> String.valueOf(c.quote().id())).toList();
+                List<Long> tied = candidates.stream()
+                        .filter(c -> c.quote().createdDate().equals(best.quote().createdDate())
+                                && c.freightDiff().compareTo(best.freightDiff()) == 0)
+                        .map(c -> c.quote().id())
+                        .toList();
+                List<String> ids = tied.stream().map(String::valueOf).toList();
                 return new Match(Outcome.AMBIGUO, best.quote(), "Cotações empatadas: " + String.join(", ", ids),
-                        null);
+                        null, tied);
             }
         }
-        return new Match(Outcome.APROVAR, best.quote(), criteria(cte, best), divergences(cte, best.quote()));
+        return new Match(Outcome.APROVAR, best.quote(), criteria(cte, best), divergences(cte, best.quote()),
+                List.of());
     }
 
     static Optional<Candidate> candidate(LegacyCte cte, LegacyQuote quote, int windowDays) {
