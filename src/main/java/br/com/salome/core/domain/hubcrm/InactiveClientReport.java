@@ -5,12 +5,14 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * CT-es de um ano em que o cliente foi o tomador do frete (Emitente CIF ou Destinatário FOB),
- * para o comercial prospectar clientes que pararam de transportar.
+ * CT-es de um cliente para o comercial prospectar: os de um ano em que ele foi o tomador do frete
+ * (cliente inativo, estágio Pagantes) ou os que ele recebeu com o frete pago pelo remetente
+ * (estágio Não Pagantes). {@code period} é o que aparece no título do PDF ("2025", "recebidos").
  */
 public record InactiveClientReport(
         long clientId,
         int year,
+        String period,
         String name,
         String tradeName,
         String cnpj,
@@ -18,6 +20,11 @@ public record InactiveClientReport(
         String state,
         List<Cte> ctes
 ) {
+    public InactiveClientReport(long clientId, int year, String name, String tradeName, String cnpj,
+            String city, String state, List<Cte> ctes) {
+        this(clientId, year, String.valueOf(year), name, tradeName, cnpj, city, state, ctes);
+    }
+
     public record Cte(
             long number,
             LocalDate issued,

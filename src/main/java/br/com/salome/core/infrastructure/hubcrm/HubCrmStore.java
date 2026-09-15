@@ -207,6 +207,25 @@ public class HubCrmStore {
                 """, cnpj);
     }
 
+    /**
+     * Cards de cliente (Carteira / Não Pagantes) que ainda não receberam a observação de
+     * transportes. Um erro volta a ser tentado depois de um dia.
+     */
+    public List<ClientCard> clientCardsWithoutTransportNote(int limit) {
+        return jdbc.query("""
+                SELECT c.legacy_client_id, c.cnpj, c.deal_id FROM hub_crm_client c
+                WHERE c.deal_id IS NOT NULL AND c.sync_status <> 'REMOVIDO'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM hub_crm_event e
+                    WHERE e.event_key=CONCAT('client:', c.cnpj, ':transportes')
+                      AND (e.status<>'ERRO' OR e.created_at > NOW() - INTERVAL 1 DAY))
+                ORDER BY c.legacy_client_id LIMIT ?
+                """, (rs, row) -> new ClientCard(rs.getLong("legacy_client_id"), rs.getString("cnpj"),
+                rs.getLong("deal_id")), limit);
+    }
+
+    public record ClientCard(long legacyClientId, String cnpj, long dealId) {}
+
     public void markQuoteReview(long quoteId, String error) {
         jdbc.update("""
                 UPDATE hub_crm_quote SET sync_status='REVISAO', last_error=? WHERE legacy_quote_id=?

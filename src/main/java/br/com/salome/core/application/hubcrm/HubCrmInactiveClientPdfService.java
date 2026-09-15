@@ -82,7 +82,7 @@ public class HubCrmInactiveClientPdfService {
                         page = new PDPage(PAGE);
                         document.addPage(page);
                         stream = new PDPageContentStream(document, page);
-                        text(stream, trim(report.name()) + " — transportes " + report.year() + " (continuação)",
+                        text(stream, trim(report.name()) + " — transportes " + report.period() + " (continuação)",
                                 LEFT, PAGE.getHeight() - 36, 9, bold);
                         y = tableHeader(stream, PAGE.getHeight() - 52);
                     }
@@ -117,7 +117,8 @@ public class HubCrmInactiveClientPdfService {
         float logoHeight = 36;
         float logoWidth = logoHeight * logo.getWidth() / logo.getHeight();
         stream.drawImage(logo, LEFT, top - logoHeight, logoWidth, logoHeight);
-        text(stream, "TRANSPORTES DO CLIENTE — " + report.year(), LEFT + logoWidth + 18, top - 24, 16, bold);
+        text(stream, "TRANSPORTES DO CLIENTE — " + report.period().toUpperCase(Locale.ROOT), LEFT + logoWidth + 18,
+                top - 24, 16, bold);
         text(stream, "Comercial Salomé: " + COMMERCIAL_PHONE, RIGHT - width("Comercial Salomé: " + COMMERCIAL_PHONE,
                 regular, 8), top - 24, 8, regular);
         float y = top - logoHeight - 10;
@@ -139,11 +140,12 @@ public class HubCrmInactiveClientPdfService {
         text(stream, trim(report.city()) + (trim(report.state()).isEmpty() ? "" : "-" + trim(report.state())),
                 LEFT + 50, y, 9, regular);
         y -= 14;
-        label(stream, "Resumo " + report.year() + ":", LEFT, y);
+        String summaryLabel = "Resumo " + report.period() + ":";
+        label(stream, summaryLabel, LEFT, y);
         text(stream, report.ctes().size() + " CT-es  |  " + report.totalVolumes() + " volumes  |  Peso "
                 + decimal3(report.totalWeight()) + " kg  |  Valor NF R$ "
                 + money(report.totalInvoiceValue()) + "  |  Frete R$ " + money(report.totalFreight()),
-                LEFT + 70, y, 9, regular);
+                LEFT + Math.max(70, width(summaryLabel, bold, 9) + 8), y, 9, regular);
         y -= 10;
         line(stream, y, 0.8f);
         return y - 16;

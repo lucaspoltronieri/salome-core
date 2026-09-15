@@ -55,6 +55,23 @@ public class HubCrmMediaSigner {
         return matches(inactivePayload(clientId, year, expires), expires, candidate);
     }
 
+    // Link do PDF dos CT-es recebidos pelo cliente não pagante (card da Carteira / Não Pagantes).
+    public SignedUrl receivedClientUrl(long clientId, long ttlDays) {
+        requireConfigured();
+        long expires = clock.instant().plus(ttlDays, ChronoUnit.DAYS).getEpochSecond();
+        String signature = sign(receivedPayload(clientId, expires));
+        return new SignedUrl(base() + "/api/hub-crm/public/nao-pagantes/" + clientId
+                + "/pdf?expires=" + expires + "&signature=" + signature, expires, signature);
+    }
+
+    public boolean validReceivedClient(long clientId, long expires, String candidate) {
+        return matches(receivedPayload(clientId, expires), expires, candidate);
+    }
+
+    private static String receivedPayload(long clientId, long expires) {
+        return "nao-pagante:" + clientId + ":" + expires;
+    }
+
     private static String quotePayload(long quoteId, long expires) {
         return quoteId + ":" + expires;
     }

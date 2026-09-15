@@ -33,6 +33,28 @@ usando `peopleId: null`, sem criar pessoa a partir do contato. Ate 09/09/2026 a 
 sem contato ficava com `sync_status=SEM_CONTATO` e sem card — o que deixou 81
 cadastros qualificados fora da Carteira.
 
+**Observacao de transportes (v1.9.0).** A Carteira aparece no ArpaSuite como o
+estagio **Nao Pagantes** (320394): clientes que recebem mercadoria com o frete
+pago pelo remetente e que estao em prospeccao. Cada card de cliente do Hub (em
+qualquer estagio, desde que nao removido) recebe uma vez a observacao, na mesma
+ideia dos cards de Pagantes:
+
+- total de CT-es recebidos sem pagar frete desde 2020, com o peso, o valor da NF
+  e o frete pago pelo remetente;
+- o ultimo transporte: data, CT-e, origem, destino, volumes, peso, valor da NF,
+  frete e tipo de pagamento;
+- o link assinado (365 dias) do PDF com a relacao de todos os CT-es recebidos
+  (`/api/hub-crm/public/nao-pagantes/{idCliente}/pdf`). O PDF e gerado na hora,
+  entao traz tambem os CT-es emitidos depois da observacao.
+
+Os CT-es sao os mesmos da regra do cadastro: o cliente e o destinatario e o
+pagamento nao e Destinatario (FOB). Tambem valem os filtros do PDF de inativos:
+CT-e autorizado, nao cancelado, sem cortesia e com situacao Finalizada, Em
+Viagem ou Armazem. O Hub grava 25 cards por ciclo e registra o evento
+`client:<cnpj>:transportes`, que impede a observacao de ser repetida. Uma falha da
+API fica como `ERRO` e volta a ser tentada depois de um dia. Se o card tiver sido
+apagado, o Hub marca o cliente como `REMOVIDO`.
+
 Quando o card gravado no Hub nao existe mais no ArpaSuite (apagado na mao, a API
 responde 404), o Hub **respeita a exclusao**: grava `sync_status=REMOVIDO`, limpa
 o `deal_id`, registra o evento `CARD_REMOVIDO` e nao recria. Cadastro ou cotacao

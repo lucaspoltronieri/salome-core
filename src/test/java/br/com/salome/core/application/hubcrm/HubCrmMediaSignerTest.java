@@ -49,6 +49,12 @@ class HubCrmMediaSignerTest {
         assertThat(signed.url()).startsWith("https://core.example.com/api/hub-crm/public/inativos/26055/pdf?ano=2025");
         assertThat(signer.validInactiveClient(26055, 2025, signed.expires(), signed.signature())).isTrue();
         assertThat(signer.validInactiveClient(26056, 2025, signed.expires(), signed.signature())).isFalse();
+        // O link de não pagante tem assinatura própria: não vale para o de inativo nem para outro cliente.
+        var received = signer.receivedClientUrl(26055, 365);
+        assertThat(received.url()).startsWith("https://core.example.com/api/hub-crm/public/nao-pagantes/26055/pdf?expires=");
+        assertThat(signer.validReceivedClient(26055, received.expires(), received.signature())).isTrue();
+        assertThat(signer.validReceivedClient(26056, received.expires(), received.signature())).isFalse();
+        assertThat(signer.validInactiveClient(26055, 2025, received.expires(), received.signature())).isFalse();
         assertThat(signer.validInactiveClient(26055, 2024, signed.expires(), signed.signature())).isFalse();
         assertThat(signer.valid(26055, signed.expires(), signed.signature())).isFalse();
 
