@@ -96,6 +96,20 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
+    public Optional<Long> findDealStage(long dealId) {
+        if (dealId <= 0) return Optional.empty();
+        try {
+            JsonNode item = get("/deals/" + dealId);
+            JsonNode data = item.path("data").isObject() ? item.path("data") : item;
+            if (data.path("id").asLong(0) <= 0) return Optional.empty();
+            return Optional.ofNullable(nullableLong(data, "stageId"));
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404) return Optional.empty();
+            throw exception;
+        }
+    }
+
+    @Override
     public Optional<ArpaDeal> findLatestOpenDealByCnpj(String cnpj) {
         long fieldId = properties.arpa().cnpjCustomfieldId();
         JsonNode response = get("/deals?perPage=100&pipe=" + properties.arpa().pipeId()

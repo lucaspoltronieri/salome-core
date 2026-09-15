@@ -2,6 +2,7 @@ package br.com.salome.core.application.hubcrm;
 
 import br.com.salome.core.domain.hubcrm.HubCrmNormalization;
 import br.com.salome.core.domain.hubcrm.InactiveClientReport;
+import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
@@ -30,13 +31,15 @@ public class HubCrmClientTransportNoteService {
     private final InactiveClientRepository reports;
     private final ArpaSuiteGateway arpa;
     private final HubCrmMediaSigner signer;
+    private final HubCrmProperties properties;
 
     public HubCrmClientTransportNoteService(HubCrmStore store, InactiveClientRepository reports,
-            ArpaSuiteGateway arpa, HubCrmMediaSigner signer) {
+            ArpaSuiteGateway arpa, HubCrmMediaSigner signer, HubCrmProperties properties) {
         this.store = store;
         this.reports = reports;
         this.arpa = arpa;
         this.signer = signer;
+        this.properties = properties;
     }
 
     public NoteResult annotatePending() {
@@ -53,11 +56,19 @@ public class HubCrmClientTransportNoteService {
                     skipped++;
                     continue;
                 }
-                if (arpa.findDeal(card.dealId()).isEmpty()) {
+                Optional<Long> stage = arpa.findDealStage(card.dealId());
+                if (stage.isEmpty()) {
                     // Card apagado no ArpaSuite: mesma regra do sync, não recria.
                     store.markClientRemoved(card.cnpj());
                     store.recordEvent(key, "CLIENTE", card.legacyClientId(), "OBS_TRANSPORTES", "CARD_REMOVIDO",
                             "Card apagado no ArpaSuite", null);
+                    skipped++;
+                    continue;
+                }
+                if (stage.get() != properties.arpa().carteiraStageId()) {
+                    // Pedido do Lucas: só os cards que estão no estágio Não Pagantes.
+                    store.recordEvent(key, "CLIENTE", card.legacyClientId(), "OBS_TRANSPORTES", "FORA_DO_ESTAGIO",
+                            "Card no estágio " + stage.get() + "; só Não Pagantes recebe", null);
                     skipped++;
                     continue;
                 }

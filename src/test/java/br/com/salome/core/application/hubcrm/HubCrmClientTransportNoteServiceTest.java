@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.salome.core.domain.hubcrm.InactiveClientReport;
+import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,7 +35,14 @@ class HubCrmClientTransportNoteServiceTest {
         reports = mock(InactiveClientRepository.class);
         arpa = mock(ArpaSuiteGateway.class);
         signer = mock(HubCrmMediaSigner.class);
-        service = new HubCrmClientTransportNoteService(store, reports, arpa, signer);
+        // Carteira / Não Pagantes = 2 (segundo id do Arpa abaixo).
+        HubCrmProperties properties = new HubCrmProperties(true, false, 30000, 32001, 10,
+                "https://core.example.com", "12345678901234567890123456789012", 60,
+                new HubCrmProperties.Datasource("jdbc:h2:mem:test", "sa", ""),
+                new HubCrmProperties.Arpa("https://suite.arpacore.com.br", "key", 1, 2, 3,
+                        4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+        service = new HubCrmClientTransportNoteService(store, reports, arpa, signer, properties);
+        when(arpa.findDealStage(2290001)).thenReturn(Optional.of(2L));
         when(store.clientCardsWithoutTransportNote(HubCrmClientTransportNoteService.PER_CYCLE))
                 .thenReturn(List.of(new HubCrmStore.ClientCard(32500, CNPJ, 2290001)));
         when(signer.receivedClientUrl(32500, HubCrmClientTransportNoteService.LINK_TTL_DAYS))
@@ -47,7 +55,6 @@ class HubCrmClientTransportNoteServiceTest {
         when(reports.findReceivedReport(32500)).thenReturn(Optional.of(report(List.of(
                 cte(301000, LocalDate.of(2025, 11, 3), "10", "500", "80.00"),
                 cte(318500, LocalDate.of(2026, 9, 1), "25.5", "1200", "150.40")))));
-        when(arpa.findDeal(2290001)).thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(2290001, 1L, null, 1L)));
         when(arpa.addAnnotation(eq(2290001L), anyString())).thenReturn(77L);
 
         var result = service.annotatePending();
@@ -70,12 +77,26 @@ class HubCrmClientTransportNoteServiceTest {
     void cardApagadoNoArpaNaoRecebeObservacaoEViraRemovido() {
         when(reports.findReceivedReport(32500)).thenReturn(Optional.of(report(List.of(
                 cte(318500, LocalDate.of(2026, 9, 1), "1", "1", "1")))));
-        when(arpa.findDeal(2290001)).thenReturn(Optional.empty());
+        when(arpa.findDealStage(2290001)).thenReturn(Optional.empty());
 
         service.annotatePending();
 
         verify(arpa, never()).addAnnotation(anyLong(), anyString());
         verify(store).markClientRemoved(CNPJ);
+    }
+
+    @Test
+    void cardForaDoEstagioNaoPagantesNaoRecebeObservacao() {
+        when(reports.findReceivedReport(32500)).thenReturn(Optional.of(report(List.of(
+                cte(318500, LocalDate.of(2026, 9, 1), "1", "1", "1")))));
+        when(arpa.findDealStage(2290001)).thenReturn(Optional.of(3L));
+
+        var result = service.annotatePending();
+
+        verify(arpa, never()).addAnnotation(anyLong(), anyString());
+        verify(store).recordEvent(eq("client:" + CNPJ + ":transportes"), eq("CLIENTE"), eq(32500L),
+                eq("OBS_TRANSPORTES"), eq("FORA_DO_ESTAGIO"), anyString(), isNull());
+        assertThat(result.skipped()).isEqualTo(1);
     }
 
     @Test
@@ -94,7 +115,6 @@ class HubCrmClientTransportNoteServiceTest {
     void falhaNaApiFicaRegistradaComoErro() {
         when(reports.findReceivedReport(32500)).thenReturn(Optional.of(report(List.of(
                 cte(318500, LocalDate.of(2026, 9, 1), "1", "1", "1")))));
-        when(arpa.findDeal(2290001)).thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(2290001, 1L, null, 1L)));
         when(arpa.addAnnotation(eq(2290001L), anyString())).thenThrow(new IllegalStateException("429"));
 
         var result = service.annotatePending();

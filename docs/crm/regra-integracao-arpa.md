@@ -35,9 +35,11 @@ cadastros qualificados fora da Carteira.
 
 **Observacao de transportes (v1.9.0).** A Carteira aparece no ArpaSuite como o
 estagio **Nao Pagantes** (320394): clientes que recebem mercadoria com o frete
-pago pelo remetente e que estao em prospeccao. Cada card de cliente do Hub (em
-qualquer estagio, desde que nao removido) recebe uma vez a observacao, na mesma
-ideia dos cards de Pagantes:
+pago pelo remetente e que estao em prospeccao. Desde a v1.9.1, **so os cards que
+estao no estagio Nao Pagantes** no momento da verificacao recebem a observacao,
+por pedido do Lucas. Card que o comercial ja moveu para outro estagio fica com o
+evento `FORA_DO_ESTAGIO` e nao recebe nada. Cada card recebe a observacao uma
+vez, na mesma ideia dos cards de Pagantes:
 
 - total de CT-es recebidos sem pagar frete desde 2020, com o peso, o valor da NF
   e o frete pago pelo remetente;

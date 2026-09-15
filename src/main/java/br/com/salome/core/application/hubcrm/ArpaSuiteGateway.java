@@ -9,6 +9,8 @@ import java.util.Optional;
 public interface ArpaSuiteGateway {
     void validateCatalog();
     Optional<ArpaDeal> findDeal(long dealId);
+    /** Estágio atual do card; vazio quando o card foi apagado (404). */
+    Optional<Long> findDealStage(long dealId);
     Optional<ArpaDeal> findDealByLegacyQuoteId(long legacyQuoteId);
     Optional<ArpaDeal> findLatestOpenDealByCnpj(String cnpj);
     long createOrganization(String legalName);
