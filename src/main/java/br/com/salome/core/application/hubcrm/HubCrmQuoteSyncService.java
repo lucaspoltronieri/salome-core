@@ -22,15 +22,15 @@ public class HubCrmQuoteSyncService {
     private final HubCrmStore store;
     private final ArpaSuiteGateway arpa;
     private final HubCrmProperties properties;
-    private final HubCrmMediaSigner mediaSigner;
+    private final HubCrmQuoteWhatsappService whatsapp;
 
     public HubCrmQuoteSyncService(HubCrmLegacyRepository legacy, HubCrmStore store,
-            ArpaSuiteGateway arpa, HubCrmProperties properties, HubCrmMediaSigner mediaSigner) {
+            ArpaSuiteGateway arpa, HubCrmProperties properties, HubCrmQuoteWhatsappService whatsapp) {
         this.legacy = legacy;
         this.store = store;
         this.arpa = arpa;
         this.properties = properties;
-        this.mediaSigner = mediaSigner;
+        this.whatsapp = whatsapp;
     }
 
     public synchronized QuoteSyncResult syncQuotes() {
@@ -59,7 +59,7 @@ public class HubCrmQuoteSyncService {
                         applyQuoteAnnotation(quote, current.dealId());
                         applyStatus(quote, current.dealId());
                     }
-                    trySendPdf(quote, current.peopleId(), current.dealId(), current.whatsappStatus());
+                    whatsapp.process(quote, current.peopleId(), current.dealId());
                     skipped++;
                 } catch (Exception exception) {
                     // Não muda o status da cotação: ela continua INTEGRADO e o
@@ -156,32 +156,7 @@ public class HubCrmQuoteSyncService {
         applyStatus(quote, dealId);
         store.markQuoteIntegrated(quote, organizationId, peopleId, dealId, userId, hash,
                 arpa.hasWhatsappChannel() ? "PENDENTE" : "AGUARDANDO_CANAL");
-        trySendPdf(quote, peopleId, dealId,
-                arpa.hasWhatsappChannel() ? "PENDENTE" : "AGUARDANDO_CANAL");
-    }
-
-    private void trySendPdf(LegacyQuote quote, Long peopleId, Long dealId, String currentStatus) {
-        if (peopleId == null || dealId == null || "ENVIADO".equals(currentStatus)) return;
-        if (!arpa.hasWhatsappChannel()) {
-            store.markWhatsapp(quote.id(), "AGUARDANDO_CANAL", null);
-            return;
-        }
-        String eventKey = "quote:" + quote.id() + ":whatsapp";
-        if (store.eventProcessed(eventKey)) {
-            store.markWhatsapp(quote.id(), "ENVIADO", null);
-            return;
-        }
-        try {
-            String mediaUrl = mediaSigner.quoteUrl(quote.id()).url();
-            arpa.sendQuoteDocument(peopleId, dealId, mediaUrl, "Cotação de frete nº " + quote.id());
-            store.markWhatsapp(quote.id(), "ENVIADO", null);
-            store.recordEvent(eventKey, "COTACAO", quote.id(), "WHATSAPP_PDF",
-                    "PROCESSADO", "Documento enviado", null);
-        } catch (Exception exception) {
-            store.markWhatsapp(quote.id(), "ERRO", exception.getMessage());
-            store.recordEvent(eventKey, "COTACAO", quote.id(), "WHATSAPP_PDF",
-                    "ERRO", null, exception.getMessage());
-        }
+        whatsapp.process(quote, peopleId, dealId);
     }
 
     void applyStatus(LegacyQuote quote, long dealId) {

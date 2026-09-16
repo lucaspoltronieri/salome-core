@@ -306,7 +306,8 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
-    public void sendQuoteDocument(long peopleId, long dealId, String mediaUrl, String caption) {
+    public String sendQuoteDocument(long peopleId, long dealId, String mediaUrl, String caption,
+            Long fallbackTemplateId) {
         Long channelId = whatsappChannelId.get();
         if (channelId == null && !hasWhatsappChannel()) {
             throw new IllegalStateException("Nenhum canal WhatsApp ativo no ArpaSuite");
@@ -318,8 +319,32 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         payload.put("type", "document");
         payload.put("mediaUrl", mediaUrl);
         payload.put("caption", caption);
+        if (fallbackTemplateId != null) payload.put("fallbackTemplateId", fallbackTemplateId);
         payload.put("sentBy", "bot");
-        post("/messages/send", payload);
+        JsonNode response = post("/messages/send", payload);
+        JsonNode data = response.path("data").isObject() ? response.path("data") : response;
+        String result = response.toString();
+        if ("failed".equals(data.path("status").asText())) {
+            throw new IllegalStateException("Meta recusou a mensagem: "
+                    + result.substring(0, Math.min(500, result.length())));
+        }
+        String dispatch = data.path("dispatch").asText();
+        return dispatch.isBlank() ? "requested" : dispatch;
+    }
+
+    @Override
+    public boolean whatsappWindowOpen(long peopleId) {
+        Long channelId = whatsappChannelId.get();
+        if (channelId == null && !hasWhatsappChannel()) return false;
+        JsonNode response = get("/conversations?peopleId=" + peopleId + "&channel=" + whatsappChannelId.get()
+                + "&perPage=20");
+        // Margem de 10 minutos para não cair no 422 window_closed bem no fim da janela.
+        Instant limit = Instant.now().minus(Duration.ofHours(24)).plus(Duration.ofMinutes(10));
+        return dataEntries(response).stream()
+                .map(item -> item.path("lastInboundAt").asText())
+                .filter(value -> !value.isBlank())
+                .map(value -> java.time.OffsetDateTime.parse(value).toInstant())
+                .anyMatch(inbound -> inbound.isAfter(limit));
     }
 
     // O título do card é a razão social completa, sem a inscrição numérica do CNPJ/CPF

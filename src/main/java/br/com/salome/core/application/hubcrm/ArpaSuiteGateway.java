@@ -30,7 +30,14 @@ public interface ArpaSuiteGateway {
     void markWon(long dealId, LocalDateTime wonAt);
     void markLost(long dealId, LossReason reason, LocalDateTime lostAt);
     boolean hasWhatsappChannel();
-    void sendQuoteDocument(long peopleId, long dealId, String mediaUrl, String caption);
+    /**
+     * Envia o PDF. Com {@code fallbackTemplateId} e a janela de 24h fechada, a API envia o template
+     * no lugar. Devolve o {@code dispatch} da resposta ("requested" ou "fallback_template").
+     */
+    String sendQuoteDocument(long peopleId, long dealId, String mediaUrl, String caption, Long fallbackTemplateId);
+
+    /** Janela de 24h aberta: o contato mandou mensagem no canal nas últimas 24h. */
+    boolean whatsappWindowOpen(long peopleId);
 
     record ArpaDeal(long id, Long organizationId, Long peopleId, Long userId) {}
 }

@@ -42,7 +42,7 @@ class HubCrmQuoteSyncServiceTest {
                 .thenReturn(Optional.of(new ArpaSuiteGateway.ArpaDeal(99, 77L, 88L, 4L)));
         when(arpa.addAnnotation(anyLong(), anyString())).thenReturn(123L);
         when(arpa.hasWhatsappChannel()).thenReturn(false);
-        service = new HubCrmQuoteSyncService(legacy, store, arpa, properties(), mock(HubCrmMediaSigner.class));
+        service = new HubCrmQuoteSyncService(legacy, store, arpa, properties(), mock(HubCrmQuoteWhatsappService.class));
     }
 
     @Test

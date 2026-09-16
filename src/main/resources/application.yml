@@ -96,6 +96,13 @@ salome:
       legacy-password: ${SALOME_HUB_CRM_LEGACY_WRITE_PASSWORD:}
       # Valor do combo "Tipo" da aprovação no legado (Telefone / E-mail / Outro).
       approval-type: ${SALOME_HUB_CRM_AUTO_APPROVAL_TYPE:Outro}
+    # PDF da cotação pelo WhatsApp (HubCrmQuoteWhatsappService). Janela de 24h fechada: vai o
+    # template no lugar e o PDF segue quando o cliente responder. 302790 = "Atendimento Salome".
+    whatsapp:
+      fallback-template-id: ${SALOME_HUB_CRM_WHATSAPP_TEMPLATE_ID:302790}
+      fallback-template-sends-document: ${SALOME_HUB_CRM_WHATSAPP_TEMPLATE_SENDS_DOCUMENT:false}
+      first-quote-id: ${SALOME_HUB_CRM_WHATSAPP_FIRST_QUOTE_ID:0}
+      wait-days: ${SALOME_HUB_CRM_WHATSAPP_WAIT_DAYS:3}
     # Lote de limpeza das cotações executado uma vez na inicialização quando o token
     # é definido (o mesmo token nunca roda de novo). Vazio = só pelo botão da aba Lote.
     batch:
