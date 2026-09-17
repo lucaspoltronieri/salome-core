@@ -59,7 +59,7 @@ public class HubCrmQuoteSyncService {
                         applyQuoteAnnotation(quote, current.dealId());
                         applyStatus(quote, current.dealId());
                     }
-                    whatsapp.process(quote, current.peopleId(), current.dealId());
+                    whatsapp.process(quote, current.organizationId(), current.peopleId(), current.dealId());
                     skipped++;
                 } catch (Exception exception) {
                     // Não muda o status da cotação: ela continua INTEGRADO e o
@@ -156,7 +156,7 @@ public class HubCrmQuoteSyncService {
         applyStatus(quote, dealId);
         store.markQuoteIntegrated(quote, organizationId, peopleId, dealId, userId, hash,
                 arpa.hasWhatsappChannel() ? "PENDENTE" : "AGUARDANDO_CANAL");
-        whatsapp.process(quote, peopleId, dealId);
+        whatsapp.process(quote, organizationId, peopleId, dealId);
     }
 
     void applyStatus(LegacyQuote quote, long dealId) {

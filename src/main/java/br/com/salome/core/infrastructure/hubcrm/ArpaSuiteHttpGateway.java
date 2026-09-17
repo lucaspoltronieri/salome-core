@@ -42,6 +42,9 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     private final Map<LossReason, Long> lostReasonIds = new EnumMap<>(LossReason.class);
     private final AtomicReference<Long> whatsappChannelId = new AtomicReference<>();
     private final AtomicReference<Instant> whatsappChannelCheckedAt = new AtomicReference<>();
+    private static final Duration CONVERSATION_CACHE_TTL = Duration.ofSeconds(60);
+    private final AtomicReference<List<JsonNode>> openConversations = new AtomicReference<>(List.of());
+    private final AtomicReference<Instant> openConversationsAt = new AtomicReference<>();
 
     public ArpaSuiteHttpGateway(HubCrmProperties properties) {
         this.properties = properties;
@@ -306,46 +309,100 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
-    public String sendQuoteDocument(long peopleId, long dealId, String mediaUrl, String caption,
-            Long fallbackTemplateId) {
-        Long channelId = whatsappChannelId.get();
-        if (channelId == null && !hasWhatsappChannel()) {
-            throw new IllegalStateException("Nenhum canal WhatsApp ativo no ArpaSuite");
+    public Optional<OpenConversation> findOpenConversation(long peopleId, String phone, Long organizationId,
+            String... names) {
+        String quotePhone = bestPhone(phone);
+        java.util.Set<String> quoteNames = new java.util.HashSet<>();
+        for (String name : names) {
+            String normalized = HubCrmNormalization.normalizedText(name);
+            if (!normalized.isBlank()) quoteNames.add(normalized);
         }
+        OpenConversation best = null;
+        int bestRank = Integer.MAX_VALUE;
+        Instant bestInbound = Instant.MIN;
+        for (JsonNode item : openConversations()) {
+            JsonNode people = item.path("people");
+            int rank;
+            String match;
+            if (item.path("peopleId").asLong() == peopleId) {
+                rank = 0;
+                match = "mesma pessoa";
+            } else if (samePhone(quotePhone, bestPhone(people.path("phone").asText()))) {
+                rank = 1;
+                match = "mesmo telefone";
+            } else if (organizationId != null && people.path("organizationId").asLong(0) == organizationId) {
+                rank = 2;
+                match = "mesma organização";
+            } else if (quoteNames.contains(HubCrmNormalization.normalizedText(people.path("name").asText()))) {
+                rank = 3;
+                match = "mesmo nome";
+            } else {
+                continue;
+            }
+            Instant inbound = java.time.OffsetDateTime.parse(item.path("lastInboundAt").asText()).toInstant();
+            if (rank < bestRank || (rank == bestRank && inbound.isAfter(bestInbound))) {
+                best = new OpenConversation(item.path("id").asLong(), match);
+                bestRank = rank;
+                bestInbound = inbound;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
+    @Override
+    public void sendDocumentToConversation(long conversationId, long dealId, String mediaUrl, String caption) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("channelId", whatsappChannelId.get());
-        payload.put("peopleId", peopleId);
+        payload.put("conversationId", conversationId);
         payload.put("dealId", dealId);
         payload.put("type", "document");
         payload.put("mediaUrl", mediaUrl);
         payload.put("caption", caption);
-        if (fallbackTemplateId != null) payload.put("fallbackTemplateId", fallbackTemplateId);
         payload.put("sentBy", "bot");
         JsonNode response = post("/messages/send", payload);
         JsonNode data = response.path("data").isObject() ? response.path("data") : response;
-        String result = response.toString();
         if ("failed".equals(data.path("status").asText())) {
+            String result = response.toString();
             throw new IllegalStateException("Meta recusou a mensagem: "
                     + result.substring(0, Math.min(500, result.length())));
         }
-        String dispatch = data.path("dispatch").asText();
-        return dispatch.isBlank() ? "requested" : dispatch;
     }
 
-    @Override
-    public boolean whatsappWindowOpen(long peopleId) {
+    // Conversas do canal com mensagem do contato nas últimas 24h (margem de 10 minutos para não cair
+    // no 422 window_closed no fim da janela). Cache curto: uma busca serve a todas as cotações do ciclo.
+    private synchronized List<JsonNode> openConversations() {
+        Instant cachedAt = openConversationsAt.get();
+        if (cachedAt != null && cachedAt.isAfter(Instant.now().minus(CONVERSATION_CACHE_TTL))) {
+            return openConversations.get();
+        }
+        List<JsonNode> open = new ArrayList<>();
         Long channelId = whatsappChannelId.get();
-        if (channelId == null && !hasWhatsappChannel()) return false;
-        JsonNode response = get("/conversations?peopleId=" + peopleId + "&channel=" + whatsappChannelId.get()
-                + "&perPage=20");
-        // Margem de 10 minutos para não cair no 422 window_closed bem no fim da janela.
-        Instant limit = Instant.now().minus(Duration.ofHours(24)).plus(Duration.ofMinutes(10));
-        return dataEntries(response).stream()
-                .map(item -> item.path("lastInboundAt").asText())
-                .filter(value -> !value.isBlank())
-                .map(value -> java.time.OffsetDateTime.parse(value).toInstant())
-                .anyMatch(inbound -> inbound.isAfter(limit));
+        if (channelId != null || hasWhatsappChannel()) {
+            Instant limit = Instant.now().minus(Duration.ofHours(24)).plus(Duration.ofMinutes(10));
+            for (int page = 1; page <= 20; page++) {
+                List<JsonNode> entries = dataEntries(get("/conversations?channel=" + whatsappChannelId.get()
+                        + "&status=all&perPage=100&page=" + page));
+                for (JsonNode item : entries) {
+                    String inbound = item.path("lastInboundAt").asText();
+                    if (!inbound.isBlank() && java.time.OffsetDateTime.parse(inbound).toInstant().isAfter(limit)) {
+                        open.add(item);
+                    }
+                }
+                if (entries.size() < 100) break;
+            }
+        }
+        openConversations.set(open);
+        openConversationsAt.set(Instant.now());
+        return open;
     }
+
+    // Mesmo número com ou sem o nono dígito do celular: DDD e os 8 últimos dígitos iguais.
+    static boolean samePhone(String a, String b) {
+        if (a.isBlank() || b.isBlank()) return false;
+        if (a.equals(b)) return true;
+        return a.length() >= 10 && b.length() >= 10 && a.substring(0, 2).equals(b.substring(0, 2))
+                && a.substring(a.length() - 8).equals(b.substring(b.length() - 8));
+    }
+
 
     // O título do card é a razão social completa, sem a inscrição numérica do CNPJ/CPF
     // que alguns cadastros trazem na frente do nome (businessName). O nome curto continua

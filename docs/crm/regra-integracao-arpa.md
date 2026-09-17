@@ -173,38 +173,34 @@ outra.
 A consulta do canal de WhatsApp e cacheada por 5 minutos, em vez de uma chamada
 por cotacao a cada polling.
 
-## PDF da cotacao pelo WhatsApp (v1.10.0)
+## PDF da cotacao pelo WhatsApp (v1.11.0)
 
-Regra definida pelo Lucas em 16/09/2026 e implementada em `HubCrmQuoteWhatsappService`. O
-envio usa a API `POST /api/messages/send` (documentacao em
-`https://suite.arpacore.com.br/docs`). A Meta so aceita mensagem livre, como o PDF, dentro de
-24h da ultima mensagem recebida do contato.
+Regra definida pelo Lucas em 17/09/2026 e implementada em `HubCrmQuoteWhatsappService`. O PDF
+**so e enviado quando ja existe uma conversa aberta** com o cliente. **Nenhum template e
+enviado.** Essa regra substitui a v1.10.0, que mandava o template "Atendimento Salome" quando a
+janela estava fechada.
 
-1. O Hub envia o PDF com `fallbackTemplateId`. Se a janela estiver aberta, isto e, se ja existe
-   uma conversa ativa com o contato no conversacional, o PDF vai direto (`dispatch: requested`).
-2. Com a janela fechada, a API envia o template no lugar (`dispatch: fallback_template`), e a
-   cotacao fica em `AGUARDANDO_RESPOSTA` (evento `quote:<id>:whatsapp-template`).
-3. A cada ciclo, o Hub consulta `GET /api/conversations?peopleId=&channel=`. Quando o
-   `lastInboundAt` esta dentro das ultimas 24h, o cliente respondeu, e o Hub envia o PDF sem
-   template.
-4. Se o cliente nao responder ate `wait-days` (3) dias depois da data da cotacao, o envio e
-   encerrado sem o PDF (`SEM_RESPOSTA`).
+Conversa aberta e uma conversa do canal cujo `lastInboundAt` esta dentro das ultimas 24h, que e a
+janela da Meta. A conversa vale para a cotacao quando cumpre uma destas condicoes, nesta ordem de
+preferencia:
 
-Outros encerramentos: pessoa sem telefone (`SEM_TELEFONE`) e erro de validacao 4xx (`ERRO`).
-Os dois ficam no evento `quote:<id>:whatsapp-encerrado` e nunca se repetem a cada ciclo. Erro
-temporario (429, 5xx ou rede) e tentado de novo no ciclo seguinte.
+1. mesma pessoa do card (`peopleId`);
+2. mesmo telefone do pagador, inclusive com ou sem o nono digito;
+3. pessoa da mesma organizacao do card no ArpaSuite;
+4. pessoa com o mesmo nome da empresa (razao social ou nome curto). Isso cobre o cliente que fala
+   de outro numero.
 
-Configuracao em `salome.hub-crm.whatsapp`:
-- `fallback-template-id`: hoje 302790, "Atendimento Salome", so a saudacao.
-- `first-quote-id`: primeira cotacao que entra no envio. As cotacoes anteriores ao deploy nao
-  sao reenviadas.
-- `fallback-template-sends-document`: passa a `true` quando o template com a cotacao em anexo
-  for aprovado. Nesse caso, a cotacao ja fica `ENVIADO` com o template.
+O PDF e enviado dentro dessa conversa (`POST /api/messages/send` com `conversationId`). O Hub
+consulta as conversas uma vez por minuto, com cache.
 
-Atencao ao trocar pelo template com anexo: pela documentacao, o documento do cabecalho do
-template e um arquivo fixo, enviado no cadastro do template. Antes de ligar
-`fallback-template-sends-document`, e preciso confirmar com um envio de teste se a API usa o
-`mediaUrl` da mensagem, que e o PDF daquela cotacao.
+- **Sem conversa aberta:** a cotacao fica `AGUARDANDO_CONVERSA`, e o Hub procura de novo a cada
+  ciclo. Se nada aparecer ate `wait-days` (3) dias depois da data da cotacao, o envio e encerrado
+  sem o PDF (`SEM_CONVERSA`).
+- **Janela fechada durante o envio (`window_closed`):** o Hub tenta de novo no ciclo seguinte.
+- **Outro erro 4xx:** o envio e encerrado (`ERRO`).
+- **Eventos:** `quote:<id>:whatsapp` (enviado) e `quote:<id>:whatsapp-encerrado`. Nada e
+  reenviado.
+- **Corte:** so entram cotacoes a partir de `first-quote-id` (15841).
 
 ## Titulo do card
 

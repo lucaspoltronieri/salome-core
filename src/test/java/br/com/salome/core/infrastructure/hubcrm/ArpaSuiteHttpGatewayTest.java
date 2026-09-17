@@ -14,6 +14,53 @@ import org.junit.jupiter.api.Test;
 class ArpaSuiteHttpGatewayTest {
 
     @Test
+    void encontraConversaAbertaPorTelefoneOrganizacaoOuNomeEEnviaNaConversa() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> sent = new AtomicReference<>();
+        String recent = java.time.OffsetDateTime.now().minusHours(2).toString();
+        String old = java.time.OffsetDateTime.now().minusHours(30).toString();
+        String conversations = "{\"data\":["
+                + "{\"id\":1,\"peopleId\":10,\"lastInboundAt\":\"" + old + "\",\"people\":{\"phone\":\"5517999990000\",\"organizationId\":0,\"name\":\"X\"}},"
+                + "{\"id\":2,\"peopleId\":11,\"lastInboundAt\":\"" + recent + "\",\"people\":{\"phone\":\"551799990000\",\"organizationId\":0,\"name\":\"Fulano\"}},"
+                + "{\"id\":3,\"peopleId\":12,\"lastInboundAt\":\"" + recent + "\",\"people\":{\"phone\":\"5511911112222\",\"organizationId\":77,\"name\":\"Compras\"}},"
+                + "{\"id\":4,\"peopleId\":13,\"lastInboundAt\":\"" + recent + "\",\"people\":{\"phone\":\"5511933334444\",\"organizationId\":0,\"name\":\"Tintas Rio Preto\"}}"
+                + "],\"metadata\":{}}";
+        server.createContext("/api/channels", exchange -> respond(exchange, "{\"data\":[{\"id\":92}]}"));
+        server.createContext("/api/conversations", exchange -> respond(exchange, conversations));
+        server.createContext("/api/messages/send", exchange -> {
+            sent.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            respond(exchange, "{\"id\":9,\"status\":\"sent\",\"dispatch\":\"requested\"}");
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(properties("http://127.0.0.1:" + server.getAddress().getPort()));
+
+            // Telefone sem o nono dígito casa com a conversa 2; a 1 tem a janela fechada.
+            assertThat(gateway.findOpenConversation(500, "(17) 99999-0000", 1L, "OUTRA"))
+                    .contains(new ArpaSuiteGateway.OpenConversation(2, "mesmo telefone"));
+            assertThat(gateway.findOpenConversation(500, "", 77L, "OUTRA"))
+                    .contains(new ArpaSuiteGateway.OpenConversation(3, "mesma organização"));
+            assertThat(gateway.findOpenConversation(500, "", 1L, "TINTAS RIO PRETO"))
+                    .contains(new ArpaSuiteGateway.OpenConversation(4, "mesmo nome"));
+            assertThat(gateway.findOpenConversation(500, "(11) 3333-0000", 1L, "OUTRA")).isEmpty();
+
+            gateway.sendDocumentToConversation(3, 99, "https://hub/pdf", "Cotação de frete nº 1");
+            assertThat(sent.get()).contains("\"conversationId\":3", "\"type\":\"document\"")
+                    .doesNotContain("template");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static void respond(com.sun.net.httpserver.HttpExchange exchange, String body) throws java.io.IOException {
+        byte[] response = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.sendResponseHeaders(200, response.length);
+        exchange.getResponseBody().write(response);
+        exchange.close();
+    }
+
+    @Test
     void aceitaErroDeDigitacaoExistenteNoCatalogoDeCargaEspecial() {
         HubCrmProperties properties = properties("https://suite.arpacore.com.br");
         ArpaSuiteHttpGateway gateway = new ArpaSuiteHttpGateway(properties);

@@ -1,26 +1,25 @@
 package br.com.salome.core.application.hubcrm;
 
+import br.com.salome.core.domain.hubcrm.HubCrmNormalization;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmWhatsappProperties;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * PDF da cotação pelo WhatsApp (regra do Lucas, 16/09/2026):
- * <ol>
- *   <li>janela de 24h aberta com o contato (conversa ativa no conversacional): vai o PDF direto;</li>
- *   <li>janela fechada: a API envia o template no lugar ({@code fallbackTemplateId}) e a cotação
- *       fica aguardando; quando o cliente responde e a janela abre, o Hub manda o PDF;</li>
- *   <li>sem resposta até {@code waitDays} depois da data da cotação: encerra sem enviar.</li>
- * </ol>
- * O estado fica nos eventos (enviado / template / encerrado), então nada é reenviado quando a
- * cotação muda no legado. Cotações anteriores a {@code firstQuoteId} não entram.
+ * PDF da cotação pelo WhatsApp — regra do Lucas (17/09/2026): só vai quando já existe conversa
+ * aberta (janela de 24h) com o cliente, e nunca por template. A conversa pode ser da pessoa do
+ * card, do mesmo telefone, de uma pessoa da mesma organização ou com o mesmo nome da empresa
+ * (cliente falando de outro número). Sem conversa, o Hub volta a procurar a cada ciclo até
+ * {@code waitDays} depois da data da cotação e então encerra sem enviar.
+ * O estado fica nos eventos (enviado / encerrado), então nada é reenviado.
  */
 @Service
 @ConditionalOnProperty(prefix = "salome.hub-crm", name = "enabled", havingValue = "true")
@@ -47,75 +46,52 @@ public class HubCrmQuoteWhatsappService {
         this.clock = clock;
     }
 
-    public void process(LegacyQuote quote, Long peopleId, Long dealId) {
+    public void process(LegacyQuote quote, Long organizationId, Long peopleId, Long dealId) {
         if (peopleId == null || dealId == null || quote.id() < properties.firstQuoteId()) return;
         String sentKey = "quote:" + quote.id() + ":whatsapp";
-        String templateKey = "quote:" + quote.id() + ":whatsapp-template";
         String closedKey = "quote:" + quote.id() + ":whatsapp-encerrado";
         if (store.eventProcessed(sentKey) || store.eventProcessed(closedKey)) return;
         if (!arpa.hasWhatsappChannel()) {
             store.markWhatsapp(quote.id(), "AGUARDANDO_CANAL", null);
             return;
         }
-        boolean waiting = store.eventProcessed(templateKey);
+        if (LocalDate.now(clock).isAfter(quote.createdDate().plusDays(properties.waitDays()))) {
+            store.markWhatsapp(quote.id(), "SEM_CONVERSA", null);
+            store.recordEvent(closedKey, "COTACAO", quote.id(), "WHATSAPP_SEM_CONVERSA", "PROCESSADO",
+                    "Nenhuma conversa aberta em " + properties.waitDays() + " dias; PDF não enviado", null);
+            return;
+        }
         try {
-            if (waiting) {
-                LocalDate limit = quote.createdDate().plusDays(properties.waitDays());
-                if (LocalDate.now(clock).isAfter(limit)) {
-                    close(quote, closedKey, "SEM_RESPOSTA", "Cliente não respondeu ao template em "
-                            + properties.waitDays() + " dias; PDF não enviado");
-                    return;
-                }
-                if (!arpa.whatsappWindowOpen(peopleId)) return;
-                arpa.sendQuoteDocument(peopleId, dealId, pdfUrl(quote), caption(quote), null);
-                sent(quote, sentKey, "PDF enviado depois da resposta do cliente ao template");
+            Optional<ArpaSuiteGateway.OpenConversation> conversation = arpa.findOpenConversation(peopleId,
+                    quote.payerPhone(), organizationId, HubCrmNormalization.businessName(quote.payerName()),
+                    HubCrmNormalization.shortName(quote.payerName()));
+            if (conversation.isEmpty()) {
+                store.markWhatsapp(quote.id(), "AGUARDANDO_CONVERSA", null);
                 return;
             }
-            Long fallback = properties.fallbackTemplateId() > 0 ? properties.fallbackTemplateId() : null;
-            String dispatch = arpa.sendQuoteDocument(peopleId, dealId, pdfUrl(quote), caption(quote), fallback);
-            if (!"fallback_template".equals(dispatch)) {
-                sent(quote, sentKey, "PDF enviado (janela de 24h aberta)");
-            } else if (properties.fallbackTemplateSendsDocument()) {
-                sent(quote, sentKey, "Janela fechada: enviado o template " + fallback + " com a cotação");
-            } else {
-                store.markWhatsapp(quote.id(), "AGUARDANDO_RESPOSTA", null);
-                store.recordEvent(templateKey, "COTACAO", quote.id(), "WHATSAPP_TEMPLATE", "PROCESSADO",
-                        "Janela fechada: enviado o template " + fallback + "; PDF aguarda a resposta", null);
-            }
+            arpa.sendDocumentToConversation(conversation.get().id(), dealId, mediaSigner.quoteUrl(quote.id()).url(),
+                    "Cotação de frete nº " + quote.id());
+            store.markWhatsapp(quote.id(), "ENVIADO", null);
+            store.recordEvent(sentKey, "COTACAO", quote.id(), "WHATSAPP_PDF", "PROCESSADO",
+                    "PDF enviado na conversa " + conversation.get().id() + " (" + conversation.get().match() + ")",
+                    null);
         } catch (RestClientResponseException exception) {
             String body = exception.getResponseBodyAsString();
-            if (body.contains("people_without_phone")) {
-                close(quote, closedKey, "SEM_TELEFONE", "Pessoa sem telefone no ArpaSuite");
-            } else if (waiting && body.contains("window_closed")) {
-                // A janela fechou entre a consulta e o envio: tenta de novo no próximo ciclo.
+            if (body.contains("window_closed")) {
+                // A janela fechou entre a consulta e o envio: procura de novo no próximo ciclo.
                 return;
-            } else if (exception.getStatusCode().is4xxClientError() && exception.getStatusCode().value() != 429) {
-                // Erro de validação não se resolve sozinho: encerra em vez de repetir a cada ciclo.
-                close(quote, closedKey, "ERRO", exception.getMessage());
-            } else {
-                failed(quote, exception);
             }
+            if (exception.getStatusCode().is4xxClientError() && exception.getStatusCode().value() != 429) {
+                // Erro de validação não se resolve sozinho: encerra em vez de repetir a cada ciclo.
+                store.markWhatsapp(quote.id(), "ERRO", exception.getMessage());
+                store.recordEvent(closedKey, "COTACAO", quote.id(), "WHATSAPP_ERRO", "PROCESSADO",
+                        exception.getMessage(), null);
+                return;
+            }
+            failed(quote, exception);
         } catch (Exception exception) {
             failed(quote, exception);
         }
-    }
-
-    private String pdfUrl(LegacyQuote quote) {
-        return mediaSigner.quoteUrl(quote.id()).url();
-    }
-
-    private static String caption(LegacyQuote quote) {
-        return "Cotação de frete nº " + quote.id();
-    }
-
-    private void sent(LegacyQuote quote, String key, String summary) {
-        store.markWhatsapp(quote.id(), "ENVIADO", null);
-        store.recordEvent(key, "COTACAO", quote.id(), "WHATSAPP_PDF", "PROCESSADO", summary, null);
-    }
-
-    private void close(LegacyQuote quote, String key, String status, String reason) {
-        store.markWhatsapp(quote.id(), status, "SEM_RESPOSTA".equals(status) ? null : reason);
-        store.recordEvent(key, "COTACAO", quote.id(), "WHATSAPP_" + status, "PROCESSADO", reason, null);
     }
 
     private void failed(LegacyQuote quote, Exception exception) {
