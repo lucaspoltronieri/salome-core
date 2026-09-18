@@ -27,6 +27,9 @@ import org.springframework.stereotype.Service;
 @Service
 @ConditionalOnExpression("${salome.hub-crm.enabled:false} and ${salome.hub-crm.auto-approval.enabled:false}")
 public class HubCrmCteApprovalService {
+    /** Fuso das datas gravadas no legado (statusData, statusHora, log); o servidor roda em UTC. */
+    static final java.time.ZoneId LEGACY_ZONE = java.time.ZoneId.of("America/Sao_Paulo");
+
     private final HubCrmLegacyRepository legacy;
     private final HubCrmStore store;
     private final LegacyQuoteApprovalWriter writer;
@@ -36,7 +39,7 @@ public class HubCrmCteApprovalService {
     @Autowired
     public HubCrmCteApprovalService(HubCrmLegacyRepository legacy, HubCrmStore store,
             LegacyQuoteApprovalWriter writer, HubCrmAutoApprovalProperties properties) {
-        this(legacy, store, writer, properties, Clock.systemDefaultZone());
+        this(legacy, store, writer, properties, Clock.system(HubCrmCteApprovalService.LEGACY_ZONE));
     }
 
     HubCrmCteApprovalService(HubCrmLegacyRepository legacy, HubCrmStore store,

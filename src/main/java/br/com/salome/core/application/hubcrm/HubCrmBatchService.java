@@ -55,7 +55,7 @@ public class HubCrmBatchService {
     @Autowired
     public HubCrmBatchService(HubCrmLegacyRepository legacy, HubCrmStore store,
             LegacyQuoteApprovalWriter writer, HubCrmAutoApprovalProperties properties) {
-        this(legacy, store, writer, properties, Clock.systemDefaultZone());
+        this(legacy, store, writer, properties, Clock.system(HubCrmCteApprovalService.LEGACY_ZONE));
     }
 
     HubCrmBatchService(HubCrmLegacyRepository legacy, HubCrmStore store,
