@@ -79,6 +79,22 @@ cotação e mercadoria emitida direto no balcão, sem a coleta de R$ 253,37 prev
 Conta do caso: (1.531,15 − 183,74 − 253,37) ÷ (1 − 12%) = 1.243,23; × 2.060/2.000 =
 1.280,52 contra 1.279,83 no CT-e.
 
+**Cotação sem remetente (v1.14.0, decisão do Lucas em 18/09/2026).** Caso 15798 ×
+CT-e 297104: a cotação foi feita com o remetente genérico `11111111111111` / "CLIENTE".
+O frete saiu de uma origem que não é a real (R$ 615,22 contra R$ 561,70 no CT-e, com
+pedágio e entrega diferentes), mas o pagador, o peso (428 × 428,74 kg), os volumes (9)
+e a NF (R$ 5.873,00 × 5.966,37) batiam.
+
+- A cotação conta como "sem remetente" quando o CNPJ do remetente está vazio ou tem todos
+  os dígitos iguais, ou quando a razão social é "CLIENTE".
+- Nesse caso, **o frete não é critério**: a amarração é por pagador, peso (até 5%) e NF
+  (até 5%).
+- A cotação sempre fica com os valores do CT-e.
+
+**Regra geral (Lucas, 18/09/2026): sempre que um CT-e amarra com uma cotação por qualquer
+uma das regras acima, o Hub ajusta a cotação aos valores do CT-e e aprova.** A única
+exceção é a cubagem esquecida no CT-e, em que a cotação fica como está.
+
 Quais cotações podem ser aprovadas:
 
 | Responsável | Status | O que acontece |
@@ -155,6 +171,7 @@ visível.
 | 15281 | 317921 | Destinatário divergente; volumes, peso, valor da NF e frete coincidem. |
 | 15296 | — | Não existe CT-e localizado. |
 | 15813 | 320274 | NF final maior (R$ 2.507,00 × 2.693,92), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
+| 15798 | 297104 | Cotação sem remetente (11111111111111 / CLIENTE), frete de outra origem; pagador, peso e NF batem; aprovada pelo Hub e ajustada ao CT-e (v1.14.0). |
 | 15839 | 385982 | Remetente filial, peso 2.060 × 2.000 kg, sem coleta (balcão); aprovada pelo Hub e ajustada ao CT-e (v1.13.0). |
 | 15815 | 320273 | NF final maior (R$ 650,00 × 766,16), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
 

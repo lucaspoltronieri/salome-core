@@ -19,6 +19,8 @@ import java.util.Optional;
  *       frete da cotação, proporcional ao peso do CT-e, bater;</li>
  *   <li>CT-e sem coleta (emitido no balcão) e cotação com coleta: compara o frete da
  *       cotação sem a taxa de coleta;</li>
+ *   <li>cotação sem remetente (CNPJ genérico): o frete não é critério; amarra por pagador,
+ *       peso e NF (até 5%);</li>
  *   <li>valor da NF igual, ou diferente com peso e frete batendo: a NF final da carga muda e o
  *       frete (ad valorem) quase não mexe; nesse caso a cotação é aprovada e fica com os
  *       valores do CT-e ({@link Match#syncValues()});</li>
@@ -106,6 +108,18 @@ public final class CteQuoteMatcher {
             adjustments.add("peso " + plain(cte.weight()) + " x " + plain(quote.weight())
                     + " kg, frete proporcional " + money(quoteFreight));
         }
+        if (unknownSender(quote)) {
+            // Cotação feita sem o remetente (CNPJ genérico): o frete saiu de uma origem que não é a
+            // real e não serve de critério. Amarra por pagador, peso e NF; a cotação fica com o CT-e.
+            if (!same(cte.invoiceValue(), quote.invoiceValue())
+                    && !withinPercent(cte.invoiceValue(), quote.invoiceValue(), WEIGHT_PERCENT)) {
+                return Optional.empty();
+            }
+            adjustments.add("remetente não informado na cotação (" + safe(quote.senderCnpj())
+                    + "): frete não comparado");
+            return Optional.of(new Candidate(quote, cteFreight.subtract(quoteFreight).abs(), false,
+                    !same(cte.invoiceValue(), quote.invoiceValue()), String.join("; ", adjustments)));
+        }
         boolean freightOk = same(cteFreight, quoteFreight);
         boolean cubageException = !freightOk && positive(quote.cubage())
                 && cteFreight.signum() > 0 && cteFreight.compareTo(quoteFreight) < 0;
@@ -127,6 +141,16 @@ public final class CteQuoteMatcher {
         String b = digits(quoteCnpj);
         if (a.equals(b)) return true;
         return a.length() == 14 && b.length() == 14 && a.substring(0, 8).equals(b.substring(0, 8));
+    }
+
+    /**
+     * Remetente não informado na cotação: CNPJ vazio ou genérico (todos os dígitos iguais, como
+     * 11111111111111) ou razão social "CLIENTE" (caso 15798).
+     */
+    static boolean unknownSender(LegacyQuote quote) {
+        String cnpj = digits(quote.senderCnpj());
+        if (cnpj.isEmpty() || cnpj.chars().distinct().count() == 1) return true;
+        return "CLIENTE".equals(HubCrmNormalization.normalizedText(quote.senderName()));
     }
 
     /** Chave para agrupar as cotações candidatas de um pagador (raiz do CNPJ). */

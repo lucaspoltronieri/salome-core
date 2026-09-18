@@ -163,6 +163,42 @@ class CteQuoteMatcherTest {
         assertThat(CteQuoteMatcher.payerKey("53.186.342/0003-76")).isEqualTo("53186342");
     }
 
+    /** Caso 15798 x CT-e 297104: cotação sem remetente (11111111111111 / CLIENTE), frete de outra origem. */
+    @Test
+    void cotacaoSemRemetenteAmarraPorPagadorPesoENf() {
+        var match = CteQuoteMatcher.evaluate(cte297104(new BigDecimal("5966.37")), List.of(quote15798()), 30);
+
+        assertThat(match.outcome()).isEqualTo(CteQuoteMatcher.Outcome.APROVAR);
+        assertThat(match.syncValues()).isTrue();
+        assertThat(match.criteria()).contains("remetente não informado");
+    }
+
+    @Test
+    void cotacaoSemRemetenteComNfMuitoDiferenteNaoAprova() {
+        assertThat(CteQuoteMatcher.evaluate(cte297104(new BigDecimal("6600")), List.of(quote15798()), 30).outcome())
+                .isEqualTo(CteQuoteMatcher.Outcome.SEM_COTACAO);
+    }
+
+    private static LegacyQuote quote15798() {
+        BigDecimal zero = BigDecimal.ZERO;
+        return new LegacyQuote(15798, LocalDate.of(2026, 9, 11), "10:00", "FERNANDA", "ABERTA",
+                LocalDateTime.of(2026, 9, 11, 10, 0), "Destinatário (FOB)", "11111111111111", "CLIENTE", "X",
+                "30414378000100", "J E L", "Y", "30414378000100", "J E L", "", "", "DIVERSOS", 9,
+                new BigDecimal("428"), new BigDecimal("5873"), zero, new BigDecimal("223.73"),
+                new BigDecimal("23.49"), new BigDecimal("27.55"), new BigDecimal("189"), new BigDecimal("60"), zero,
+                new BigDecimal("17.62"), zero, new BigDecimal("73.83"), zero, zero, new BigDecimal("615.22"), "",
+                Map.of());
+    }
+
+    private static LegacyCte cte297104(BigDecimal invoice) {
+        BigDecimal zero = BigDecimal.ZERO;
+        return new LegacyCte(710201, "297104", "1", "k", LocalDate.of(2026, 9, 16), "10:00", "Destinatário (FOB)",
+                "01140700000144", "30414378000100", "30414378000100", new BigDecimal("428.74"), invoice, 9,
+                new BigDecimal("561.70"), new LegacyCte.Charges(new BigDecimal("209.10"), new BigDecimal("23.49"),
+                        new BigDecimal("22.04"), new BigDecimal("189"), new BigDecimal("33.05"), zero,
+                        new BigDecimal("17.62"), zero, new BigDecimal("67.40"), zero, zero));
+    }
+
     @Test
     void arredondamentoDentroDaToleranciaAprova() {
         assertThat(CteQuoteMatcher.same(new BigDecimal("1000.00"), new BigDecimal("1009.00"))).isTrue();
