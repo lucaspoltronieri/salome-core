@@ -84,6 +84,11 @@ public class LegacyQuoteApprovalWriter {
                 log.append(prefix).append(" [").append(change.column().toUpperCase(Locale.ROOT)).append("] [")
                         .append(logNumber(change.previous())).append("] [").append(logNumber(change.value()))
                         .append("] && ");
+                if ("coletaValor".equals(change.column()) && change.value().signum() == 0) {
+                    // CT-e emitido no balcão, sem coleta: a cotação deixa de prever coleta.
+                    sets.add("coleta='Não'");
+                    log.append(prefix).append(" [COLETA] [Sim] [Não] && ");
+                }
             }
         }
         sets.add("log=CONCAT(IFNULL(log,''), ?)");

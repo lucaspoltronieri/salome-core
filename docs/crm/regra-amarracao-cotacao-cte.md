@@ -60,6 +60,25 @@ então:
   do CT-e, e a data da aprovação continua a mesma, para o ganho não sair de novo no
   ArpaSuite.
 
+**Filial, peso um pouco diferente e CT-e sem coleta (v1.13.0, decisão do Lucas em
+18/09/2026).** Caso 15839 × CT-e 385982: remetente de outra filial da Santa Cruz
+(53186342/0001 × /0003, mesma razão social), 2.060 kg no CT-e contra 2.000 kg na
+cotação e mercadoria emitida direto no balcão, sem a coleta de R$ 253,37 prevista.
+
+- **Pagador:** vale o CNPJ igual ou a mesma raiz (8 primeiros dígitos: matriz e
+  filiais da mesma empresa). CPF só vale igual. O remetente continua fora do critério.
+- **Sem coleta:** se a cotação tem coleta e o CT-e não, o frete da cotação é comparado
+  sem a coleta, com o ICMS recalculado na mesma alíquota (frete sem ICMS e sem coleta,
+  dividido por 1 − alíquota).
+- **Peso até 5% diferente:** passa quando o frete da cotação, proporcional ao peso do
+  CT-e, bate com o frete do CT-e (tolerância normal de 1% / R$ 1). Acima de 5%, não
+  aprova.
+- Aprovada assim, a cotação fica com os valores do CT-e, como na regra acima, e com
+  `coleta='Não'` quando a coleta sai.
+
+Conta do caso: (1.531,15 − 183,74 − 253,37) ÷ (1 − 12%) = 1.243,23; × 2.060/2.000 =
+1.280,52 contra 1.279,83 no CT-e.
+
 Quais cotações podem ser aprovadas:
 
 | Responsável | Status | O que acontece |
@@ -136,6 +155,7 @@ visível.
 | 15281 | 317921 | Destinatário divergente; volumes, peso, valor da NF e frete coincidem. |
 | 15296 | — | Não existe CT-e localizado. |
 | 15813 | 320274 | NF final maior (R$ 2.507,00 × 2.693,92), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
+| 15839 | 385982 | Remetente filial, peso 2.060 × 2.000 kg, sem coleta (balcão); aprovada pelo Hub e ajustada ao CT-e (v1.13.0). |
 | 15815 | 320273 | NF final maior (R$ 650,00 × 766,16), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
 
 Os números acima devem ser validados também por data, série, chave e demais

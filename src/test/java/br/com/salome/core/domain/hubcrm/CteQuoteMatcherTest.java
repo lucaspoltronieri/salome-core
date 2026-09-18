@@ -121,6 +121,48 @@ class CteQuoteMatcherTest {
     }
 
 
+    /** Caso 15839 x CT-e 385982: remetente filial, 60 kg a mais e sem coleta (emitido no balcão). */
+    @Test
+    void semColetaEPesoPoucoMaiorAprovaComFreteProporcional() {
+        BigDecimal zero = BigDecimal.ZERO;
+        LegacyQuote quote = new LegacyQuote(15839, LocalDate.of(2026, 9, 16), "10:00", "FERNANDA", "ABERTA",
+                LocalDateTime.of(2026, 9, 16, 10, 0), "Destinatário (FOB)", "53186342000104", "SANTA CRUZ", "X",
+                "24554711000176", "VEGAS", "Y", "24554711000176", "VEGAS", "", "", "DIVERSOS", 2,
+                new BigDecimal("2000"), new BigDecimal("10200"), zero, new BigDecimal("878.58"),
+                new BigDecimal("20.40"), new BigDecimal("195.06"), new BigDecimal("253.37"), zero, zero, zero, zero,
+                new BigDecimal("183.74"), zero, zero, new BigDecimal("1531.15"), "", Map.of());
+        LegacyCte cte = new LegacyCte(710486, "385982", "1", "k", LocalDate.of(2026, 9, 18), "10:00",
+                "Destinatário (FOB)", "53186342000376", "24554711000176", "24554711000176", new BigDecimal("2060"),
+                new BigDecimal("10200"), 2, new BigDecimal("1279.83"),
+                new LegacyCte.Charges(new BigDecimal("904.94"), new BigDecimal("20.40"), new BigDecimal("200.91"),
+                        zero, zero, zero, zero, zero, new BigDecimal("153.58"), zero, zero));
+
+        var match = CteQuoteMatcher.evaluate(cte, List.of(quote), 30);
+
+        assertThat(match.outcome()).isEqualTo(CteQuoteMatcher.Outcome.APROVAR);
+        assertThat(match.syncValues()).isTrue();
+        assertThat(match.criteria()).contains("sem coleta").contains("frete proporcional");
+    }
+
+    @Test
+    void pesoMaisDeCincoPorCentoDiferenteNaoAprova() {
+        LegacyQuote quote = quote(1, "ABERTA", "FERNANDA", LocalDate.of(2026, 9, 1), "150.00", "0");
+        LegacyCte cte = new LegacyCte(10, "5000", "1", "chave", LocalDate.of(2026, 9, 2), "10:00",
+                "CIF", PAGADOR, "98765432000110", PAGADOR, new BigDecimal("53"), new BigDecimal("1000"), 2,
+                new BigDecimal("159.00"));
+
+        assertThat(CteQuoteMatcher.evaluate(cte, List.of(quote), 30).outcome())
+                .isEqualTo(CteQuoteMatcher.Outcome.SEM_COTACAO);
+    }
+
+    @Test
+    void pagadorFilialDaMesmaEmpresaValeCpfNao() {
+        assertThat(CteQuoteMatcher.samePayer("53186342000376", "53186342000104")).isTrue();
+        assertThat(CteQuoteMatcher.samePayer("53186342000376", "99186342000104")).isFalse();
+        assertThat(CteQuoteMatcher.samePayer("12345678901", "12345678902")).isFalse();
+        assertThat(CteQuoteMatcher.payerKey("53.186.342/0003-76")).isEqualTo("53186342");
+    }
+
     @Test
     void arredondamentoDentroDaToleranciaAprova() {
         assertThat(CteQuoteMatcher.same(new BigDecimal("1000.00"), new BigDecimal("1009.00"))).isTrue();

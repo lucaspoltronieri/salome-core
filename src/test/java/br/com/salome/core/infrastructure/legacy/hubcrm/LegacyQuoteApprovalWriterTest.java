@@ -70,6 +70,31 @@ class LegacyQuoteApprovalWriterTest {
     }
 
     @Test
+    void cteSemColetaTiraAColetaDaCotacao() {
+        BigDecimal zero = BigDecimal.ZERO;
+        LegacyQuote comColeta = new LegacyQuote(15839, LocalDate.of(2026, 9, 16), "10:00", "FERNANDA", "ABERTA",
+                LocalDateTime.of(2026, 9, 16, 10, 0), "Destinatário (FOB)", "A", "A", "X", "B", "B", "Y", "B", "B",
+                "", "", "DIVERSOS", 2, new BigDecimal("2000"), new BigDecimal("10200"), zero,
+                new BigDecimal("878.58"), new BigDecimal("20.40"), new BigDecimal("195.06"),
+                new BigDecimal("253.37"), zero, zero, zero, zero, new BigDecimal("183.74"), zero, zero,
+                new BigDecimal("1531.15"), "", Map.of());
+        LegacyCte semColeta = new LegacyCte(710486, "385982", "1", "k", LocalDate.of(2026, 9, 18), "10:00",
+                "Destinatário (FOB)", "A", "B", "B", new BigDecimal("2060"), new BigDecimal("10200"), 2,
+                new BigDecimal("1279.83"), new LegacyCte.Charges(new BigDecimal("904.94"), new BigDecimal("20.40"),
+                        new BigDecimal("200.91"), zero, zero, zero, zero, zero, new BigDecimal("153.58"), zero, zero));
+
+        assertThat(writer.approve(comColeta, semColeta, NOW, true)).isTrue();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(sql.capture(), args.capture());
+        assertThat(sql.getValue()).contains("coletaValor=?", "coleta='Não'", "peso=?", "status='APROVADA'");
+        assertThat(Arrays.asList(args.getValue())).anySatisfy(value -> assertThat(String.valueOf(value))
+                .contains("[COLETAVALOR] [253.37] [0.0]").contains("[COLETA] [Sim] [Não]")
+                .contains("[PESO] [2000.0] [2060.0]"));
+    }
+
+    @Test
     void cotacaoAbertaSemAjusteSoAprova() {
         assertThat(writer.approve(quote("ABERTA"), cte, NOW, false)).isTrue();
 

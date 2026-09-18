@@ -13,9 +13,12 @@ import java.util.Optional;
  * (docs/crm/regra-amarracao-cotacao-cte.md).
  *
  * <ul>
- *   <li>pagador igual (obrigatório);</li>
+ *   <li>pagador igual (obrigatório); vale a mesma raiz de CNPJ (matriz/filial);</li>
  *   <li>CT-e emitido no dia da cotação ou até {@code windowDays} dias depois;</li>
- *   <li>peso e frete iguais (tolerância de arredondamento);</li>
+ *   <li>peso e frete iguais (tolerância de arredondamento). Peso até 5% diferente passa se o
+ *       frete da cotação, proporcional ao peso do CT-e, bater;</li>
+ *   <li>CT-e sem coleta (emitido no balcão) e cotação com coleta: compara o frete da
+ *       cotação sem a taxa de coleta;</li>
  *   <li>valor da NF igual, ou diferente com peso e frete batendo: a NF final da carga muda e o
  *       frete (ad valorem) quase não mexe; nesse caso a cotação é aprovada e fica com os
  *       valores do CT-e ({@link Match#syncValues()});</li>
@@ -30,6 +33,8 @@ import java.util.Optional;
 public final class CteQuoteMatcher {
     private static final BigDecimal ONE = BigDecimal.ONE;
     private static final BigDecimal PERCENT = new BigDecimal("0.01");
+    /** Diferença de peso aceita quando o frete acompanha o peso real (decisão do Lucas, caso 15839). */
+    static final BigDecimal WEIGHT_PERCENT = new BigDecimal("0.05");
 
     public enum Outcome { APROVAR, SEM_COTACAO, AMBIGUO }
 
@@ -39,7 +44,7 @@ public final class CteQuoteMatcher {
             List<Long> tiedQuoteIds, boolean syncValues) {}
 
     private record Candidate(LegacyQuote quote, BigDecimal freightDiff, boolean cubageException,
-            boolean invoiceDiverges) {}
+            boolean invoiceDiverges, String adjustments) {}
 
     private CteQuoteMatcher() {}
 
@@ -83,10 +88,24 @@ public final class CteQuoteMatcher {
         if (quote.createdDate() == null || cte.issueDate() == null) return Optional.empty();
         long days = ChronoUnit.DAYS.between(quote.createdDate(), cte.issueDate());
         if (days < 0 || days > windowDays) return Optional.empty();
-        if (blank(cte.payerCnpj()) || !cte.payerCnpj().equals(quote.payerCnpj())) return Optional.empty();
-        if (!same(cte.weight(), quote.weight())) return Optional.empty();
+        if (!samePayer(cte.payerCnpj(), quote.payerCnpj())) return Optional.empty();
+        boolean weightOk = same(cte.weight(), quote.weight());
+        if (!weightOk && !withinPercent(cte.weight(), quote.weight(), WEIGHT_PERCENT)) return Optional.empty();
         BigDecimal cteFreight = zero(cte.totalFreight());
+        List<String> adjustments = new ArrayList<>();
         BigDecimal quoteFreight = zero(quote.totalFreight());
+        if (withoutPickup(cte, quote)) {
+            // Mercadoria entregue no balcão: o CT-e não cobra a coleta que a cotação previa.
+            quoteFreight = freightWithoutPickup(quote);
+            adjustments.add("sem coleta no CT-e (cotação previa " + money(quote.pickup()) + ")");
+        }
+        if (!weightOk) {
+            // Peso um pouco diferente: o frete da cotação acompanha o peso real.
+            quoteFreight = quoteFreight.multiply(zero(cte.weight()))
+                    .divide(zero(quote.weight()), 2, RoundingMode.HALF_UP);
+            adjustments.add("peso " + plain(cte.weight()) + " x " + plain(quote.weight())
+                    + " kg, frete proporcional " + money(quoteFreight));
+        }
         boolean freightOk = same(cteFreight, quoteFreight);
         boolean cubageException = !freightOk && positive(quote.cubage())
                 && cteFreight.signum() > 0 && cteFreight.compareTo(quoteFreight) < 0;
@@ -95,7 +114,51 @@ public final class CteQuoteMatcher {
         // NF diferente só passa quando o frete bate; na exceção da cubagem a NF tem de bater.
         if (invoiceDiverges && !freightOk) return Optional.empty();
         return Optional.of(new Candidate(quote, cteFreight.subtract(quoteFreight).abs(), cubageException,
-                invoiceDiverges));
+                invoiceDiverges, String.join("; ", adjustments)));
+    }
+
+    /**
+     * Mesmo pagador: CNPJ igual ou, para CNPJ, a mesma raiz (8 primeiros dígitos, matriz e
+     * filiais da mesma empresa, com a mesma razão social). CPF só vale igual.
+     */
+    static boolean samePayer(String cteCnpj, String quoteCnpj) {
+        if (blank(cteCnpj) || blank(quoteCnpj)) return false;
+        String a = digits(cteCnpj);
+        String b = digits(quoteCnpj);
+        if (a.equals(b)) return true;
+        return a.length() == 14 && b.length() == 14 && a.substring(0, 8).equals(b.substring(0, 8));
+    }
+
+    /** Chave para agrupar as cotações candidatas de um pagador (raiz do CNPJ). */
+    public static String payerKey(String cnpj) {
+        String value = digits(cnpj);
+        return value.length() == 14 ? value.substring(0, 8) : value;
+    }
+
+    /** Cotação com taxa de coleta e CT-e sem coleta (emitido direto no balcão). */
+    static boolean withoutPickup(LegacyCte cte, LegacyQuote quote) {
+        return positive(quote.pickup()) && cte.charges() != null && zero(cte.charges().pickup()).signum() == 0;
+    }
+
+    /** Frete da cotação sem a coleta, recalculando o ICMS "por dentro" na mesma alíquota. */
+    static BigDecimal freightWithoutPickup(LegacyQuote quote) {
+        BigDecimal total = zero(quote.totalFreight());
+        BigDecimal icms = zero(quote.icms());
+        BigDecimal base = total.subtract(icms).subtract(zero(quote.pickup()));
+        if (total.signum() <= 0 || icms.signum() <= 0) return base.max(BigDecimal.ZERO);
+        BigDecimal rate = icms.divide(total, 6, RoundingMode.HALF_UP);
+        return base.divide(BigDecimal.ONE.subtract(rate), 2, RoundingMode.HALF_UP);
+    }
+
+    static boolean withinPercent(BigDecimal left, BigDecimal right, BigDecimal percent) {
+        BigDecimal a = zero(left);
+        BigDecimal b = zero(right);
+        if (a.signum() <= 0 || b.signum() <= 0) return false;
+        return a.subtract(b).abs().compareTo(a.max(b).multiply(percent)) <= 0;
+    }
+
+    private static String digits(String value) {
+        return value == null ? "" : value.replaceAll("\\D", "");
     }
 
     static boolean eligibleStatus(LegacyQuote quote) {
@@ -133,7 +196,8 @@ public final class CteQuoteMatcher {
         return "pagador " + cte.payerCnpj() + "; peso " + plain(cte.weight()) + " x " + plain(q.weight())
                 + " kg; NF " + money(cte.invoiceValue()) + " x " + money(q.invoiceValue())
                 + (candidate.invoiceDiverges() ? " (NF diferente, frete bate: cotação ajustada ao CT-e)" : "")
-                + "; " + freight;
+                + "; " + freight
+                + (candidate.adjustments().isEmpty() ? "" : "; " + candidate.adjustments());
     }
 
     private static String divergences(LegacyCte cte, LegacyQuote quote) {

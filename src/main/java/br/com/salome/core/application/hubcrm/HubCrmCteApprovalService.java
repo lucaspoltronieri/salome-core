@@ -67,7 +67,7 @@ public class HubCrmCteApprovalService {
                 .toList());
         Map<String, List<LegacyQuote>> byPayer = open.stream()
                 .filter(quote -> quote.payerCnpj() != null && !quote.payerCnpj().isBlank())
-                .collect(Collectors.groupingBy(LegacyQuote::payerCnpj));
+                .collect(Collectors.groupingBy(quote -> CteQuoteMatcher.payerKey(quote.payerCnpj())));
 
         int approved = 0;
         int ambiguous = 0;
@@ -76,7 +76,8 @@ public class HubCrmCteApprovalService {
         for (LegacyCte cte : ctes) {
             String eventKey = "cte:" + cte.id() + ":aprovacao";
             try {
-                List<LegacyQuote> candidates = byPayer.getOrDefault(cte.payerCnpj(), List.of());
+                List<LegacyQuote> candidates =
+                        byPayer.getOrDefault(CteQuoteMatcher.payerKey(cte.payerCnpj()), List.of());
                 var match = CteQuoteMatcher.evaluate(cte, candidates, properties.windowDays());
                 switch (match.outcome()) {
                     case SEM_COTACAO -> { }
@@ -105,7 +106,7 @@ public class HubCrmCteApprovalService {
                             store.recordEvent(eventKey, "CTE", cte.id(), "APROVACAO_CTE", "REVISAO", null,
                                     "Cotação " + quote.id() + " mudou de status antes da aprovação automática");
                         }
-                        byPayer.computeIfPresent(cte.payerCnpj(),
+                        byPayer.computeIfPresent(CteQuoteMatcher.payerKey(cte.payerCnpj()),
                                 (key, list) -> list.stream().filter(q -> q.id() != quote.id()).toList());
                     }
                 }
