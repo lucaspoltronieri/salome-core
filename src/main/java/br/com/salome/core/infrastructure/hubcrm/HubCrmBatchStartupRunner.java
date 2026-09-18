@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>o lote de limpeza, quando {@code SALOME_HUB_CRM_BATCH_TOKEN} é definido;</li>
  *   <li>o ajuste manual ({@code SALOME_HUB_CRM_ADJUST_APPROVE} = "cotação:CT-e,...",
- *       {@code SALOME_HUB_CRM_ADJUST_REJECT} = "cotação,..."), quando
+ *       {@code SALOME_HUB_CRM_ADJUST_REJECT} = "cotação" ou "cotação:MOTIVO",...), quando
  *       {@code SALOME_HUB_CRM_ADJUST_TOKEN} é definido.</li>
  * </ul>
  * Cada token executado fica em {@code hub_crm_checkpoint}; o mesmo token nunca roda de novo.
@@ -60,7 +60,7 @@ public class HubCrmBatchStartupRunner {
         }
         if (firstTime("ajuste_token", adjustToken)) {
             Map<Long, String> approve = parseApprove(adjustApprove);
-            Set<Long> reject = parseIds(adjustReject);
+            Map<Long, String> reject = parseReject(adjustReject);
             log.info("Iniciando ajuste manual do Hub CRM (token {}): aprovar {}, não aprovar {}",
                     adjustToken, approve, reject);
             Thread.ofVirtual().name("hub-crm-ajuste").start(() -> batch.runManual(approve, reject));
@@ -85,6 +85,18 @@ public class HubCrmBatchStartupRunner {
             if (pair.length == 2 && !pair[0].isBlank() && !pair[1].isBlank()) {
                 result.put(Long.parseLong(pair[0].trim()), pair[1].trim());
             }
+        }
+        return result;
+    }
+
+    /** "cotação" (motivo Preço) ou "cotação:MOTIVO" (PRAZO, CONCORRENTE...), separados por vírgula. */
+    static Map<Long, String> parseReject(String spec) {
+        Map<Long, String> result = new LinkedHashMap<>();
+        if (spec == null) return result;
+        for (String part : spec.split(",")) {
+            if (part.isBlank()) continue;
+            String[] pair = part.trim().split(":");
+            result.put(Long.parseLong(pair[0].trim()), pair.length > 1 ? pair[1].trim() : "PRECO");
         }
         return result;
     }

@@ -95,6 +95,18 @@ class LegacyQuoteApprovalWriterTest {
     }
 
     @Test
+    void naoAprovaPorPrazoGravaAColunaDoMotivo() {
+        assertThat(writer.reject(quote("APROVADA"), "naoAprovacaoPrazo", "duas cotações num CT-e", NOW)).isTrue();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).update(sql.capture(), any(Object[].class));
+        assertThat(sql.getValue()).contains("status='NÃO APROVADA'", "naoAprovacaoPrazo='Sim'",
+                "naoAprovacaoPrazoDescricao=?");
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> writer.reject(quote("ABERTA"), "status", "x", NOW)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void cotacaoAbertaSemAjusteSoAprova() {
         assertThat(writer.approve(quote("ABERTA"), cte, NOW, false)).isTrue();
 

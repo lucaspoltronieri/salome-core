@@ -131,7 +131,7 @@ class HubCrmBatchServiceTest {
         when(legacy.findQuotesByIds(any())).thenReturn(List.of(par1, par2, dia31, jaAprovada));
         when(legacy.findRecentCtes(HubCrmBatchService.MANUAL_CTE_SINCE)).thenReturn(List.of(cte));
         when(writer.approve(any(), eq(cte), any(), eq(true))).thenReturn(true);
-        when(writer.rejectForPrice(eq(dia31), anyString(), any())).thenReturn(true);
+        when(writer.reject(eq(dia31), eq("naoAprovacaoPreco"), anyString(), any())).thenReturn(true);
 
         service.runManual(new java.util.LinkedHashMap<>(Map.of(20L, "5000", 21L, "5000")),
                 new java.util.LinkedHashSet<>(List.of(22L, 23L)));
@@ -140,8 +140,8 @@ class HubCrmBatchServiceTest {
         verify(writer).approve(eq(par2), eq(cte), any(), eq(true));
         verify(store, org.mockito.Mockito.times(2)).recordCteMatch(eq(cte), any(), eq("RESOLVIDO_MANUAL"), anyString(),
                 any());
-        verify(writer).rejectForPrice(eq(dia31), anyString(), any());
-        verify(writer, never()).rejectForPrice(eq(jaAprovada), anyString(), any());
+        verify(writer).reject(eq(dia31), eq("naoAprovacaoPreco"), anyString(), any());
+        verify(writer, never()).reject(eq(jaAprovada), anyString(), anyString(), any());
         assertThat(service.status().totals())
                 .containsEntry("APROVAR:APROVADA", 2)
                 .containsEntry("NAO_APROVAR:NAO_APROVADA", 1)
@@ -163,6 +163,20 @@ class HubCrmBatchServiceTest {
         verify(store).recordEvent(eq("quote:24:lote:aprovada"), eq("COTACAO"), eq(24L), eq("LOTE_APROVADA"),
                 eq("PROCESSADO"), org.mockito.ArgumentMatchers.contains("reaprovada"), any());
         assertThat(service.status().totals()).containsEntry("APROVAR:APROVADA", 1);
+    }
+
+    /** Caso 15784/15785: duas cotações num CT-e só; a que sobra, aprovada à mão, vira NÃO APROVADA por Prazo. */
+    @Test
+    void ajusteManualNaoAprovaPorPrazoCotacaoAprovadaAMao() {
+        LegacyQuote aprovadaAMao = quote(25, "APROVADA", "FERNANDA", LocalDate.of(2026, 9, 10), "A");
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of(aprovadaAMao));
+        when(writer.reject(eq(aprovadaAMao), eq("naoAprovacaoPrazo"), anyString(), any())).thenReturn(true);
+
+        service.runManual(Map.of(), new java.util.LinkedHashMap<>(Map.of(25L, "PRAZO")));
+
+        verify(writer).reject(eq(aprovadaAMao), eq("naoAprovacaoPrazo"),
+                org.mockito.ArgumentMatchers.contains("Prazo"), any());
+        assertThat(service.status().totals()).containsEntry("NAO_APROVAR:NAO_APROVADA", 1);
     }
 
     @Test

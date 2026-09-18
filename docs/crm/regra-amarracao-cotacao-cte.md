@@ -172,6 +172,8 @@ visível.
 | 15296 | — | Não existe CT-e localizado. |
 | 15813 | 320274 | NF final maior (R$ 2.507,00 × 2.693,92), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
 | 15798 | 297104 | Cotação sem remetente (11111111111111 / CLIENTE), frete de outra origem; pagador, peso e NF batem; aprovada pelo Hub e ajustada ao CT-e (v1.14.0). |
+| 15784 | 320289 | O cliente fez duas cotações (15784 e 15785) e mandou tudo num CT-e só; a 15784, já aprovada à mão, foi reaprovada com os dados do CT-e (peso, volumes, NF e frete somados) (v1.15.0). |
+| 15785 | 320289 | A outra cotação do mesmo envio: estava aprovada à mão e virou NÃO APROVADA com motivo Prazo, por decisão do Lucas (v1.15.0). |
 | 15839 | 385982 | Remetente filial, peso 2.060 × 2.000 kg, sem coleta (balcão); aprovada pelo Hub e ajustada ao CT-e (v1.13.0). |
 | 15815 | 320273 | NF final maior (R$ 650,00 × 766,16), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
 

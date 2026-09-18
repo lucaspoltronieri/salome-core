@@ -175,14 +175,21 @@ public class HubCrmBatchService {
      * aprova as cotações indicadas citando o CT-e de cada uma e marca as outras como NÃO
      * APROVADA por Preço. Só mexe em cotação ABERTA (ou NÃO APROVADA, na aprovação).
      */
-    public void runManual(Map<Long, String> approveWithCte, Set<Long> reject) {
+    public void runManual(Map<Long, String> approveWithCte, Set<Long> rejectForPrice) {
+        Map<Long, String> reject = new LinkedHashMap<>();
+        rejectForPrice.forEach(id -> reject.put(id, "PRECO"));
+        runManual(approveWithCte, reject);
+    }
+
+    /** {@code reject}: cotação → motivo (PRECO, PRAZO...). */
+    public void runManual(Map<Long, String> approveWithCte, Map<Long, String> reject) {
         List<BatchItem> items = new ArrayList<>();
         Map<String, Integer> totals = new LinkedHashMap<>();
         state.set(BatchState.started(true, null, Instant.now(clock)));
         try {
             LocalDateTime now = LocalDateTime.now(clock);
             List<Long> ids = new ArrayList<>(approveWithCte.keySet());
-            ids.addAll(reject);
+            ids.addAll(reject.keySet());
             Map<Long, LegacyQuote> quotes = legacy.findQuotesByIds(ids).stream()
                     .collect(Collectors.toMap(LegacyQuote::id, quote -> quote, (a, b) -> a));
             List<LegacyCte> ctes = approveWithCte.isEmpty() ? List.of() : legacy.findRecentCtes(MANUAL_CTE_SINCE);
@@ -221,24 +228,35 @@ public class HubCrmBatchService {
                     add(items, totals, "APROVAR", quote, cte, exception.getMessage(), "ERRO");
                 }
             }
-            String description = "Sem CT-e emitido para a cotação (ajuste Hub CRM " + BR.format(now.toLocalDate()) + ")";
-            for (Long id : reject) {
+            String priceDescription = "Sem CT-e emitido para a cotação (ajuste Hub CRM "
+                    + BR.format(now.toLocalDate()) + ")";
+            for (var rejection : reject.entrySet()) {
+                Long id = rejection.getKey();
+                Reason reason = Reason.of(rejection.getValue());
                 LegacyQuote quote = quotes.get(id);
                 if (quote == null) {
                     totals.merge("NAO_APROVAR:NAO_ENCONTRADA", 1, Integer::sum);
                     continue;
                 }
-                if (!"ABERTA".equals(HubCrmNormalization.normalizedText(quote.status()))) {
+                String status = HubCrmNormalization.normalizedText(quote.status());
+                // Preço (lote) só vale para ABERTA; um motivo informado vale também para a cotação
+                // aprovada à mão por engano (ex.: 15785, duas cotações num CT-e só).
+                boolean allowed = "ABERTA".equals(status) || (reason != Reason.PRECO && "APROVADA".equals(status));
+                if (!allowed) {
                     add(items, totals, "NAO_APROVAR", quote, null, "já estava " + quote.status(), "IGNORADA");
                     continue;
                 }
+                String description = reason == Reason.PRECO ? priceDescription
+                        : "Não aprovada por " + reason.label() + " (ajuste Hub CRM " + BR.format(now.toLocalDate())
+                                + ", decisão do Lucas)";
                 try {
-                    if (writer.rejectForPrice(quote, description, now)) {
+                    if (writer.reject(quote, reason.column(), description, now)) {
                         store.recordEvent("quote:" + quote.id() + ":lote:nao-aprovada", "COTACAO", quote.id(),
                                 "LOTE_NAO_APROVADA", "PROCESSADO",
-                                "Ajuste manual: " + quote.status() + " → NÃO APROVADA (Preço)", null);
-                        add(items, totals, "NAO_APROVAR", quote, null, "motivo Preço", "NAO_APROVADA");
+                                "Ajuste manual: " + quote.status() + " → NÃO APROVADA (" + reason.label() + ")", null);
+                        add(items, totals, "NAO_APROVAR", quote, null, "motivo " + reason.label(), "NAO_APROVADA");
                     } else {
+
                         add(items, totals, "NAO_APROVAR", quote, null, "status mudou antes da gravação", "CONCORRENCIA");
                     }
                 } catch (Exception exception) {
@@ -302,6 +320,37 @@ public class HubCrmBatchService {
             result.put("itemCount", itemCount);
             result.put("error", error);
             return result;
+        }
+    }
+
+    /** Motivos de não aprovação do ajuste manual e a coluna da tela do legado. */
+    enum Reason {
+        PRECO("naoAprovacaoPreco", "Preço"),
+        PRAZO("naoAprovacaoPrazo", "Prazo"),
+        CONCORRENTE("naoAprovacaoConcorrente", "Concorrente"),
+        QUALIDADE("naoAprovacaoQualidade", "Qualidade"),
+        FORA_PERFIL("naoAprovacaoForaPerfil", "Fora do perfil"),
+        SEM_MOTIVO("naoAprovacaoSemMotivo", "Sem motivo");
+
+        private final String column;
+        private final String label;
+
+        Reason(String column, String label) {
+            this.column = column;
+            this.label = label;
+        }
+
+        String column() {
+            return column;
+        }
+
+        String label() {
+            return label;
+        }
+
+        static Reason of(String value) {
+            if (value == null || value.isBlank()) return PRECO;
+            return valueOf(HubCrmNormalization.normalizedText(value).replace(' ', '_'));
         }
     }
 }

@@ -29,6 +29,9 @@ public class LegacyQuoteApprovalWriter {
     private static final DateTimeFormatter LOG_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
     private static final String USER = "crm_api";
+    /** Colunas de motivo da tela de não aprovação do legado aceitas pelo Hub. */
+    static final java.util.Set<String> REJECT_COLUMNS = java.util.Set.of("naoAprovacaoPreco", "naoAprovacaoPrazo",
+            "naoAprovacaoConcorrente", "naoAprovacaoQualidade", "naoAprovacaoForaPerfil", "naoAprovacaoSemMotivo");
 
     private final JdbcTemplate jdbc;
     private final HubCrmAutoApprovalProperties properties;
@@ -80,9 +83,12 @@ public class LegacyQuoteApprovalWriter {
         if (syncValues) {
             for (ValueChange change : valueChanges(quote, cte)) {
                 sets.add(change.column() + "=?");
-                args.add(change.value());
+                boolean integer = "quantidadeVolumes".equals(change.column());
+                args.add(integer ? (Object) change.value().intValue() : change.value());
                 log.append(prefix).append(" [").append(change.column().toUpperCase(Locale.ROOT)).append("] [")
-                        .append(logNumber(change.previous())).append("] [").append(logNumber(change.value()))
+                        .append(integer ? String.valueOf(change.previous().intValue()) : logNumber(change.previous()))
+                        .append("] [")
+                        .append(integer ? String.valueOf(change.value().intValue()) : logNumber(change.value()))
                         .append("] && ");
                 if ("coletaValor".equals(change.column()) && change.value().signum() == 0) {
                     // CT-e emitido no balcão, sem coleta: a cotação deixa de prever coleta.
@@ -120,6 +126,10 @@ public class LegacyQuoteApprovalWriter {
             change(changes, "descontoValor", quote.discount(), c.discount());
             change(changes, "acrescimoValor", quote.addition(), c.addition());
         }
+        if (cte.volumes() > 0) {
+            change(changes, "quantidadeVolumes", BigDecimal.valueOf(quote.volumes()),
+                    BigDecimal.valueOf(cte.volumes()));
+        }
         change(changes, "totalFrete", quote.totalFreight(), cte.totalFreight());
         return changes;
     }
@@ -140,16 +150,27 @@ public class LegacyQuoteApprovalWriter {
      * abertas sem CT-e). Mesmos campos da tela de não aprovação e mesma trava de status.
      */
     public boolean rejectForPrice(LegacyQuote quote, String description, LocalDateTime now) {
+        return reject(quote, "naoAprovacaoPreco", description, now);
+    }
+
+    /**
+     * Marca a cotação como NÃO APROVADA com o motivo da coluna {@code reasonColumn}
+     * ({@code naoAprovacaoPreco}, {@code naoAprovacaoPrazo}...), mesmos campos da tela de não
+     * aprovação e mesma trava de status.
+     */
+    public boolean reject(LegacyQuote quote, String reasonColumn, String description, LocalDateTime now) {
+        if (!REJECT_COLUMNS.contains(reasonColumn)) {
+            throw new IllegalArgumentException("Motivo de não aprovação desconhecido: " + reasonColumn);
+        }
         String prefix = "[" + LOG_TIME.format(now) + "] [" + USER + "]";
         String log = prefix + " [status] [" + quote.status() + "] [NÃO APROVADA] && "
                 + prefix + " [statusData] [" + (quote.statusAt() == null ? null : LOG_DATE.format(quote.statusAt()))
                 + "] [" + LOG_DATE.format(now) + "] && "
-                + prefix + " [naoAprovacaoPreco] [null] [Sim] && "
-                + prefix + " [naoAprovacaoPrecoDescricao] [null] [" + description + "] && ";
-        return jdbc.update("""
-                UPDATE cotacao SET status='NÃO APROVADA', statusData=?, statusHora=?,
-                  naoAprovacaoPreco='Sim', naoAprovacaoPrecoDescricao=?, log=CONCAT(IFNULL(log,''), ?)
-                WHERE idCotacao=? AND status=?
-                """, Timestamp.valueOf(now), HOUR.format(now), description, log, quote.id(), quote.status()) == 1;
+                + prefix + " [" + reasonColumn + "] [null] [Sim] && "
+                + prefix + " [" + reasonColumn + "Descricao] [null] [" + description + "] && ";
+        return jdbc.update("UPDATE cotacao SET status='NÃO APROVADA', statusData=?, statusHora=?, "
+                + reasonColumn + "='Sim', " + reasonColumn + "Descricao=?, log=CONCAT(IFNULL(log,''), ?) "
+                + "WHERE idCotacao=? AND status=?",
+                Timestamp.valueOf(now), HOUR.format(now), description, log, quote.id(), quote.status()) == 1;
     }
 }
