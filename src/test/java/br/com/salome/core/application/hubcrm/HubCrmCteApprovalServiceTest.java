@@ -2,6 +2,7 @@ package br.com.salome.core.application.hubcrm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -55,7 +56,7 @@ class HubCrmCteApprovalServiceTest {
         LegacyCte cte = cte(100);
         when(legacy.findRecentCtes(LocalDate.of(2026, 9, 8))).thenReturn(List.of(cte));
         when(legacy.findApprovableQuotes(LocalDate.of(2026, 8, 9))).thenReturn(List.of(quote));
-        when(writer.approve(eq(quote), eq(cte), any())).thenReturn(true);
+        when(writer.approve(eq(quote), eq(cte), any(), anyBoolean())).thenReturn(true);
 
         var result = service.approveFromCtes();
 
@@ -71,7 +72,7 @@ class HubCrmCteApprovalServiceTest {
         LegacyCte cte = cte(101);
         when(legacy.findRecentCtes(any())).thenReturn(List.of(cte));
         when(legacy.findApprovableQuotes(any())).thenReturn(List.of(quote));
-        when(writer.approve(eq(quote), eq(cte), any())).thenReturn(true);
+        when(writer.approve(eq(quote), eq(cte), any(), anyBoolean())).thenReturn(true);
 
         service.approveFromCtes();
 
@@ -85,7 +86,7 @@ class HubCrmCteApprovalServiceTest {
         LegacyCte cte = cte(102);
         when(legacy.findRecentCtes(any())).thenReturn(List.of(cte));
         when(legacy.findApprovableQuotes(any())).thenReturn(List.of(quote));
-        when(writer.approve(eq(quote), eq(cte), any())).thenReturn(false);
+        when(writer.approve(eq(quote), eq(cte), any(), anyBoolean())).thenReturn(false);
 
         var result = service.approveFromCtes();
 
@@ -104,7 +105,7 @@ class HubCrmCteApprovalServiceTest {
         var result = service.approveFromCtes();
 
         assertThat(result.evaluated()).isEqualTo(1);
-        verify(writer, never()).approve(any(), any(), any());
+        verify(writer, never()).approve(any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -112,7 +113,7 @@ class HubCrmCteApprovalServiceTest {
         LegacyQuote quote = quote(5, "ABERTA", "FERNANDA");
         when(legacy.findRecentCtes(any())).thenReturn(List.of(cte(105), cte(106)));
         when(legacy.findApprovableQuotes(any())).thenReturn(List.of(quote));
-        when(writer.approve(any(), any(), any())).thenReturn(true);
+        when(writer.approve(any(), any(), any(), anyBoolean())).thenReturn(true);
 
         var result = service.approveFromCtes();
 
@@ -135,8 +136,9 @@ class HubCrmCteApprovalServiceTest {
                 new BigDecimal("1000"), 2, new BigDecimal("150.00"));
         when(legacy.findRecentCtes(any())).thenReturn(List.of(c1, c2));
         when(legacy.findApprovableQuotes(any())).thenReturn(List.of(q1, q2));
-        when(writer.approve(eq(q1), eq(c1), any())).thenThrow(new IllegalStateException("lock wait timeout"));
-        when(writer.approve(eq(q2), eq(c2), any())).thenReturn(true);
+        when(writer.approve(eq(q1), eq(c1), any(), anyBoolean()))
+                .thenThrow(new IllegalStateException("lock wait timeout"));
+        when(writer.approve(eq(q2), eq(c2), any(), anyBoolean())).thenReturn(true);
 
         var result = service.approveFromCtes();
 

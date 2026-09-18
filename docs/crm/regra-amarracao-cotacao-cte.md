@@ -30,13 +30,35 @@ Critérios (`CteQuoteMatcher`), decididos com o Lucas em 10/09/2026:
 2. CT-e emitido **no dia da cotação ou até 30 dias depois**, não cancelado
    (`cteCancelado` vazio e `situacao` diferente de Cancelada/Inutilizada).
 3. **Peso** (soma de `conhecimentonotasfiscais.pesoNf`) igual ao da cotação.
-4. **Valor da NF** (soma de `valorNF`) igual ao da cotação.
+4. **Valor da NF** (soma de `valorNF`) igual ao da cotação, **ou diferente quando
+   peso e frete batem** (v1.12.0, ver abaixo).
 5. **Frete** (`conhecimento.valorTotal`) igual ao `totalFrete` da cotação.
    Exceção: se a cotação tem cubagem e o frete do CT-e é **menor** (cubagem
    esquecida na emissão), aprova mesmo assim quando peso e NF batem.
 
 "Igual" aceita diferença de até 1% ou 1 unidade (kg / R$), o que for maior.
 Volumes e natureza não são critério.
+
+**Pouca diferença: aprova e iguala a cotação ao CT-e (v1.12.0, decisão do Lucas em
+18/09/2026).** Casos 15813 × CT-e 320274 e 15815 × CT-e 320273: pagador, peso e
+frete batiam (R$ 186,92 × 187,94 e R$ 116,16 × 115,56), e só a NF final era maior
+(R$ 2.507,00 × 2.693,92 e R$ 650,00 × 766,16). O frete ad valorem quase não muda,
+então:
+
+- NF diferente não bloqueia quando pagador, peso e frete batem. Com duas
+  candidatas, a de NF igual tem preferência.
+- Aprovada com diferença de peso, NF ou frete, a cotação **fica com os valores do
+  CT-e**: `peso`, `valorNf`, a composição do frete (`fretePesoValor`, `freteValor`,
+  `pedagioValor`, `coletaValor`, `entregaValor`, `despachoValor`, `grisValor`,
+  `redespachoValor`, `icmsValor`, `descontoValor`, `acrescimoValor`) e `totalFrete`.
+  Cada campo alterado ganha uma linha no `log` (`[crm_api] [VALORNF] [antes] [depois]`).
+  O card do ArpaSuite é atualizado pelo sync normal da cotação.
+- Na exceção da cubagem, a NF tem de bater e a cotação **não** é alterada, porque
+  o erro está no CT-e.
+- Cotação já aprovada à mão pode entrar no ajuste manual
+  (`SALOME_HUB_CRM_ADJUST_APPROVE`). Ela é reaprovada pelo `crm_api` com os valores
+  do CT-e, e a data da aprovação continua a mesma, para o ganho não sair de novo no
+  ArpaSuite.
 
 Quais cotações podem ser aprovadas:
 
@@ -113,6 +135,8 @@ visível.
 | 15294 | 83864 | CT-e informado pelo usuário; validar por remetente/destinatário e dados da carga. |
 | 15281 | 317921 | Destinatário divergente; volumes, peso, valor da NF e frete coincidem. |
 | 15296 | — | Não existe CT-e localizado. |
+| 15813 | 320274 | NF final maior (R$ 2.507,00 × 2.693,92), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
+| 15815 | 320273 | NF final maior (R$ 650,00 × 766,16), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
 
 Os números acima devem ser validados também por data, série, chave e demais
 campos antes da persistência definitiva no Hub CRM.

@@ -53,6 +53,7 @@ class CteQuoteMatcherTest {
 
         assertThat(match.outcome()).isEqualTo(CteQuoteMatcher.Outcome.APROVAR);
         assertThat(match.criteria()).contains("cubagem");
+        assertThat(match.syncValues()).isFalse();
     }
 
     @Test
@@ -65,20 +66,60 @@ class CteQuoteMatcherTest {
     }
 
     @Test
-    void pesoOuNotaDiferentesNaoAprovam() {
+    void pesoDiferenteNaoAprova() {
         LegacyQuote quote = quote(1, "ABERTA", "FERNANDA", LocalDate.of(2026, 9, 1), "150.00", "0");
         LegacyCte pesoDiferente = new LegacyCte(10, "5000", "1", "chave", LocalDate.of(2026, 9, 2), "10:00",
                 "CIF", PAGADOR, "98765432000110", PAGADOR, new BigDecimal("80"), new BigDecimal("1000"), 2,
                 new BigDecimal("150.00"));
-        LegacyCte notaDiferente = new LegacyCte(11, "5001", "1", "chave", LocalDate.of(2026, 9, 2), "10:00",
-                "CIF", PAGADOR, "98765432000110", PAGADOR, new BigDecimal("50"), new BigDecimal("1500"), 2,
-                new BigDecimal("150.00"));
 
         assertThat(CteQuoteMatcher.evaluate(pesoDiferente, List.of(quote), 30).outcome())
                 .isEqualTo(CteQuoteMatcher.Outcome.SEM_COTACAO);
-        assertThat(CteQuoteMatcher.evaluate(notaDiferente, List.of(quote), 30).outcome())
+    }
+
+    /** Casos 15813 x CT-e 320274 e 15815 x CT-e 320273: NF final maior, frete quase igual. */
+    @Test
+    void notaDiferenteComPesoEFreteBatendoAprovaEAjustaACotacao() {
+        LegacyQuote quote = quote(1, "ABERTA", "FERNANDA", LocalDate.of(2026, 9, 1), "186.92", "0");
+        LegacyCte notaDiferente = new LegacyCte(11, "5001", "1", "chave", LocalDate.of(2026, 9, 2), "10:00",
+                "CIF", PAGADOR, "98765432000110", PAGADOR, new BigDecimal("50"), new BigDecimal("1186.92"), 2,
+                new BigDecimal("187.94"));
+
+        var match = CteQuoteMatcher.evaluate(notaDiferente, List.of(quote), 30);
+
+        assertThat(match.outcome()).isEqualTo(CteQuoteMatcher.Outcome.APROVAR);
+        assertThat(match.syncValues()).isTrue();
+        assertThat(match.criteria()).contains("NF diferente");
+    }
+
+    @Test
+    void notaDiferenteComFreteDiferenteNaoAprovaNemPelaCubagem() {
+        LegacyQuote quote = quote(1, "ABERTA", "JACI", LocalDate.of(2026, 9, 1), "150.00", "0.8");
+        LegacyCte cte = new LegacyCte(11, "5001", "1", "chave", LocalDate.of(2026, 9, 2), "10:00",
+                "CIF", PAGADOR, "98765432000110", PAGADOR, new BigDecimal("50"), new BigDecimal("1500"), 2,
+                new BigDecimal("120.00"));
+
+        assertThat(CteQuoteMatcher.evaluate(cte, List.of(quote), 30).outcome())
                 .isEqualTo(CteQuoteMatcher.Outcome.SEM_COTACAO);
     }
+
+    @Test
+    void cotacaoComNfIgualTemPreferencia() {
+        LegacyQuote nfIgual = quote(1, "ABERTA", "FERNANDA", LocalDate.of(2026, 9, 5), "150.00", "0");
+        LegacyQuote nfDiferente = new LegacyQuote(2, LocalDate.of(2026, 9, 5), "10:30", "JACI", "ABERTA",
+                LocalDateTime.of(2026, 9, 5, 11, 0), "Emitente (CIF)", PAGADOR, "R", "SP", "D", "D", "C",
+                PAGADOR, "R", "1", "e", "DIVERSOS", 2, new BigDecimal("50"), new BigDecimal("900"),
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("150.00"), "M", Map.of());
+
+        var match = CteQuoteMatcher.evaluate(cte(LocalDate.of(2026, 9, 6), "150.00", PAGADOR, "x"),
+                List.of(nfDiferente, nfIgual), 30);
+
+        assertThat(match.outcome()).isEqualTo(CteQuoteMatcher.Outcome.APROVAR);
+        assertThat(match.quote().id()).isEqualTo(1);
+        assertThat(match.syncValues()).isFalse();
+    }
+
 
     @Test
     void arredondamentoDentroDaToleranciaAprova() {

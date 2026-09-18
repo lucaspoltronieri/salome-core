@@ -85,12 +85,13 @@ public class HubCrmCteApprovalService {
                     }
                     case APROVAR -> {
                         LegacyQuote quote = match.quote();
-                        if (writer.approve(quote, cte, LocalDateTime.now(clock))) {
+                        if (writer.approve(quote, cte, LocalDateTime.now(clock), match.syncValues())) {
                             approved++;
                             store.recordCteMatch(cte, quote, "APROVADA_AUTO", match.criteria(), match.divergences());
                             store.recordEvent(eventKey, "CTE", cte.id(), "APROVACAO_CTE", "PROCESSADO",
                                     "Cotação " + quote.id() + " (" + quote.responsible() + ") "
                                             + quote.status() + " → APROVADA pelo CT-e " + cte.label()
+                                            + (match.syncValues() ? "; valores da cotação ajustados ao CT-e" : "")
                                             + (CteQuoteMatcher.inArpaSuite(quote.responsible())
                                                     ? "" : "; responsável fora do ArpaSuite, só legado"),
                                     null);

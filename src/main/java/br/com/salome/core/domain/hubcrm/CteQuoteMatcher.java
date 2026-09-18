@@ -15,9 +15,13 @@ import java.util.Optional;
  * <ul>
  *   <li>pagador igual (obrigatório);</li>
  *   <li>CT-e emitido no dia da cotação ou até {@code windowDays} dias depois;</li>
- *   <li>peso, valor da NF e frete iguais (tolerância de arredondamento);</li>
+ *   <li>peso e frete iguais (tolerância de arredondamento);</li>
+ *   <li>valor da NF igual, ou diferente com peso e frete batendo: a NF final da carga muda e o
+ *       frete (ad valorem) quase não mexe; nesse caso a cotação é aprovada e fica com os
+ *       valores do CT-e ({@link Match#syncValues()});</li>
  *   <li>exceção: cotação com cubagem e CT-e com frete menor (cubagem esquecida na
- *       emissão) aprova se peso e NF baterem.</li>
+ *       emissão) aprova se peso e NF baterem; a cotação não é
+ *       alterada, porque o erro está no CT-e.</li>
  * </ul>
  * Remetente, destinatário, volumes e natureza não são critério; divergências ficam só
  * registradas. Cotação ABERTA de qualquer responsável é elegível; NÃO APROVADA só das
@@ -30,10 +34,12 @@ public final class CteQuoteMatcher {
     public enum Outcome { APROVAR, SEM_COTACAO, AMBIGUO }
 
     /** {@code tiedQuoteIds}: no AMBIGUO, as cotações empatadas (têm CT-e, só não se sabe qual é a certa). */
+    /** {@code syncValues}: aprovou com diferença de valores e a cotação deve ficar igual ao CT-e. */
     public record Match(Outcome outcome, LegacyQuote quote, String criteria, String divergences,
-            List<Long> tiedQuoteIds) {}
+            List<Long> tiedQuoteIds, boolean syncValues) {}
 
-    private record Candidate(LegacyQuote quote, BigDecimal freightDiff, boolean cubageException) {}
+    private record Candidate(LegacyQuote quote, BigDecimal freightDiff, boolean cubageException,
+            boolean invoiceDiverges) {}
 
     private CteQuoteMatcher() {}
 
@@ -42,11 +48,12 @@ public final class CteQuoteMatcher {
         for (LegacyQuote quote : quotes) {
             candidate(cte, quote, windowDays).ifPresent(candidates::add);
         }
-        if (candidates.isEmpty()) return new Match(Outcome.SEM_COTACAO, null, null, null, List.of());
+        if (candidates.isEmpty()) return new Match(Outcome.SEM_COTACAO, null, null, null, List.of(), false);
 
-        // Mais próxima da emissão primeiro; depois a de frete mais parecido; depois a mais nova.
+        // Mais próxima da emissão primeiro; depois a de NF igual; depois a de frete mais parecido; depois a mais nova.
         Comparator<Candidate> order = Comparator
                 .comparing((Candidate c) -> c.quote().createdDate(), Comparator.reverseOrder())
+                .thenComparing(Candidate::invoiceDiverges)
                 .thenComparing(Candidate::freightDiff)
                 .thenComparing(c -> c.quote().id(), Comparator.reverseOrder());
         candidates.sort(order);
@@ -54,19 +61,21 @@ public final class CteQuoteMatcher {
         if (candidates.size() > 1) {
             Candidate second = candidates.get(1);
             if (second.quote().createdDate().equals(best.quote().createdDate())
+                    && second.invoiceDiverges() == best.invoiceDiverges()
                     && second.freightDiff().compareTo(best.freightDiff()) == 0) {
                 List<Long> tied = candidates.stream()
                         .filter(c -> c.quote().createdDate().equals(best.quote().createdDate())
+                                && c.invoiceDiverges() == best.invoiceDiverges()
                                 && c.freightDiff().compareTo(best.freightDiff()) == 0)
                         .map(c -> c.quote().id())
                         .toList();
                 List<String> ids = tied.stream().map(String::valueOf).toList();
                 return new Match(Outcome.AMBIGUO, best.quote(), "Cotações empatadas: " + String.join(", ", ids),
-                        null, tied);
+                        null, tied, false);
             }
         }
         return new Match(Outcome.APROVAR, best.quote(), criteria(cte, best), divergences(cte, best.quote()),
-                List.of());
+                List.of(), !best.cubageException() && differs(cte, best.quote()));
     }
 
     static Optional<Candidate> candidate(LegacyCte cte, LegacyQuote quote, int windowDays) {
@@ -76,14 +85,17 @@ public final class CteQuoteMatcher {
         if (days < 0 || days > windowDays) return Optional.empty();
         if (blank(cte.payerCnpj()) || !cte.payerCnpj().equals(quote.payerCnpj())) return Optional.empty();
         if (!same(cte.weight(), quote.weight())) return Optional.empty();
-        if (!same(cte.invoiceValue(), quote.invoiceValue())) return Optional.empty();
         BigDecimal cteFreight = zero(cte.totalFreight());
         BigDecimal quoteFreight = zero(quote.totalFreight());
         boolean freightOk = same(cteFreight, quoteFreight);
         boolean cubageException = !freightOk && positive(quote.cubage())
                 && cteFreight.signum() > 0 && cteFreight.compareTo(quoteFreight) < 0;
         if (!freightOk && !cubageException) return Optional.empty();
-        return Optional.of(new Candidate(quote, cteFreight.subtract(quoteFreight).abs(), cubageException));
+        boolean invoiceDiverges = !same(cte.invoiceValue(), quote.invoiceValue());
+        // NF diferente só passa quando o frete bate; na exceção da cubagem a NF tem de bater.
+        if (invoiceDiverges && !freightOk) return Optional.empty();
+        return Optional.of(new Candidate(quote, cteFreight.subtract(quoteFreight).abs(), cubageException,
+                invoiceDiverges));
     }
 
     static boolean eligibleStatus(LegacyQuote quote) {
@@ -95,6 +107,13 @@ public final class CteQuoteMatcher {
     public static boolean inArpaSuite(String responsible) {
         String name = HubCrmNormalization.normalizedText(responsible);
         return name.contains("FERNANDA") || name.contains("JACI") || name.contains("QUEIROZ");
+    }
+
+    /** Algum valor da cotação (peso, NF ou frete) difere do CT-e além do centavo. */
+    static boolean differs(LegacyCte cte, LegacyQuote quote) {
+        return zero(cte.weight()).compareTo(zero(quote.weight())) != 0
+                || zero(cte.invoiceValue()).compareTo(zero(quote.invoiceValue())) != 0
+                || zero(cte.totalFreight()).compareTo(zero(quote.totalFreight())) != 0;
     }
 
     /** Diferença até 1% ou até 1 unidade (kg / R$), o que for maior. */
@@ -112,7 +131,9 @@ public final class CteQuoteMatcher {
                         + " (cotação com cubagem " + plain(q.cubage()) + ")"
                 : "frete " + money(cte.totalFreight()) + " x " + money(q.totalFreight());
         return "pagador " + cte.payerCnpj() + "; peso " + plain(cte.weight()) + " x " + plain(q.weight())
-                + " kg; NF " + money(cte.invoiceValue()) + " x " + money(q.invoiceValue()) + "; " + freight;
+                + " kg; NF " + money(cte.invoiceValue()) + " x " + money(q.invoiceValue())
+                + (candidate.invoiceDiverges() ? " (NF diferente, frete bate: cotação ajustada ao CT-e)" : "")
+                + "; " + freight;
     }
 
     private static String divergences(LegacyCte cte, LegacyQuote quote) {

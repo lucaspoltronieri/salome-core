@@ -130,21 +130,39 @@ class HubCrmBatchServiceTest {
         LegacyQuote jaAprovada = quote(23, "APROVADA", "CARLOS", LocalDate.of(2026, 8, 31), "G");
         when(legacy.findQuotesByIds(any())).thenReturn(List.of(par1, par2, dia31, jaAprovada));
         when(legacy.findRecentCtes(HubCrmBatchService.MANUAL_CTE_SINCE)).thenReturn(List.of(cte));
-        when(writer.approve(any(), eq(cte), any())).thenReturn(true);
+        when(writer.approve(any(), eq(cte), any(), eq(true))).thenReturn(true);
         when(writer.rejectForPrice(eq(dia31), anyString(), any())).thenReturn(true);
 
         service.runManual(new java.util.LinkedHashMap<>(Map.of(20L, "5000", 21L, "5000")),
                 new java.util.LinkedHashSet<>(List.of(22L, 23L)));
 
-        verify(writer).approve(eq(par1), eq(cte), any());
-        verify(writer).approve(eq(par2), eq(cte), any());
-        verify(store, org.mockito.Mockito.times(2)).markCteMatchStatus(900, "RESOLVIDO_MANUAL");
+        verify(writer).approve(eq(par1), eq(cte), any(), eq(true));
+        verify(writer).approve(eq(par2), eq(cte), any(), eq(true));
+        verify(store, org.mockito.Mockito.times(2)).recordCteMatch(eq(cte), any(), eq("RESOLVIDO_MANUAL"), anyString(),
+                any());
         verify(writer).rejectForPrice(eq(dia31), anyString(), any());
         verify(writer, never()).rejectForPrice(eq(jaAprovada), anyString(), any());
         assertThat(service.status().totals())
                 .containsEntry("APROVAR:APROVADA", 2)
                 .containsEntry("NAO_APROVAR:NAO_APROVADA", 1)
                 .containsEntry("NAO_APROVAR:IGNORADA", 1);
+    }
+
+    @Test
+    void ajusteManualReaprovaCotacaoJaAprovadaComOsValoresDoCte() {
+        LegacyQuote aprovadaAMao = quote(24, "APROVADA", "FERNANDA", LocalDate.of(2026, 9, 14), "A");
+        LegacyCte antigo = new LegacyCte(100, "5000", "1", "k", LocalDate.of(2024, 6, 14), "10:00", "CIF",
+                "A", "B", "A", new BigDecimal("1"), new BigDecimal("1"), 1, new BigDecimal("1"));
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of(aprovadaAMao));
+        when(legacy.findRecentCtes(HubCrmBatchService.MANUAL_CTE_SINCE)).thenReturn(List.of(antigo, cte));
+        when(writer.approve(eq(aprovadaAMao), eq(cte), any(), eq(true))).thenReturn(true);
+
+        service.runManual(Map.of(24L, "5000"), Set.of());
+
+        verify(writer).approve(eq(aprovadaAMao), eq(cte), any(), eq(true));
+        verify(store).recordEvent(eq("quote:24:lote:aprovada"), eq("COTACAO"), eq(24L), eq("LOTE_APROVADA"),
+                eq("PROCESSADO"), org.mockito.ArgumentMatchers.contains("reaprovada"), any());
+        assertThat(service.status().totals()).containsEntry("APROVAR:APROVADA", 1);
     }
 
     @Test

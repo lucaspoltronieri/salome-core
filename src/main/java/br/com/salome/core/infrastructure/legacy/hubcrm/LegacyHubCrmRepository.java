@@ -100,7 +100,9 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
     // (Finalizada, Armazém, Em Viagem, Pendente, Aberta, Cancelada, Inutilizada).
     private static final String CTE_SQL = """
             SELECT c.idConhecimento, c.cte, c.cteSerie, c.cteChave, c.cteEmissao, c.cteHora,
-                   c.tipoPagamento, c.valorTotal,
+                   c.tipoPagamento, c.valorTotal, c.fretePesoValor, c.freteValorValor, c.pedagioValor,
+                   c.coletaValor, c.entregaValor, c.despachoValor, c.grisValor, c.redespacho, c.icms,
+                   c.desconto, c.acrescimo,
                    REGEXP_REPLACE(COALESCE(em.cnpj_cpf,''),'[^0-9]','') emitenteCnpj,
                    REGEXP_REPLACE(COALESCE(de.cnpj_cpf,''),'[^0-9]','') destinatarioCnpj,
                    (SELECT SUM(IFNULL(nf.pesoNf,0)) FROM conhecimentonotasfiscais nf
@@ -185,7 +187,12 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
                 localDate(rs, "cteEmissao"), trim(rs.getString("cteHora")), payment,
                 sender, recipient, fob ? recipient : sender,
                 rs.getBigDecimal("peso"), rs.getBigDecimal("valorNf"), rs.getInt("volumes"),
-                rs.getBigDecimal("valorTotal"));
+                rs.getBigDecimal("valorTotal"), new LegacyCte.Charges(rs.getBigDecimal("fretePesoValor"),
+                        rs.getBigDecimal("freteValorValor"), rs.getBigDecimal("pedagioValor"),
+                        rs.getBigDecimal("coletaValor"), rs.getBigDecimal("entregaValor"),
+                        rs.getBigDecimal("despachoValor"), rs.getBigDecimal("grisValor"),
+                        rs.getBigDecimal("redespacho"), rs.getBigDecimal("icms"), rs.getBigDecimal("desconto"),
+                        rs.getBigDecimal("acrescimo")));
     }
 
     private LegacyQuotePrint.Party party(ResultSet rs, String prefix) throws SQLException {

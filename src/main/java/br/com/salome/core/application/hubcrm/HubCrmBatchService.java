@@ -192,24 +192,27 @@ public class HubCrmBatchService {
                     totals.merge("APROVAR:NAO_ENCONTRADA", 1, Integer::sum);
                     continue;
                 }
-                String status = HubCrmNormalization.normalizedText(quote.status());
-                if (!"ABERTA".equals(status) && !"NAO APROVADA".equals(status)) {
-                    add(items, totals, "APROVAR", quote, null, "já estava " + quote.status(), "IGNORADA");
-                    continue;
-                }
+                // Cotação já APROVADA à mão também entra: é reaprovada pelo usuário da API e fica com os
+                // valores do CT-e (decisão do Lucas, 18/09/2026).
+                boolean alreadyApproved = "APROVADA".equals(HubCrmNormalization.normalizedText(quote.status()));
+                // O número do CT-e se repete entre séries/anos: fica o mais recente do mesmo pagador.
                 LegacyCte cte = ctes.stream()
                         .filter(c -> entry.getValue().equals(c.number()) && quote.payerCnpj().equals(c.payerCnpj()))
-                        .findFirst().orElse(null);
+                        .filter(c -> c.issueDate() != null)
+                        .max(java.util.Comparator.comparing(LegacyCte::issueDate)).orElse(null);
                 if (cte == null) {
                     add(items, totals, "APROVAR", quote, null, "CT-e " + entry.getValue() + " não encontrado", "ERRO");
                     continue;
                 }
                 try {
-                    if (writer.approve(quote, cte, now)) {
+                    if (writer.approve(quote, cte, now, true)) {
                         store.recordEvent("quote:" + quote.id() + ":lote:aprovada", "COTACAO", quote.id(),
                                 "LOTE_APROVADA", "PROCESSADO",
-                                "Ajuste manual (decisão do Lucas): APROVADA pelo CT-e " + cte.label(), null);
-                        store.markCteMatchStatus(cte.id(), "RESOLVIDO_MANUAL");
+                                "Ajuste manual (decisão do Lucas): " + (alreadyApproved ? "reaprovada" : "APROVADA")
+                                        + " pelo CT-e " + cte.label() + " com o usuário da API; valores da cotação"
+                                        + " ajustados ao CT-e", null);
+                        store.recordCteMatch(cte, quote, "RESOLVIDO_MANUAL", "Ajuste manual: cotação " + quote.id(),
+                                null);
                         add(items, totals, "APROVAR", quote, cte, "ajuste manual", "APROVADA");
                     } else {
                         add(items, totals, "APROVAR", quote, cte, "status mudou antes da gravação", "CONCORRENCIA");
