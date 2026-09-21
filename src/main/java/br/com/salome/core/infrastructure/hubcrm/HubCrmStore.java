@@ -234,6 +234,11 @@ public class HubCrmStore {
                 """, truncate(error), quoteId);
     }
 
+    /** Aviso numa cotação integrada: fica visível na coluna de erro sem tirar o status INTEGRADO. */
+    public void markQuoteWarning(long quoteId, String warning) {
+        jdbc.update("UPDATE hub_crm_quote SET last_error=? WHERE legacy_quote_id=?", truncate(warning), quoteId);
+    }
+
     public void markWhatsapp(long quoteId, String status, String error) {
         jdbc.update("UPDATE hub_crm_quote SET whatsapp_status=?, last_error=? WHERE legacy_quote_id=?",
                 status, truncate(error), quoteId);

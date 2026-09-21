@@ -178,10 +178,13 @@ WhatsApp (ENVIADO, SEM_CONVERSA, ERRO).
 mudada para FOB): quando o CNPJ do card difere do pagador atual, o Hub liga o
 card a empresa/pessoa do pagador novo em vez de renomear as do antigo.
 
-**CNPJ do pagador invalido** (diferente de 14 digitos) continua em REVISAO. A
-mensagem mostra quantos digitos veio e, se houver um unico cliente com a mesma
-razao social, o CNPJ do cadastro. Corrigido o CNPJ no legado, o hash muda e a
-cotacao volta sozinha.
+**CNPJ do pagador invalido** (diferente de 14 digitos) **nao bloqueia** (v1.17.0,
+regra do Lucas em 21/09/2026): a cotacao sobe com o CNPJ como esta, fica INTEGRADO e
+recebe um aviso na coluna de erro (evento `CNPJ_INVALIDO`) com quantos digitos veio
+e, se houver um unico cliente com a mesma razao social, o CNPJ do cadastro. Com
+CNPJ invalido o Hub nao procura card aberto do cliente por CNPJ; cria o card da
+cotacao. Corrigido o CNPJ no legado, o hash muda e o card e atualizado (e, se
+for outra empresa, religado a ela) no proximo polling.
 
 ## Resiliencia do polling
 

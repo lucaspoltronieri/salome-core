@@ -89,11 +89,17 @@ public class HubCrmQuoteSyncService {
                 continue;
             }
             try {
-                if (quote.payerCnpj().length() != 14) {
-                    throw new ReviewException(invalidPayerMessage(quote));
-                }
                 integrate(quote, hash, current);
                 integrated++;
+                if (!validPayerCnpj(quote)) {
+                    // CNPJ errado não bloqueia (regra do Lucas, 21/09/2026): o card sobe com o
+                    // CNPJ como está e fica o aviso. Corrigido no legado, o hash muda e o card
+                    // é corrigido no próximo polling.
+                    String warning = invalidPayerMessage(quote);
+                    store.markQuoteWarning(quote.id(), warning);
+                    store.recordEvent("quote:" + quote.id() + ":cnpj-invalido:" + hash, "COTACAO", quote.id(),
+                            "CNPJ_INVALIDO", "PROCESSADO", warning, null);
+                }
             } catch (DealRemovedException exception) {
                 skipped++;
                 store.markQuoteRemoved(quote.id());
@@ -124,6 +130,7 @@ public class HubCrmQuoteSyncService {
         if (current.dealId() != null && storedDeal.isEmpty()) throw new DealRemovedException();
         var quoteDeal = storedDeal.isPresent() ? storedDeal : arpa.findDealByLegacyQuoteId(quote.id());
         var openDeal = quoteDeal.isPresent() ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
+                : !validPayerCnpj(quote) ? java.util.Optional.<ArpaSuiteGateway.ArpaDeal>empty()
                 : arpa.findLatestOpenDealByCnpj(quote.payerCnpj())
                         .filter(deal -> !store.dealBoundToOtherQuote(deal.id(), quote.id()));
         var external = quoteDeal.isPresent() ? quoteDeal : openDeal;
@@ -172,14 +179,19 @@ public class HubCrmQuoteSyncService {
         return deal.cnpj() != null && !deal.cnpj().equals(quote.payerCnpj());
     }
 
+    // CNPJ inválido não serve para procurar card aberto do cliente: casaria com qualquer coisa.
+    private boolean validPayerCnpj(LegacyQuote quote) {
+        return quote.payerCnpj().length() == 14;
+    }
+
     private String invalidPayerMessage(LegacyQuote quote) {
-        String message = "CNPJ do pagador inválido na cotação: " + quote.payerCnpj()
+        String message = "Integrada com CNPJ do pagador inválido: " + quote.payerCnpj()
                 + " (" + quote.payerCnpj().length() + " dígitos)";
         String suggestion = legacy.findClientCnpjByLegalName(quote.payerName())
                 .filter(cnpj -> cnpj.length() == 14)
                 .map(cnpj -> "; no cadastro, " + quote.payerName().trim() + " é " + cnpj)
                 .orElse("");
-        return message + suggestion + ". Corrija no legado: a cotação volta sozinha.";
+        return message + suggestion + ". Ao corrigir no legado, o card é atualizado sozinho.";
     }
 
     void applyStatus(LegacyQuote quote, long dealId) {

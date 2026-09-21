@@ -338,7 +338,7 @@ class HubCrmQuoteSyncServiceTest {
     }
 
     @Test
-    void cnpjDoPagadorInvalidoVaiParaRevisaoApontandoOCnpjDoCadastro() {
+    void cnpjDoPagadorInvalidoNaoBloqueiaIntegraComAvisoDoCnpjDoCadastro() {
         LegacyQuote valid = quote("ABERTA", Map.of());
         LegacyQuote quote = new LegacyQuote(valid.id(), valid.createdDate(), valid.createdTime(),
                 valid.responsible(), valid.status(), valid.statusAt(), "Destinatário (FOB)",
@@ -352,12 +352,20 @@ class HubCrmQuoteSyncServiceTest {
         prepare(quote);
         when(legacy.findClientCnpjByLegalName("OURO TINTAS LTDA")).thenReturn(Optional.of("51741300000162"));
 
+        when(arpa.createOrganization("OURO TINTAS LTDA")).thenReturn(500L);
+        when(arpa.createPerson(anyString(), any(), org.mockito.ArgumentMatchers.eq(500L))).thenReturn(600L);
+        when(arpa.createQuoteDeal(quote, 500, 600, 4)).thenReturn(700L);
+
         var result = service.syncQuotes();
 
-        assertThat(result.review()).isEqualTo(1);
-        verify(store).markQuoteReview(quote.id(), "CNPJ do pagador inválido na cotação: 5174300000162 (13 dígitos);"
-                + " no cadastro, OURO TINTAS LTDA é 51741300000162. Corrija no legado: a cotação volta sozinha.");
-        verify(arpa, never()).updateDealFromQuote(anyLong(), any(), anyLong());
+        assertThat(result.integrated()).isEqualTo(1);
+        assertThat(result.review()).isZero();
+        // CNPJ inválido não procura card aberto de cliente por CNPJ: cria o card da cotação.
+        verify(arpa, never()).findLatestOpenDealByCnpj(anyString());
+        verify(arpa).updateDealFromQuote(700, quote, 4);
+        verify(store).markQuoteWarning(quote.id(), "Integrada com CNPJ do pagador inválido: 5174300000162 (13 dígitos);"
+                + " no cadastro, OURO TINTAS LTDA é 51741300000162. Ao corrigir no legado, o card é atualizado sozinho.");
+        verify(store, never()).markQuoteReview(anyLong(), anyString());
     }
 
     private void prepare(LegacyQuote quote) {
