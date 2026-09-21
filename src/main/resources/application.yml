@@ -130,3 +130,6 @@ salome:
       rota-customfield-id: ${SALOME_HUB_CRM_ROTA_FIELD_ID:320206}
       tipo-carga-customfield-id: ${SALOME_HUB_CRM_TIPO_CARGA_FIELD_ID:320208}
       volume-customfield-id: ${SALOME_HUB_CRM_VOLUME_FIELD_ID:320207}
+      email-customfield-id: ${SALOME_HUB_CRM_EMAIL_FIELD_ID:320461}
+      telefone-customfield-id: ${SALOME_HUB_CRM_TELEFONE_FIELD_ID:320838}
+      previsao-fechamento-customfield-id: ${SALOME_HUB_CRM_PREVISAO_FECHAMENTO_FIELD_ID:320017}

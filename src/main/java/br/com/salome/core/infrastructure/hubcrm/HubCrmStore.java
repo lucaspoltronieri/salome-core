@@ -183,7 +183,9 @@ public class HubCrmStore {
         jdbc.update("""
                 UPDATE hub_crm_quote SET organization_id=?, people_id=?, deal_id=?, assigned_user_id=?,
                   legacy_status=?, total_freight=?, snapshot_hash=?, sync_status='INTEGRADO',
-                  pdf_status='DISPONIVEL', whatsapp_status=?, attempt_count=0, next_attempt_at=NULL, last_error=NULL,
+                  pdf_status='DISPONIVEL',
+                  whatsapp_status=IF(whatsapp_status IN ('ENVIADO','SEM_CONVERSA','ERRO'), whatsapp_status, ?),
+                  attempt_count=0, next_attempt_at=NULL, last_error=NULL,
                   last_synced_at=NOW() WHERE legacy_quote_id=?
                 """, organizationId, peopleId, dealId, userId, quote.status(), quote.totalFreight(),
                 hash, whatsappStatus, quote.id());

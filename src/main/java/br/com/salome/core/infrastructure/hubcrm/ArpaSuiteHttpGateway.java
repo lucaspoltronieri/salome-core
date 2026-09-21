@@ -90,8 +90,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
             JsonNode item = get("/deals/" + dealId);
             JsonNode data = item.path("data").isObject() ? item.path("data") : item;
             if (data.path("id").asLong(0) <= 0) return Optional.empty();
-            return Optional.of(new ArpaDeal(data.path("id").asLong(), nullableLong(data, "organizationId"),
-                    nullableLong(data, "peopleId"), nullableLong(data, "userId")));
+            return Optional.of(dealFrom(data));
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == 404) return Optional.empty();
             throw exception;
@@ -245,6 +244,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
                 organizationId, peopleId, userId, properties.arpa().propostaStageId(), quote.totalFreight());
         payload.put("details", "Cotação do legado #" + quote.id());
         payload.put("customfields", quoteFields(quote));
+        putClosingDate(payload, quote);
         try {
             return extractId(post("/deals", payload));
         } catch (InvalidArpaResponseException exception) {
@@ -262,7 +262,13 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         payload.put("price", amount(quote.totalFreight()));
         payload.put("details", "Cotação do legado #" + quote.id());
         payload.put("customfields", quoteFields(quote));
+        putClosingDate(payload, quote);
         put("/deals/" + dealId, payload);
+    }
+
+    private void putClosingDate(Map<String, Object> payload, LegacyQuote quote) {
+        String date = closingDate(quote.payerProfile().closingForecast());
+        if (date != null) payload.put("expectClosingDate", date);
     }
 
     @Override
@@ -448,7 +454,28 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         addField(fields, properties.arpa().rotaCustomfieldId(), quote.senderCity() + " → " + quote.recipientCity());
         addField(fields, properties.arpa().tipoCargaCustomfieldId(), quote.cargoType());
         addField(fields, properties.arpa().volumeCustomfieldId(), quote.volumes() + " volume(s)");
+        LegacyQuote.PayerProfile payer = quote.payerProfile();
+        addField(fields, properties.arpa().segmentoCustomfieldId(), payer.segment());
+        addField(fields, properties.arpa().cidadeCustomfieldId(), payer.city());
+        addField(fields, properties.arpa().estadoCustomfieldId(), payer.state());
+        addField(fields, properties.arpa().emailCustomfieldId(), firstEmail(payer.email()));
+        addField(fields, properties.arpa().telefoneCustomfieldId(), bestPhone(payer.phone()));
+        addField(fields, properties.arpa().previsaoFechamentoCustomfieldId(), closingDate(payer.closingForecast()));
         return fields;
+    }
+
+    // O legado junta vários e-mails no mesmo campo ("a@x.com / b@x.com"); o card leva o primeiro.
+    private String firstEmail(String value) {
+        if (value == null) return "";
+        for (String part : value.split("[,;/\\s]+")) {
+            if (part.contains("@")) return part.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        return "";
+    }
+
+    // Data sem hora no legado: meio-dia de Brasília, no formato ISO que a API do Arpa usa.
+    private String closingDate(java.time.LocalDate date) {
+        return date == null ? null : date + "T12:00:00.000-03:00";
     }
 
     private void addField(List<Map<String, Object>> fields, long id, String value) {
@@ -552,7 +579,20 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     private ArpaDeal dealFrom(JsonNode item) {
         return new ArpaDeal(item.path("id").asLong(), nullableLong(item, "organizationId"),
-                nullableLong(item, "peopleId"), nullableLong(item, "userId"));
+                nullableLong(item, "peopleId"), nullableLong(item, "userId"), dealCnpj(item));
+    }
+
+    private String dealCnpj(JsonNode item) {
+        long fieldId = properties.arpa().cnpjCustomfieldId();
+        for (String name : List.of("normalizedCustomfields", "customfields")) {
+            for (JsonNode field : item.path(name)) {
+                if (field.path("customfieldId").asLong() == fieldId) {
+                    String digits = HubCrmNormalization.digits(field.path("value").asText(""));
+                    if (!digits.isEmpty()) return digits;
+                }
+            }
+        }
+        return null;
     }
 
     private double amount(BigDecimal value) {

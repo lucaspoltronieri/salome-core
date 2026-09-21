@@ -42,5 +42,10 @@ public interface ArpaSuiteGateway {
 
     record OpenConversation(long id, String match) {}
 
-    record ArpaDeal(long id, Long organizationId, Long peopleId, Long userId) {}
+    /** `cnpj` = campo CNPJ do card (só dígitos), para saber se o pagador da cotação mudou. */
+    record ArpaDeal(long id, Long organizationId, Long peopleId, Long userId, String cnpj) {
+        public ArpaDeal(long id, Long organizationId, Long peopleId, Long userId) {
+            this(id, organizationId, peopleId, userId, null);
+        }
+    }
 }

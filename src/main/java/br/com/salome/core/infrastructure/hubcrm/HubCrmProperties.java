@@ -32,6 +32,9 @@ public record HubCrmProperties(
             long baseCotacaoCustomfieldId,
             long rotaCustomfieldId,
             long tipoCargaCustomfieldId,
-            long volumeCustomfieldId
+            long volumeCustomfieldId,
+            long emailCustomfieldId,
+            long telefoneCustomfieldId,
+            long previsaoFechamentoCustomfieldId
     ) {}
 }

@@ -90,7 +90,7 @@ public class HubCrmQuoteSyncService {
             }
             try {
                 if (quote.payerCnpj().length() != 14) {
-                    throw new ReviewException("CNPJ do pagador inválido: " + quote.payerCnpj());
+                    throw new ReviewException(invalidPayerMessage(quote));
                 }
                 integrate(quote, hash, current);
                 integrated++;
@@ -130,7 +130,16 @@ public class HubCrmQuoteSyncService {
         long organizationId;
         long peopleId;
         long dealId;
-        if (external.isPresent() && external.get().organizationId() != null && external.get().peopleId() != null) {
+        if (external.isPresent() && payerChanged(external.get(), quote)) {
+            // O pagador da cotação mudou depois do card criado (ex.: CIF virou FOB). A empresa
+            // e a pessoa do card são do pagador antigo: renomeá-las contaminaria os outros
+            // cards delas. O card passa para a empresa/pessoa do pagador novo.
+            dealId = external.get().id();
+            organizationId = arpa.createOrganization(HubCrmNormalization.businessName(quote.payerName()));
+            peopleId = arpa.createPerson(HubCrmNormalization.shortName(quote.payerName()),
+                    quote.payerPhone(), organizationId);
+            arpa.linkDeal(dealId, organizationId, peopleId, userId);
+        } else if (external.isPresent() && external.get().organizationId() != null && external.get().peopleId() != null) {
             organizationId = external.get().organizationId();
             peopleId = external.get().peopleId();
             dealId = external.get().id();
@@ -157,6 +166,20 @@ public class HubCrmQuoteSyncService {
         store.markQuoteIntegrated(quote, organizationId, peopleId, dealId, userId, hash,
                 arpa.hasWhatsappChannel() ? "PENDENTE" : "AGUARDANDO_CANAL");
         whatsapp.process(quote, organizationId, peopleId, dealId);
+    }
+
+    private boolean payerChanged(ArpaSuiteGateway.ArpaDeal deal, LegacyQuote quote) {
+        return deal.cnpj() != null && !deal.cnpj().equals(quote.payerCnpj());
+    }
+
+    private String invalidPayerMessage(LegacyQuote quote) {
+        String message = "CNPJ do pagador inválido na cotação: " + quote.payerCnpj()
+                + " (" + quote.payerCnpj().length() + " dígitos)";
+        String suggestion = legacy.findClientCnpjByLegalName(quote.payerName())
+                .filter(cnpj -> cnpj.length() == 14)
+                .map(cnpj -> "; no cadastro, " + quote.payerName().trim() + " é " + cnpj)
+                .orElse("");
+        return message + suggestion + ". Corrija no legado: a cotação volta sozinha.";
     }
 
     void applyStatus(LegacyQuote quote, long dealId) {
@@ -237,7 +260,8 @@ public class HubCrmQuoteSyncService {
                 quote.payerPhone(), quote.payerEmail(), quote.cargoType(), quote.volumes(),
                 quote.weight(), quote.invoiceValue(), quote.cubage(), quote.freightWeight(), quote.freightValue(),
                 quote.toll(), quote.pickup(), quote.delivery(), quote.dispatch(), quote.gris(), quote.redelivery(),
-                quote.icms(), quote.discount(), quote.addition(), quote.totalFreight(), quote.selectedLossReasons());
+                quote.icms(), quote.discount(), quote.addition(), quote.totalFreight(), quote.selectedLossReasons(),
+                quote.payerProfile());
     }
 
     private long owner(String responsible) {

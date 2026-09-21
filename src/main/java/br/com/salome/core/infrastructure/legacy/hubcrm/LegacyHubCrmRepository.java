@@ -67,22 +67,42 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
             ORDER BY cl.idCliente
             """;
 
-    private static final String QUOTE_SELECT = """
-            SELECT q.*, remCi.descricao remetenteCidade, destCi.descricao destinatarioCidade,
-                   nat.descricao naturezaCarga
-            FROM cotacao q
-            LEFT JOIN cidade remCi ON remCi.idCidade=q.remetenteIdCidade
-            LEFT JOIN cidade destCi ON destCi.idCidade=q.destinatarioIdCidade
-            LEFT JOIN naturezacargacliente ncc ON ncc.idNaturezaCargaCliente=q.idNaturezaCargaCliente
-            LEFT JOIN naturezacarga nat ON nat.idNaturezaCarga=COALESCE(q.idNaturezaCarga,ncc.idNaturezaCarga)
+    // Cadastro do tomador do frete (destinatário no FOB, remetente nos demais — mesma regra do
+    // mapQuote). A igualdade direta com cnpj_cpf usa o índice único do cliente.
+    private static final String PAYER_COLUMNS = """
+                   , tomCn.descricao tomadorSegmento, tomCi.descricao tomadorCidade, tomEs.uf tomadorUf,
+                   tom.telefone tomadorTelefone, tom.celular tomadorCelular, tom.email tomadorEmail
+            """;
+    private static final String PAYER_JOINS = """
+            LEFT JOIN cliente tom ON tom.cnpj_cpf=CASE
+                WHEN UPPER(COALESCE(q.tipoPagamento,'')) LIKE '%DESTINAT%'
+                 AND UPPER(COALESCE(q.tipoPagamento,'')) LIKE '%FOB%' THEN q.destinatarioCnpj
+                ELSE q.remetenteCnpj END
+            LEFT JOIN cidade tomCi ON tomCi.idCidade=tom.idCidade
+            LEFT JOIN estado tomEs ON tomEs.idEstado=tomCi.idEstado
+            LEFT JOIN cnae tomCn ON tomCn.codigo=tom.cnae
             """;
 
+    private static final String QUOTE_SELECT = """
+            SELECT q.*, remCi.descricao remetenteCidade, destCi.descricao destinatarioCidade,
+                   remEs.uf remetenteUf, destEs.uf destinatarioUf, nat.descricao naturezaCarga
+            """ + PAYER_COLUMNS + """
+            FROM cotacao q
+            LEFT JOIN cidade remCi ON remCi.idCidade=q.remetenteIdCidade
+            LEFT JOIN estado remEs ON remEs.idEstado=remCi.idEstado
+            LEFT JOIN cidade destCi ON destCi.idCidade=q.destinatarioIdCidade
+            LEFT JOIN estado destEs ON destEs.idEstado=destCi.idEstado
+            LEFT JOIN naturezacargacliente ncc ON ncc.idNaturezaCargaCliente=q.idNaturezaCargaCliente
+            LEFT JOIN naturezacarga nat ON nat.idNaturezaCarga=COALESCE(q.idNaturezaCarga,ncc.idNaturezaCarga)
+            """ + PAYER_JOINS;
+
     // Mesmas colunas do QUOTE_SELECT (para reaproveitar mapQuote) mais o que a impressão
-    // no formato do legado precisa: UF das cidades e o bloco do consignatário.
+    // no formato do legado precisa: o bloco do consignatário.
     private static final String PRINT_SELECT = """
             SELECT q.*, remCi.descricao remetenteCidade, destCi.descricao destinatarioCidade,
                    consCi.descricao consignatarioCidade, remEs.uf remetenteUf, destEs.uf destinatarioUf,
                    consEs.uf consignatarioUf, nat.descricao naturezaCarga
+            """ + PAYER_COLUMNS + """
             FROM cotacao q
             LEFT JOIN cidade remCi ON remCi.idCidade=q.remetenteIdCidade
             LEFT JOIN estado remEs ON remEs.idEstado=remCi.idEstado
@@ -92,6 +112,7 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
             LEFT JOIN estado consEs ON consEs.idEstado=consCi.idEstado
             LEFT JOIN naturezacargacliente ncc ON ncc.idNaturezaCargaCliente=q.idNaturezaCargaCliente
             LEFT JOIN naturezacarga nat ON nat.idNaturezaCarga=COALESCE(q.idNaturezaCarga,ncc.idNaturezaCarga)
+            """ + PAYER_JOINS + """
             WHERE q.idCotacao=?
             """;
 
@@ -177,6 +198,16 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
                 """, (rs, row) -> mapQuote(rs), java.sql.Date.valueOf(from));
     }
 
+    @Override
+    public Optional<String> findClientCnpjByLegalName(String legalName) {
+        if (legalName == null || legalName.isBlank()) return Optional.empty();
+        List<String> cnpjs = jdbc.queryForList("""
+                SELECT REGEXP_REPLACE(COALESCE(cnpj_cpf,''),'[^0-9]','') FROM cliente
+                WHERE TRIM(razaoSocial)=? LIMIT 2
+                """, String.class, legalName.trim());
+        return cnpjs.size() == 1 ? Optional.of(cnpjs.get(0)) : Optional.empty();
+    }
+
     private LegacyCte mapCte(ResultSet rs) throws SQLException {
         String payment = rs.getString("tipoPagamento");
         boolean fob = normalized(payment).contains("DESTINAT") && normalized(payment).contains("FOB");
@@ -247,7 +278,28 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
                 rs.getBigDecimal("despachoValor"), rs.getBigDecimal("grisValor"),
                 rs.getBigDecimal("redespachoValor"), rs.getBigDecimal("icmsValor"),
                 rs.getBigDecimal("descontoValor"), rs.getBigDecimal("acrescimoValor"),
-                rs.getBigDecimal("totalFrete"), rs.getString("contatoAprovacao"), lossReasons(rs));
+                rs.getBigDecimal("totalFrete"), rs.getString("contatoAprovacao"), lossReasons(rs),
+                payerProfile(rs, fob ? "destinatario" : "remetente", payerPhone, payerEmail));
+    }
+
+    // Cadastro do tomador primeiro; sem cadastro, cidade/UF caem para as da própria cotação.
+    // Telefone e e-mail seguem o contrário: o da cotação é o contato da negociação.
+    private LegacyQuote.PayerProfile payerProfile(ResultSet rs, String side, String quotePhone,
+            String quoteEmail) throws SQLException {
+        return new LegacyQuote.PayerProfile(
+                trim(rs.getString("tomadorSegmento")),
+                firstFilled(rs.getString("tomadorCidade"), rs.getString(side + "Cidade")),
+                firstFilled(rs.getString("tomadorUf"), rs.getString(side + "Uf")),
+                firstFilled(quotePhone, rs.getString("tomadorTelefone"), rs.getString("tomadorCelular")),
+                firstFilled(quoteEmail, rs.getString("tomadorEmail")),
+                localDate(rs, "previsaoFechamento"));
+    }
+
+    private String firstFilled(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return "";
     }
 
     private Map<LossReason, String> lossReasons(ResultSet rs) throws SQLException {

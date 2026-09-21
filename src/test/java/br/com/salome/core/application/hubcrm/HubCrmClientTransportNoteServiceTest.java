@@ -40,7 +40,7 @@ class HubCrmClientTransportNoteServiceTest {
                 "https://core.example.com", "12345678901234567890123456789012", 60,
                 new HubCrmProperties.Datasource("jdbc:h2:mem:test", "sa", ""),
                 new HubCrmProperties.Arpa("https://suite.arpacore.com.br", "key", 1, 2, 3,
-                        4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+                        4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16));
         service = new HubCrmClientTransportNoteService(store, reports, arpa, signer, properties);
         when(arpa.findDealStage(2290001)).thenReturn(Optional.of(2L));
         when(store.clientCardsWithoutTransportNote(HubCrmClientTransportNoteService.PER_CYCLE))

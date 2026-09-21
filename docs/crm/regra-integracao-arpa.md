@@ -155,6 +155,34 @@ nao mudem esse texto nao criam uma segunda observacao. O snapshot tecnico do
 card e o evento de ganho/perda continuam separados. Registros anteriores a
 essa regra sao indexados no primeiro polling sem republicar a observacao.
 
+## Campos personalizados do card de cotacao (v1.16.0)
+
+Alem de CNPJ, Base de Cotacao, Rota, Tipo de Carga e Volume, o card da cotacao
+recebe os dados do tomador do frete (destinatario no FOB, remetente nos demais):
+
+- Segmento, Cidade e Estado: do cadastro do cliente no legado (`cliente` pelo
+  CNPJ, segmento = descricao do CNAE). Sem cadastro, Cidade e Estado caem para
+  os da propria cotacao; Segmento fica vazio.
+- Telefone e E-mail: primeiro os da cotacao; sem eles, os do cadastro. Do
+  e-mail vai o primeiro endereco do campo.
+- Data de fechamento prevista (campo e `expectClosingDate`): `previsaoFechamento`
+  da cotacao, somente quando informada.
+- Origem nao e preenchida (lista sem opcoes no ArpaSuite).
+
+Esses dados entram no hash da cotacao: a publicacao da v1.16.0 reprocessa uma
+vez as cotacoes acompanhadas e preenche os cards ja existentes. O reprocesso
+nao repete observacao, ganho, perda nem WhatsApp, e nao apaga o status final do
+WhatsApp (ENVIADO, SEM_CONVERSA, ERRO).
+
+**Pagador trocado depois do card criado** (ex.: cotacao salva CIF e depois
+mudada para FOB): quando o CNPJ do card difere do pagador atual, o Hub liga o
+card a empresa/pessoa do pagador novo em vez de renomear as do antigo.
+
+**CNPJ do pagador invalido** (diferente de 14 digitos) continua em REVISAO. A
+mensagem mostra quantos digitos veio e, se houver um unico cliente com a mesma
+razao social, o CNPJ do cadastro. Corrigido o CNPJ no legado, o hash muda e a
+cotacao volta sozinha.
+
 ## Resiliencia do polling
 
 O cliente HTTP do ArpaSuite tem timeout de conexao (15s) e de leitura (60s). Sem

@@ -71,6 +71,6 @@ class HubCrmMediaSignerTest {
 
     private HubCrmProperties.Arpa arpa() {
         return new HubCrmProperties.Arpa("https://suite.arpacore.com.br", "key", 1, 2, 3,
-                4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
+                4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
     }
 }

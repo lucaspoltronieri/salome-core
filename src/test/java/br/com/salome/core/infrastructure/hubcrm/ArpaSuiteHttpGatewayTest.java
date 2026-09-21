@@ -331,11 +331,56 @@ class ArpaSuiteHttpGatewayTest {
         }
     }
 
+    @Test
+    void cardDaCotacaoLevaOsDadosDoTomadorEAPrevisaoDeFechamento() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/api/deals", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"data\":{\"id\":4322}}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var gateway = new ArpaSuiteHttpGateway(
+                    properties("http://127.0.0.1:" + server.getAddress().getPort()));
+            var zero = java.math.BigDecimal.ZERO;
+            var quote = new br.com.salome.core.domain.hubcrm.LegacyQuote(15871, java.time.LocalDate.of(2026, 9, 21),
+                    "07:36", "JACI", "ABERTA", null, "Destinatário (FOB)", "61142865000691", "RENNER SAYERLACK S/A",
+                    "CAJAMAR", "51741300000162", "OURO TINTAS LTDA", "FERNANDÓPOLIS", "51741300000162",
+                    "OURO TINTAS LTDA", "1734632833", "OURO_TINTAS@HOTMAIL.COM / outro@x.com", "TINTAS", 8,
+                    zero, zero, zero, zero, zero, zero, zero, zero, zero, zero, zero, zero, zero, zero,
+                    new java.math.BigDecimal("169.26"), "", java.util.Map.of(),
+                    new br.com.salome.core.domain.hubcrm.LegacyQuote.PayerProfile("COMÉRCIO VAREJISTA DE TINTAS",
+                            "FERNANDÓPOLIS", "SP", "1734632833", "OURO_TINTAS@HOTMAIL.COM / outro@x.com",
+                            java.time.LocalDate.of(2026, 9, 30)));
+
+            gateway.updateDealFromQuote(4322, quote, 4);
+
+            // Map.of não garante a ordem das chaves: compara por id do campo.
+            var json = tools.jackson.databind.json.JsonMapper.builder().build().readTree(requestBody.get());
+            java.util.Map<Long, String> fields = new java.util.HashMap<>();
+            json.path("customfields").forEach(field ->
+                    fields.put(field.path("customfieldId").asLong(), field.path("value").asText()));
+            assertThat(fields).containsEntry(9L, "COMÉRCIO VAREJISTA DE TINTAS")
+                    .containsEntry(7L, "FERNANDÓPOLIS").containsEntry(8L, "SP")
+                    .containsEntry(14L, "ouro_tintas@hotmail.com").containsEntry(15L, "1734632833")
+                    .containsEntry(16L, "2026-09-30T12:00:00.000-03:00");
+            assertThat(json.path("expectClosingDate").asText()).isEqualTo("2026-09-30T12:00:00.000-03:00");
+            assertThat(json.path("price").asDouble()).isEqualTo(169.26);
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private HubCrmProperties properties(String arpaUrl) {
         return new HubCrmProperties(true, false, 30000, 32001, 10,
                 "https://core.example.com", "12345678901234567890123456789012", 60,
                 new HubCrmProperties.Datasource("jdbc:h2:mem:test", "sa", ""),
                 new HubCrmProperties.Arpa(arpaUrl, "key", 1, 2, 3,
-                        4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+                        4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16));
     }
 }

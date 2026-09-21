@@ -315,6 +315,51 @@ class HubCrmQuoteSyncServiceTest {
         verify(arpa, never()).createQuoteDeal(any(), anyLong(), anyLong(), anyLong());
     }
 
+    @Test
+    void pagadorTrocadoDepoisDoCardCriadoMoveOCardParaAEmpresaNovaSemRenomearAAntiga() {
+        LegacyQuote quote = quote("ABERTA", Map.of());
+        when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of());
+        when(store.findQuote(quote.id())).thenReturn(Optional.of(new QuoteIntegration(
+                quote.id(), quote.payerCnpj(), quote.status(), 321L, 77L, 88L, 4L,
+                quote.totalFreight(), "old", "ATUALIZAR", "AGUARDANDO_CANAL")));
+        // Card criado quando o pagador era outro (ex.: cotação CIF que virou FOB).
+        when(arpa.findDeal(321)).thenReturn(Optional.of(
+                new ArpaSuiteGateway.ArpaDeal(321, 77L, 88L, 4L, "61142865000691")));
+        when(arpa.createOrganization("REMETENTE LTDA")).thenReturn(500L);
+        when(arpa.createPerson(anyString(), any(), org.mockito.ArgumentMatchers.eq(500L))).thenReturn(600L);
+
+        service.syncQuotes();
+
+        verify(arpa).linkDeal(321, 500, 600, 4);
+        verify(store).bindQuote(quote.id(), 500, 600, 321, 4);
+        verify(arpa, never()).updateOrganization(org.mockito.ArgumentMatchers.eq(77L), anyString());
+        verify(arpa).updateDealFromQuote(321, quote, 4);
+    }
+
+    @Test
+    void cnpjDoPagadorInvalidoVaiParaRevisaoApontandoOCnpjDoCadastro() {
+        LegacyQuote valid = quote("ABERTA", Map.of());
+        LegacyQuote quote = new LegacyQuote(valid.id(), valid.createdDate(), valid.createdTime(),
+                valid.responsible(), valid.status(), valid.statusAt(), "Destinatário (FOB)",
+                valid.senderCnpj(), valid.senderName(), valid.senderCity(), "5174300000162",
+                "OURO TINTAS LTDA", valid.recipientCity(), "5174300000162", "OURO TINTAS LTDA",
+                valid.payerPhone(), valid.payerEmail(), valid.cargoType(), valid.volumes(), valid.weight(),
+                valid.invoiceValue(), valid.cubage(), valid.freightWeight(), valid.freightValue(), valid.toll(),
+                valid.pickup(), valid.delivery(), valid.dispatch(), valid.gris(), valid.redelivery(),
+                valid.icms(), valid.discount(), valid.addition(), valid.totalFreight(),
+                valid.approvalContact(), Map.of());
+        prepare(quote);
+        when(legacy.findClientCnpjByLegalName("OURO TINTAS LTDA")).thenReturn(Optional.of("51741300000162"));
+
+        var result = service.syncQuotes();
+
+        assertThat(result.review()).isEqualTo(1);
+        verify(store).markQuoteReview(quote.id(), "CNPJ do pagador inválido na cotação: 5174300000162 (13 dígitos);"
+                + " no cadastro, OURO TINTAS LTDA é 51741300000162. Corrija no legado: a cotação volta sozinha.");
+        verify(arpa, never()).updateDealFromQuote(anyLong(), any(), anyLong());
+    }
+
     private void prepare(LegacyQuote quote) {
         when(legacy.findQuotesAfter(0)).thenReturn(List.of(quote));
         when(legacy.findQuotesByIds(any())).thenReturn(List.of());
@@ -350,6 +395,6 @@ class HubCrmQuoteSyncServiceTest {
                 "https://core.example.com", "12345678901234567890123456789012", 60,
                 new HubCrmProperties.Datasource("jdbc:h2:mem:test", "sa", ""),
                 new HubCrmProperties.Arpa("https://suite.arpacore.com.br", "key", 1, 2, 3,
-                        4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+                        4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16));
     }
 }

@@ -20,4 +20,7 @@ public interface HubCrmLegacyRepository {
 
     /** Cotações de qualquer responsável, ainda não aprovadas, criadas a partir de {@code from}. */
     List<LegacyQuote> findApprovableQuotes(LocalDate from);
+
+    /** CNPJ (só dígitos) do único cliente cadastrado com essa razão social; vazio se não houver ou se houver mais de um. */
+    Optional<String> findClientCnpjByLegalName(String legalName);
 }
