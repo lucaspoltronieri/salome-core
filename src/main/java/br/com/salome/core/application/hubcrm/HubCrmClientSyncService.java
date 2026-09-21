@@ -229,9 +229,8 @@ public class HubCrmClientSyncService {
     }
 
     private String preferredPhone(String contact, String company) {
-        String contactDigits = HubCrmNormalization.digits(contact);
-        if (contactDigits.length() == 10 || contactDigits.length() == 11) return contactDigits;
-        return company;
+        String contactPhone = HubCrmNormalization.phone(contact);
+        return contactPhone.isEmpty() ? company : contactPhone;
     }
 
     static final class DealRemovedException extends RuntimeException {

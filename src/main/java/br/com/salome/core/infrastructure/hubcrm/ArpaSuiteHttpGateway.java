@@ -444,6 +444,10 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
         addField(fields, properties.arpa().cidadeCustomfieldId(), item.city());
         addField(fields, properties.arpa().estadoCustomfieldId(), item.state());
         addField(fields, properties.arpa().segmentoCustomfieldId(), item.segment());
+        // Telefone da empresa; sem ele, o do contato (quando só há um número, ele vai no card e na pessoa).
+        String companyPhone = bestPhone(item.phone());
+        addField(fields, properties.arpa().telefoneCustomfieldId(),
+                companyPhone.isEmpty() ? bestPhone(item.contactPhone()) : companyPhone);
         return fields;
     }
 
@@ -600,13 +604,7 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     private String bestPhone(String value) {
-        if (value == null) return "";
-        for (String part : value.split("[,;|/]")) {
-            String digits = HubCrmNormalization.digits(part);
-            if (digits.startsWith("55") && digits.length() > 11) digits = digits.substring(2);
-            if (digits.length() == 10 || digits.length() == 11) return digits;
-        }
-        return "";
+        return HubCrmNormalization.phone(value);
     }
 
     String normalized(String value) {

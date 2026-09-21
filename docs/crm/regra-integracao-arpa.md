@@ -33,6 +33,18 @@ usando `peopleId: null`, sem criar pessoa a partir do contato. Ate 09/09/2026 a 
 sem contato ficava com `sync_status=SEM_CONTATO` e sem card — o que deixou 81
 cadastros qualificados fora da Carteira.
 
+**Telefones do card da Carteira (v1.18.0).** O card tem dois telefones: o da
+pessoa (contato) e o campo personalizado **Telefone** da negociacao (320838),
+que leva o telefone da empresa. Sem telefone da empresa, o campo repete o do
+contato; sem contato, a pessoa recebe o da empresa. O celular `11965728450` (do
+Erick, gravado em contatos de varios clientes, as vezes com o nome de outro
+funcionario) nunca e usado, em nenhum campo; outro numero do mesmo contato vale.
+Em 21/09/2026 os 335 cards abertos em Nao Pagantes foram preenchidos uma vez, com
+as fontes nesta ordem: legado, Receita (BrasilAPI) e Google. 4 ficaram sem
+telefone. Nos 6 cards ligados as pessoas ADRIANO LIMA DA SILVA e LARISSA
+(compartilhadas entre empresas e com o numero do Erick) foi criada uma pessoa por
+card.
+
 **Observacao de transportes (v1.9.0).** A Carteira aparece no ArpaSuite como o
 estagio **Nao Pagantes** (320394): clientes que recebem mercadoria com o frete
 pago pelo remetente e que estao em prospeccao. Desde a v1.9.1, **so os cards que

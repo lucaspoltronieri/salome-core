@@ -151,6 +151,17 @@ class ArpaSuiteHttpGatewayTest {
             assertThat(requestBody.get()).contains("\"peopleName\":\"ACME INDUSTRIA\"");
             // O título do card leva a razão social completa.
             assertThat(requestBody.get()).contains("\"title\":\"ACME INDUSTRIA LTDA\"");
+            // Telefone da empresa no campo Telefone da negociação.
+            assertThat(requestBody.get()).contains("{\"customfieldId\":15,\"value\":\"1133334444\"}")
+                    .doesNotContain("\"customfieldId\":15,\"value\":\"11965728450\"");
+
+            // Com o celular do Erick no cadastro, vale o telefone do contato.
+            var semTelefoneDaEmpresa = new br.com.salome.core.domain.hubcrm.LegacyCrmClient(33500,
+                    "ACME INDUSTRIA LTDA", "12345678000190", "BAURU", "SP", "contato@acme.com.br",
+                    "(11) 96572-8450", "COMERCIO", "CARLOS", "", "", "14 3204-8604",
+                    java.time.LocalDate.of(2026, 8, 12));
+            gateway.createPortfolioDealWithoutPerson(semTelefoneDaEmpresa, 77, 4);
+            assertThat(requestBody.get()).contains("{\"customfieldId\":15,\"value\":\"1432048604\"}");
         } finally {
             server.stop(0);
         }

@@ -14,7 +14,22 @@ public final class HubCrmNormalization {
     private static final Pattern LEADING_REGISTRATION = Pattern.compile(
             "^([0-9][0-9\\s.\\-/]*)\\s+(.+)$", Pattern.UNICODE_CHARACTER_CLASS);
 
+    // Celular do Erick (Salomé): foi gravado em contatos de vários clientes, às vezes com o nome
+    // de outro funcionário. Nunca é telefone do cliente; outro número no mesmo contato vale.
+    private static final String SALOME_PHONE = "11965728450";
+
     private HubCrmNormalization() {}
+
+    /** Primeiro telefone válido (DDD + 8 ou 9 dígitos) de um campo que pode juntar vários. */
+    public static String phone(String value) {
+        if (value == null) return "";
+        for (String part : value.split("[,;|/]")) {
+            String digits = digits(part);
+            if (digits.startsWith("55") && digits.length() > 11) digits = digits.substring(2);
+            if ((digits.length() == 10 || digits.length() == 11) && !digits.equals(SALOME_PHONE)) return digits;
+        }
+        return "";
+    }
 
     public static String digits(String value) {
         return value == null ? "" : value.replaceAll("\\D", "");

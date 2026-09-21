@@ -33,6 +33,14 @@ class HubCrmNormalizationTest {
     }
 
     @Test
+    void telefoneIgnoraOCelularDoErickEPegaOProximoValido() {
+        assertThat(HubCrmNormalization.phone("(11) 96572-8450")).isEmpty();
+        assertThat(HubCrmNormalization.phone("11965728450 / 17 99220-8690")).isEqualTo("17992208690");
+        assertThat(HubCrmNormalization.phone("+55 14 3204-8604")).isEqualTo("1432048604");
+        assertThat(HubCrmNormalization.phone("123")).isEmpty();
+    }
+
+    @Test
     void descartaContatoErickEEmailsOperacionaisInvalidos() {
         assertThat(HubCrmNormalization.validContactName("Erick")).isFalse();
         assertThat(HubCrmNormalization.validContactName("Fernanda Silva")).isTrue();
