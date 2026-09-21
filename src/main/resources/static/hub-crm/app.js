@@ -7,7 +7,8 @@ async function status(){try{const data=await request('/api/hub-crm/status');stat
 
 // Colunas com nome amigável por aba (as demais abas mostram as colunas cruas da API).
 const COLUMNS={
-  'aprovacoes-cte':[['created_at','Quando'],['status','Situação'],['legacy_quote_id','Cotação'],['quote_responsavel','Responsável'],['quote_status_anterior','Status anterior'],['cte_numero','CT-e'],['cte_serie','Série'],['cte_emissao','Emissão'],['pagador_cnpj','Pagador'],['quote_frete','Frete cotação'],['cte_frete','Frete CT-e'],['criterios','Critérios'],['divergencias','Divergências']],
+  'cotacoes':[['legacy_quote_id','Cotação'],['legacy_responsible','Responsável'],['legacy_status','Status legado'],['payer_cnpj','Pagador'],['total_freight','Frete'],['deal_id','Card Arpa'],['assigned_user_id','Usuário Arpa'],['pdf_status','PDF'],['whatsapp_status','WhatsApp'],['sync_status','Sincronização'],['last_error','Erro'],['updated_at','Atualizada em']],
+  'aprovacoes-cte':[['legacy_quote_id','Cotação'],['created_at','Quando'],['status','Situação'],['quote_responsavel','Responsável'],['quote_status_anterior','Status anterior'],['cte_numero','CT-e'],['cte_serie','Série'],['cte_emissao','Emissão'],['pagador_cnpj','Pagador'],['quote_frete','Frete cotação'],['cte_frete','Frete CT-e'],['criterios','Critérios'],['divergencias','Divergências']],
   'logs':[['created_at','Quando'],['entity_type','Tipo'],['entity_id','ID'],['event_type','Evento'],['status','Situação'],['response_summary','Resultado'],['last_error','Erro']],
   'lote':[['acao','Ação'],['resultado','Resultado'],['cotacao','Cotação'],['responsavel','Responsável'],['statusAnterior','Status anterior'],['criada','Criada'],['cte','CT-e'],['emissao','Emissão'],['freteCotacao','Frete cotação'],['freteCte','Frete CT-e'],['detalhe','Detalhe']]
 };

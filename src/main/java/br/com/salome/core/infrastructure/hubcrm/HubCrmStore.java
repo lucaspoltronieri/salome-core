@@ -392,12 +392,29 @@ public class HubCrmStore {
     }
 
     public List<Map<String, Object>> cteMatches(int limit) {
-        return jdbc.queryForList("""
+        List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT created_at, status, legacy_quote_id, quote_responsavel, quote_status_anterior,
                        cte_numero, cte_serie, cte_emissao, pagador_cnpj, quote_frete, cte_frete,
                        criterios, divergencias, id_conhecimento
                 FROM hub_crm_cte_match ORDER BY id DESC LIMIT ?
                 """, Math.min(Math.max(limit, 1), 500));
+        // legacy_quote_id só é gravado na aprovação automática (é único); no ajuste manual e no
+        // empate a cotação está no texto dos critérios, e a tela mostra a coluna preenchida.
+        rows.forEach(row -> {
+            if (row.get("legacy_quote_id") == null) {
+                String quotes = quotesInCriteria((String) row.get("criterios"));
+                if (quotes != null) row.put("legacy_quote_id", quotes);
+            }
+        });
+        return rows;
+    }
+
+    static String quotesInCriteria(String criteria) {
+        if (criteria == null) return null;
+        for (String prefix : List.of("Ajuste manual: cotação ", "Cotações empatadas: ")) {
+            if (criteria.startsWith(prefix)) return criteria.substring(prefix.length()).trim();
+        }
+        return null;
     }
 
     public List<Map<String, Object>> logs(int limit, String entityType, boolean onlyErrors) {
