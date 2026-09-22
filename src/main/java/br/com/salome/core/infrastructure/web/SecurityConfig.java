@@ -51,7 +51,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(basic -> basic.disable())
                 .authorizeHttpRequests(req -> req
-                        .requestMatchers("/login.html", "/login", "/logout", "/api/versao", "/favicon.ico").permitAll()
+                        .requestMatchers("/login.html", "/login", "/logout", "/api/versao", "/favicon.ico",
+                                "/api/hub-crm/public/cotacoes/*/pdf", "/api/hub-crm/public/inativos/*/pdf",
+                                "/api/hub-crm/public/nao-pagantes/*/pdf").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login.html")

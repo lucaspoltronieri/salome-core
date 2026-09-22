@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Salomé Hub CRM</title>
+  <link rel="stylesheet" href="/hub-crm/styles.css">
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">SALOMÉ CORE</span><h1>Hub CRM</h1></div>
+    <div id="health" class="pill neutral">Carregando...</div>
+  </header>
+  <main>
+    <section class="hero">
+      <div><h2>Legado ↔ ArpaSuite</h2><p>Acompanhamento dos clientes, cotações e eventos integrados.</p></div>
+      <div class="actions">
+        <button id="validate">Validar ArpaSuite</button>
+        <button id="sync">Sincronizar agora</button>
+        <button id="retry">Reprocessar item</button>
+        <button id="load" class="danger">Executar piloto (10)</button>
+        <button id="loadAll" class="danger">Executar lote completo</button>
+      </div>
+    </section>
+    <section id="metrics" class="metrics"></section>
+    <section class="panel">
+      <div class="tabs">
+        <button class="tab active" data-view="clientes">Clientes</button>
+        <button class="tab" data-view="cotacoes">Cotações</button>
+        <button class="tab" data-view="eventos">Eventos</button>
+        <button class="tab" data-view="aprovacoes-cte">Aprovação por CT-e</button>
+        <button class="tab" data-view="logs">Logs</button>
+        <button class="tab" data-view="lote">Lote</button>
+      </div>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Filtrar nesta aba (cotação, CT-e, CNPJ, texto)...">
+        <select id="logType" hidden>
+          <option value="">Todos os tipos</option>
+          <option value="CTE">CT-e (aprovação automática)</option>
+          <option value="COTACAO">Cotação</option>
+          <option value="CLIENTE">Cliente</option>
+        </select>
+        <label id="logErrorsWrap" hidden><input id="logErrors" type="checkbox"> Só erros/revisão</label>
+        <button id="approveNow" hidden>Aprovar por CT-e agora</button>
+        <button id="batchSimulate" hidden>Simular lote</button>
+        <button id="batchRun" class="danger" hidden>Executar lote</button>
+        <span id="hint" class="hint"></span>
+      </div>
+      <div class="table-wrap"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
+    </section>
+    <p id="message" class="message"></p>
+  </main>
+  <script src="/hub-crm/app.js"></script>
+</body>
+</html>

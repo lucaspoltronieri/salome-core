@@ -1,0 +1,301 @@
+# Regra de amarração entre cotação e CT-e
+
+## Regra principal
+
+Para relacionar uma cotação do legado a um CT-e, considerar inicialmente:
+
+1. CNPJ do remetente igual;
+2. CNPJ do destinatário igual;
+3. CT-e emitido no mesmo dia ou depois da data da cotação e não cancelado;
+4. proximidade de data, valor do frete, natureza, volumes, peso e valor das
+   notas fiscais.
+
+Peso, quantidade, valor da NF, frete e filial podem ser alterados entre a
+cotação e a emissão. Por isso não são critérios obrigatórios quando as partes
+coincidem.
+
+## Aprovação automática da cotação pelo CT-e (a partir da v1.6.0)
+
+O Hub deixa de depender do clique em "Aprovar" no legado. A cada polling (30s)
+`HubCrmCteApprovalService` lê os CT-es emitidos nos últimos 3 dias e, quando um
+deles casa com uma cotação, aprova a cotação **no legado** com o usuário MySQL
+`crm_api` (única escrita do Hub no legado). O ganho no ArpaSuite continua saindo
+pelo fluxo normal de cotações, no mesmo ciclo.
+
+Critérios (`CteQuoteMatcher`), decididos com o Lucas em 10/09/2026:
+
+1. **Pagador igual** — obrigatório. No CT-e, pagador é o destinatário quando
+   `tipoPagamento` contém DESTINAT e FOB; senão o emitente. Remetente e
+   destinatário podem ser diferentes dos da cotação (ficam só como divergência).
+2. CT-e emitido **no dia da cotação ou até 30 dias depois**, não cancelado
+   (`cteCancelado` vazio e `situacao` diferente de Cancelada/Inutilizada).
+3. **Peso** (soma de `conhecimentonotasfiscais.pesoNf`) igual ao da cotação.
+4. **Valor da NF** (soma de `valorNF`) igual ao da cotação, **ou diferente quando
+   peso e frete batem** (v1.12.0, ver abaixo).
+5. **Frete** (`conhecimento.valorTotal`) igual ao `totalFrete` da cotação.
+   Exceção: se a cotação tem cubagem e o frete do CT-e é **menor** (cubagem
+   esquecida na emissão), aprova mesmo assim quando peso e NF batem.
+
+"Igual" aceita diferença de até 1% ou 1 unidade (kg / R$), o que for maior.
+Volumes e natureza não são critério.
+
+**Pouca diferença: aprova e iguala a cotação ao CT-e (v1.12.0, decisão do Lucas em
+18/09/2026).** Casos 15813 × CT-e 320274 e 15815 × CT-e 320273: pagador, peso e
+frete batiam (R$ 186,92 × 187,94 e R$ 116,16 × 115,56), e só a NF final era maior
+(R$ 2.507,00 × 2.693,92 e R$ 650,00 × 766,16). O frete ad valorem quase não muda,
+então:
+
+- NF diferente não bloqueia quando pagador, peso e frete batem. Com duas
+  candidatas, a de NF igual tem preferência.
+- Aprovada com diferença de peso, NF ou frete, a cotação **fica com os valores do
+  CT-e**: `peso`, `valorNf`, a composição do frete (`fretePesoValor`, `freteValor`,
+  `pedagioValor`, `coletaValor`, `entregaValor`, `despachoValor`, `grisValor`,
+  `redespachoValor`, `icmsValor`, `descontoValor`, `acrescimoValor`) e `totalFrete`.
+  Cada campo alterado ganha uma linha no `log` (`[crm_api] [VALORNF] [antes] [depois]`).
+  O card do ArpaSuite é atualizado pelo sync normal da cotação.
+- Na exceção da cubagem, a NF tem de bater e a cotação **não** é alterada, porque
+  o erro está no CT-e.
+- Cotação já aprovada à mão pode entrar no ajuste manual
+  (`SALOME_HUB_CRM_ADJUST_APPROVE`). Ela é reaprovada pelo `crm_api` com os valores
+  do CT-e, e a data da aprovação continua a mesma, para o ganho não sair de novo no
+  ArpaSuite.
+
+**Filial, peso um pouco diferente e CT-e sem coleta (v1.13.0, decisão do Lucas em
+18/09/2026).** Caso 15839 × CT-e 385982: remetente de outra filial da Santa Cruz
+(53186342/0001 × /0003, mesma razão social), 2.060 kg no CT-e contra 2.000 kg na
+cotação e mercadoria emitida direto no balcão, sem a coleta de R$ 253,37 prevista.
+
+- **Pagador:** vale o CNPJ igual ou a mesma raiz (8 primeiros dígitos: matriz e
+  filiais da mesma empresa). CPF só vale igual. O remetente continua fora do critério.
+- **Sem coleta:** se a cotação tem coleta e o CT-e não, o frete da cotação é comparado
+  sem a coleta, com o ICMS recalculado na mesma alíquota (frete sem ICMS e sem coleta,
+  dividido por 1 − alíquota).
+- **Peso até 5% diferente:** passa quando o frete da cotação, proporcional ao peso do
+  CT-e, bate com o frete do CT-e (tolerância normal de 1% / R$ 1). Acima de 5%, não
+  aprova.
+- Aprovada assim, a cotação fica com os valores do CT-e, como na regra acima, e com
+  `coleta='Não'` quando a coleta sai.
+
+Conta do caso: (1.531,15 − 183,74 − 253,37) ÷ (1 − 12%) = 1.243,23; × 2.060/2.000 =
+1.280,52 contra 1.279,83 no CT-e.
+
+**Cotação sem remetente (v1.14.0, decisão do Lucas em 18/09/2026).** Caso 15798 ×
+CT-e 297104: a cotação foi feita com o remetente genérico `11111111111111` / "CLIENTE".
+O frete saiu de uma origem que não é a real (R$ 615,22 contra R$ 561,70 no CT-e, com
+pedágio e entrega diferentes), mas o pagador, o peso (428 × 428,74 kg), os volumes (9)
+e a NF (R$ 5.873,00 × 5.966,37) batiam.
+
+- A cotação conta como "sem remetente" quando o CNPJ do remetente está vazio ou tem todos
+  os dígitos iguais, ou quando a razão social é "CLIENTE".
+- Nesse caso, **o frete não é critério**: a amarração é por pagador, peso (até 5%) e NF
+  (até 5%).
+- A cotação sempre fica com os valores do CT-e.
+
+**Regra geral (Lucas, 18/09/2026): sempre que um CT-e amarra com uma cotação por qualquer
+uma das regras acima, o Hub ajusta a cotação aos valores do CT-e e aprova.** A única
+exceção é a cubagem esquecida no CT-e, em que a cotação fica como está.
+
+Quais cotações podem ser aprovadas:
+
+| Responsável | Status | O que acontece |
+|---|---|---|
+| Fernanda/Jaci | ABERTA | aprova no legado; card vira ganho no ArpaSuite |
+| Fernanda/Jaci | NÃO APROVADA | reverte para APROVADA; card sai de perdido para ganho |
+| Carlos e demais | ABERTA | aprova só no legado; nada vai ao ArpaSuite |
+
+A gravação replica a tela `CotacaoAprovacao`: `status='APROVADA'`, `statusData`,
+`statusHora`, `tipoAprovacao='Outro'`, `contatoAprovacao='HUB CRM - CT-e <número>/<série>'` e uma linha no
+`log` no formato do legado com o usuário `crm_api`. O `UPDATE` só vale se o status
+ainda for o lido (`AND status=?`); se alguém mexeu no meio, registra
+`CONCORRENCIA` e não sobrescreve.
+
+Um CT-e aprova no máximo uma cotação e uma cotação é aprovada por no máximo um
+CT-e. Havendo mais de uma candidata, vence a de data mais próxima da emissão e
+depois a de frete mais parecido; empate exato fica `AMBIGUO` para conferência.
+Cancelamento do CT-e depois da aprovação não desfaz nada.
+
+O resultado fica em `salome_hub_crm.hub_crm_cte_match` e no `hub_crm_event`
+(`entity_type='CTE'`), e aparece na tela do Hub nas abas **Aprovação por CT-e**
+e **Logs**. Liga/desliga por `SALOME_HUB_CRM_AUTO_APPROVAL_ENABLED`; senha do
+`crm_api` em `SALOME_HUB_CRM_LEGACY_WRITE_PASSWORD`.
+
+### Lote de limpeza (v1.8.0, pedido do Lucas em 11/09/2026)
+
+Na aba **Lote** da tela do Hub, `HubCrmBatchService` roda uma vez sobre todo o
+histórico:
+
+1. aprova toda cotação ABERTA (ou NÃO APROVADA da Fernanda/Jaci) que tenha CT-e
+   correspondente pelas mesmas regras acima, procurando CT-es desde 01/01/2021;
+2. toda cotação **ABERTA criada antes de 31/08/2026 sem CT-e** vira **NÃO
+   APROVADA** com o motivo **Preço** (`naoAprovacaoPreco='Sim'`, descrição "Sem
+   CT-e emitido para a cotação (lote Hub CRM dd/mm/aaaa)", linha do `crm_api` no
+   `log`). As da Fernanda/Jaci viram **Perdido — Preço alto** no ArpaSuite nos
+   ciclos seguintes.
+
+**ArpaSuite só é atualizado, nunca contaminado (v1.8.1):** quando o status foi
+alterado pelo próprio Hub (lote ou aprovação pelo CT-e), a cotação só mexe no
+ArpaSuite se **já tiver card**: ganho ou perdido no card existente. Sem card, o
+Hub não cria organização, pessoa nem card; registra `SEM_CARD_ARPA` e segue. O
+lote também pode ser disparado uma única vez na inicialização definindo
+`SALOME_HUB_CRM_BATCH_TOKEN` (o token executado fica em
+`hub_crm_checkpoint('lote_token')` e não roda de novo).
+
+Cotações empatadas no mesmo CT-e (AMBIGUO) não são aprovadas nem marcadas como
+perdidas. Cotações a partir de 31/08/2026 sem CT-e ficam como estão. O botão
+**Simular** mostra a lista sem gravar nada; **Executar** grava.
+
+## Fallback com destinatário divergente
+
+Quando não houver candidato com os dois CNPJs, permitir uma segunda busca por:
+
+- mesmo remetente;
+- mesmo peso ou volume, com tolerância operacional;
+- mesmo valor total das notas fiscais ou valor muito próximo;
+- mesma natureza quando disponível;
+   - emissão no mesmo dia ou posterior à cotação;
+- CT-e não cancelado.
+
+Esse vínculo nunca deve ser tratado como correspondência perfeita. Registrar o
+status `ASSOCIADO_COM_ALERTA_DESTINATARIO_DIVERGENTE`, guardar o destinatário
+da cotação e o destinatário do CT-e e encaminhar para validação. O candidato
+mais próximo deve ser escolhido pela pontuação, mas a divergência deve ficar
+visível.
+
+## Casos confirmados pelo usuário
+
+| Cotação | CT-e | Observação |
+|---:|---:|---|
+| 15265 | 296083 | Destinatário divergente; usar remetente e dados físicos/valor da NF como evidência. |
+| 15299 | 296156 | Destinatário divergente; dados principais coincidem. |
+| 15294 | 83864 | CT-e informado pelo usuário; validar por remetente/destinatário e dados da carga. |
+| 15281 | 317921 | Destinatário divergente; volumes, peso, valor da NF e frete coincidem. |
+| 15296 | — | Não existe CT-e localizado. |
+| 15813 | 320274 | NF final maior (R$ 2.507,00 × 2.693,92), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
+| 15798 | 297104 | Cotação sem remetente (11111111111111 / CLIENTE), frete de outra origem; pagador, peso e NF batem; aprovada pelo Hub e ajustada ao CT-e (v1.14.0). |
+| 15784 | 320289 | O cliente fez duas cotações (15784 e 15785) e mandou tudo num CT-e só; a 15784, já aprovada à mão, foi reaprovada com os dados do CT-e (peso, volumes, NF e frete somados) (v1.15.0). |
+| 15785 | 320289 | A outra cotação do mesmo envio: estava aprovada à mão e virou NÃO APROVADA com motivo Prazo, por decisão do Lucas (v1.15.0). |
+| 15839 | 385982 | Remetente filial, peso 2.060 × 2.000 kg, sem coleta (balcão); aprovada pelo Hub e ajustada ao CT-e (v1.13.0). |
+| 15815 | 320273 | NF final maior (R$ 650,00 × 766,16), peso e frete batem; aprovada e ajustada ao CT-e (v1.12.0). |
+
+Os números acima devem ser validados também por data, série, chave e demais
+campos antes da persistência definitiva no Hub CRM.
+
+## Casos especiais de correção na timeline do Cubo
+
+- Se houver uma mensagem posterior corrigindo o número da cotação, usar o
+  número corrigido mais recente.
+- `15261` corrigida para `15281`.
+- `25359` corrigida operacionalmente para `15359`.
+
+## Idempotência e auditoria
+
+O Hub CRM deve guardar o identificador da cotação, `idConhecimento`, número,
+série, chave do CT-e, pontuação, critérios usados, divergências e status da
+validação. O legado permanece somente leitura.
+
+## Relatório operacional de comissão
+
+O relatório deverá receber como parâmetros:
+
+- período inicial e final;
+- usuário/vendedor do Cubo.
+
+Antes de montar qualquer aba ou totalizador, filtrar os cards pelos dois
+critérios abaixo, em conjunto:
+
+- a data do status deve estar dentro do período solicitado (para `Ganho`,
+  usar a data de ganho/aprovação; para `Perdido`, a data de perda; para cards
+  abertos, a última movimentação). As datas inicial e final são inclusivas;
+  tecnicamente, consultar até o início do dia seguinte ao final informado;
+- o estágio atual do card deve ser exatamente `Proposta Enviada`.
+
+Cards de outros estágios não entram na relação, nas abas de revisão ou nos
+totalizadores, mesmo que estejam dentro do período ou tenham status de ganho
+no Cubo.
+
+Para o período e vendedor informados, consultar os cards do Cubo com status
+`won` (Ganho) e usar a data `winDate` como data de aprovação no Cubo. Para cada
+card, apresentar:
+
+- título do card;
+- ID do card;
+- valor do Cubo;
+- número da cotação informado na timeline, usando a correção mais recente;
+- status do Cubo em português (`Ganho`, `Perdido` ou `Aberto`) e data do ganho;
+- status da cotação no legado (`APROVADA`, `NÃO APROVADA` ou `ABERTA`);
+- número, valor e data de emissão do CT-e, quando localizado;
+- observações e divergências do cruzamento.
+
+A ordem do relatório deve ser:
+
+1. registros com CT-e localizado, ordenados pela data do ganho no Cubo;
+2. registros sem CT-e localizado, também ordenados pela data do ganho.
+
+O totalizador deve informar:
+
+- quantidade de cotações ganhas no Cubo;
+- valor total dos cards no Cubo;
+- quantidade de CT-es localizados;
+- valor total dos CT-es localizados;
+- diferença entre o valor do Cubo e o valor dos CT-es.
+
+Uma cotação ganha no Cubo com status `NÃO APROVADA` ou `ABERTA` no legado deve
+ser destacada como pendência operacional para orientar o vendedor a concluir
+ou corrigir a aprovação no legado. Esse status não deve ser alterado
+automaticamente pelo Hub.
+
+O relatório é somente leitura e serve como apoio à comissão: ganhar no Cubo
+não significa, por si só, que o frete foi emitido. A comissão deve permitir a
+separação entre ganho sem CT-e, ganho com CT-e e ganho com pendência de status
+no legado.
+
+## Auditoria complementar de cards nao ganhos
+
+Para identificar vendas que podem ter sido fechadas sem que o vendedor tenha
+marcado o card como `won` no Cubo, executar no mesmo periodo e vendedor uma
+segunda consulta com todos os cards cujo status seja diferente de `won`
+(`lost` ou `open`).
+
+1. Extrair o numero da cotacao da timeline. Se houver mensagem posterior de
+   correcao, usar o numero corrigido mais recente.
+2. Consultar a cotacao no legado e registrar seu status (`APROVADA`,
+   `NAO APROVADA`, `ABERTA`) sem alterar o legado.
+3. Procurar CT-e nao cancelado, priorizando remetente e destinatario da
+   cotacao, emitido na data ou depois da cotacao e com proximidade de valor,
+   peso, volumes, natureza e valor de NF.
+4. Se houver mesmo remetente e destinatario, mas o CT-e for anterior à data da
+   cotação, não associar nem considerar o CT-e no relatório. O registro pode
+   ser mencionado na observação como histórico não elegível.
+5. Cards sem numero de cotacao ficam em relacao separada para revisao manual;
+   nao devem gerar consulta ambigua no legado.
+
+O resultado deve separar CT-e associado no dia ou após a cotação e ausência de
+CT-e elegível. Essa auditoria não altera status no Cubo nem no legado e serve
+para localizar fretes potencialmente fechados fora do fluxo formal de
+aprovação.
+
+Quando o valor do CT-e for diferente do valor da cotação, destacar a célula do
+valor do CT-e com fundo de alerta no Excel e manter a divergência na coluna de
+observação.
+
+## Indicadores do pagador no relatorio de comissao
+
+Na aba principal do relatorio de cotacoes ganhas, o pagador do frete e
+determinado pelo `tipoPagamento` do CT-e: quando o valor contem
+`DESTINATARIO` e `FOB`, usa-se `idClienteDestinatario`; nos demais casos,
+usa-se `idClienteEmitente`.
+
+Depois da coluna `Observação`, a aba principal deve apresentar as duas colunas
+adicionais abaixo:
+
+- `Tabela Preço`: preencher `sim` quando existir pelo menos um registro em
+  `tabelapreco` com `idCliente` igual ao pagador. Caso contrario, preencher
+  `nao`. Tabelas gerais, sem vinculo especifico ao cliente, nao contam como
+  tabela comercial cadastrada para este indicador.
+- `CTes Ultimos 6 meses`: contar CT-es nao cancelados do mesmo pagador, com
+  `cteEmissao` dentro dos seis meses anteriores até a data final do relatório,
+  inclusive. Para o relatório de 07/07/2026 a 31/07/2026, a janela usada foi
+  de 31/01/2026 a 31/07/2026. Em novas consultas, recalcular a janela a partir
+  da data final informada.
+
+Esses indicadores sao somente leitura e nao alteram o cadastro do legado.

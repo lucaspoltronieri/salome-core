@@ -1,0 +1,76 @@
+package br.com.salome.core.application.hubcrm;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.MapPropertySource;
+
+class HubCrmMediaSignerTest {
+    @Test
+    void springSelecionaConstrutorDeProducao() {
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.getEnvironment().getPropertySources().addFirst(
+                    new MapPropertySource("hub-crm-test", Map.of("salome.hub-crm.enabled", "true")));
+            context.registerBean(HubCrmProperties.class, this::properties);
+            context.register(HubCrmMediaSigner.class);
+            context.refresh();
+
+            assertThat(context.getBean(HubCrmMediaSigner.class)).isNotNull();
+        }
+    }
+
+    @Test
+    void assinaturaValidaAteExpirarENaoAceitaOutraCotacao() {
+        HubCrmProperties properties = properties();
+        Instant now = Instant.parse("2026-08-17T12:00:00Z");
+        HubCrmMediaSigner signer = new HubCrmMediaSigner(properties, Clock.fixed(now, ZoneOffset.UTC));
+        var signed = signer.quoteUrl(15580);
+
+        assertThat(signer.valid(15580, signed.expires(), signed.signature())).isTrue();
+        assertThat(signer.valid(15581, signed.expires(), signed.signature())).isFalse();
+
+        HubCrmMediaSigner expired = new HubCrmMediaSigner(properties,
+                Clock.fixed(now.plusSeconds(3601), ZoneOffset.UTC));
+        assertThat(expired.valid(15580, signed.expires(), signed.signature())).isFalse();
+    }
+
+    @Test
+    void linkDoClienteInativoValeSoParaOClienteEAnoAssinados() {
+        Instant now = Instant.parse("2026-09-11T12:00:00Z");
+        HubCrmMediaSigner signer = new HubCrmMediaSigner(properties(), Clock.fixed(now, ZoneOffset.UTC));
+        var signed = signer.inactiveClientUrl(26055, 2025, 365);
+
+        assertThat(signed.url()).startsWith("https://core.example.com/api/hub-crm/public/inativos/26055/pdf?ano=2025");
+        assertThat(signer.validInactiveClient(26055, 2025, signed.expires(), signed.signature())).isTrue();
+        assertThat(signer.validInactiveClient(26056, 2025, signed.expires(), signed.signature())).isFalse();
+        // O link de não pagante tem assinatura própria: não vale para o de inativo nem para outro cliente.
+        var received = signer.receivedClientUrl(26055, 365);
+        assertThat(received.url()).startsWith("https://core.example.com/api/hub-crm/public/nao-pagantes/26055/pdf?expires=");
+        assertThat(signer.validReceivedClient(26055, received.expires(), received.signature())).isTrue();
+        assertThat(signer.validReceivedClient(26056, received.expires(), received.signature())).isFalse();
+        assertThat(signer.validInactiveClient(26055, 2025, received.expires(), received.signature())).isFalse();
+        assertThat(signer.validInactiveClient(26055, 2024, signed.expires(), signed.signature())).isFalse();
+        assertThat(signer.valid(26055, signed.expires(), signed.signature())).isFalse();
+
+        HubCrmMediaSigner later = new HubCrmMediaSigner(properties(),
+                Clock.fixed(now.plusSeconds(364L * 24 * 3600), ZoneOffset.UTC));
+        assertThat(later.validInactiveClient(26055, 2025, signed.expires(), signed.signature())).isTrue();
+    }
+
+    private HubCrmProperties properties() {
+        return new HubCrmProperties(true, false, 30000, 32001, 10,
+                "https://core.example.com", "12345678901234567890123456789012", 60,
+                new HubCrmProperties.Datasource("jdbc:h2:mem:test", "sa", ""), arpa());
+    }
+
+    private HubCrmProperties.Arpa arpa() {
+        return new HubCrmProperties.Arpa("https://suite.arpacore.com.br", "key", 1, 2, 3,
+                4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    }
+}
