@@ -4,6 +4,7 @@ import br.com.salome.core.application.hubcrm.HubCrmClientSyncService;
 import br.com.salome.core.application.hubcrm.HubCrmClientTransportNoteService;
 import br.com.salome.core.application.hubcrm.HubCrmCteApprovalService;
 import br.com.salome.core.application.hubcrm.HubCrmQuoteSyncService;
+import br.com.salome.core.application.hubcrm.HubCrmSemTratativaService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,13 +25,16 @@ public class HubCrmScheduler {
     private final HubCrmClientTransportNoteService clientNotes;
     private final HubCrmQuoteSyncService quotes;
     private final Optional<HubCrmCteApprovalService> cteApproval;
+    private final Optional<HubCrmSemTratativaService> semTratativa;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicReference<Instant> lastStarted = new AtomicReference<>();
     private final AtomicReference<Instant> lastFinished = new AtomicReference<>();
     private final AtomicReference<String> lastError = new AtomicReference<>();
 
     public HubCrmScheduler(HubCrmClientSyncService clients, HubCrmClientTransportNoteService clientNotes,
-            HubCrmQuoteSyncService quotes, Optional<HubCrmCteApprovalService> cteApproval) {
+            HubCrmQuoteSyncService quotes, Optional<HubCrmCteApprovalService> cteApproval,
+            Optional<HubCrmSemTratativaService> semTratativa) {
+        this.semTratativa = semTratativa;
         this.clients = clients;
         this.clientNotes = clientNotes;
         this.quotes = quotes;
@@ -49,6 +53,7 @@ public class HubCrmScheduler {
             addError(errors, run("clientes", clients::syncNewClients));
             addError(errors, run("observação de transportes", clientNotes::annotatePending));
             cteApproval.ifPresent(service -> addError(errors, run("aprovação por CT-e", service::approveFromCtes)));
+            semTratativa.ifPresent(service -> addError(errors, run("sem tratativa", service::closeStaleQuotes)));
             addError(errors, run("cotações", quotes::syncQuotes));
             lastError.set(errors.isEmpty() ? null : String.join(" | ", errors));
         } finally {

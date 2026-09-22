@@ -5,6 +5,7 @@ import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.LossReason;
 import br.com.salome.core.domain.hubcrm.QuoteIntegration;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmProperties;
+import br.com.salome.core.infrastructure.hubcrm.HubCrmSemTratativaProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
@@ -23,14 +24,23 @@ public class HubCrmQuoteSyncService {
     private final ArpaSuiteGateway arpa;
     private final HubCrmProperties properties;
     private final HubCrmQuoteWhatsappService whatsapp;
+    private final HubCrmSemTratativaProperties semTratativa;
 
     public HubCrmQuoteSyncService(HubCrmLegacyRepository legacy, HubCrmStore store,
             ArpaSuiteGateway arpa, HubCrmProperties properties, HubCrmQuoteWhatsappService whatsapp) {
+        this(legacy, store, arpa, properties, whatsapp, HubCrmSemTratativaProperties.defaults());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public HubCrmQuoteSyncService(HubCrmLegacyRepository legacy, HubCrmStore store,
+            ArpaSuiteGateway arpa, HubCrmProperties properties, HubCrmQuoteWhatsappService whatsapp,
+            HubCrmSemTratativaProperties semTratativa) {
         this.legacy = legacy;
         this.store = store;
         this.arpa = arpa;
         this.properties = properties;
         this.whatsapp = whatsapp;
+        this.semTratativa = semTratativa;
     }
 
     public synchronized QuoteSyncResult syncQuotes() {
@@ -205,6 +215,18 @@ public class HubCrmQuoteSyncService {
             arpa.addAnnotation(dealId, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt() + viaCte);
             store.recordEvent(eventKey, "COTACAO", quote.id(), "GANHO", "PROCESSADO", "Card ganho", null);
         } else if ("NAO APROVADA".equals(status)) {
+            if (store.eventProcessed("quote:" + quote.id() + ":sem-tratativa")) {
+                // Baixada pelo Hub por falta de tratativa: no legado vai como Preço (é o que existe),
+                // no ArpaSuite com o motivo próprio.
+                if (store.eventProcessed(eventKey)) return;
+                arpa.markLostWithReasonId(dealId, semTratativa.lostReasonId());
+                arpa.addAnnotation(dealId, "Cotação " + quote.id() + " não aprovada automaticamente: "
+                        + semTratativa.days() + " dias sem nenhuma atividade no card. Motivo: "
+                        + semTratativa.description() + ". No legado ficou com o motivo Preço.");
+                store.recordEvent(eventKey, "COTACAO", quote.id(), "PERDIDO", "PROCESSADO",
+                        semTratativa.description(), null);
+                return;
+            }
             if (quote.selectedLossReasons().size() != 1) {
                 throw new ReviewException("Cotação não aprovada deve possuir exatamente um dos 10 motivos ativos; encontrados: "
                         + quote.selectedLossReasons().size());

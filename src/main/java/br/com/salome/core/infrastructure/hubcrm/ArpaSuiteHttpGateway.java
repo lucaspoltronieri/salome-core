@@ -302,6 +302,41 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
+    public void markLostWithReasonId(long dealId, long lostReasonId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", "lost");
+        payload.put("lostReasonId", lostReasonId);
+        payload.put("stageId", properties.arpa().propostaStageId());
+        put("/deals/" + dealId, payload);
+    }
+
+    @Override
+    public Optional<String> findDealStatus(long dealId) {
+        if (dealId <= 0) return Optional.empty();
+        try {
+            JsonNode item = get("/deals/" + dealId);
+            JsonNode data = item.path("data").isObject() ? item.path("data") : item;
+            if (data.path("id").asLong(0) <= 0) return Optional.empty();
+            String status = data.path("status").asText("");
+            return status.isBlank() ? Optional.empty() : Optional.of(status);
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404) return Optional.empty();
+            throw exception;
+        }
+    }
+
+    @Override
+    public boolean hasDealActivitySince(long dealId, java.time.LocalDate since) {
+        JsonNode response = get("/activities?deal=" + dealId + "&perPage=100");
+        return dataEntries(response).stream().anyMatch(activity -> {
+            if ("cancelled".equalsIgnoreCase(activity.path("status").asText(""))) return false;
+            String created = activity.path("createdAt").asText("");
+            // createdAt vem em ISO (2026-09-22T12:09:20.000+00:00); sem data, conta como atividade.
+            return created.length() < 10 || !java.time.LocalDate.parse(created.substring(0, 10)).isBefore(since);
+        });
+    }
+
+    @Override
     public boolean hasWhatsappChannel() {
         Instant checkedAt = whatsappChannelCheckedAt.get();
         if (checkedAt != null && checkedAt.isAfter(Instant.now().minus(CHANNEL_CACHE_TTL))) {
@@ -484,7 +519,11 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
 
     private void addField(List<Map<String, Object>> fields, long id, String value) {
         if (id > 0 && value != null && !value.isBlank()) {
-            fields.add(Map.of("customfieldId", id, "value", value));
+            // Ordem fixa das chaves (Map.of não garante ordem e deixava o JSON variar entre execuções).
+            Map<String, Object> field = new LinkedHashMap<>();
+            field.put("customfieldId", id);
+            field.put("value", value);
+            fields.add(field);
         }
     }
 

@@ -376,6 +376,23 @@ class HubCrmQuoteSyncServiceTest {
                 quote.totalFreight(), "old", "PENDENTE", "AGUARDANDO_CANAL")));
     }
 
+    @Test
+    void baixadaSemTratativaPerdeNoArpaComOMotivoProprio() {
+        LegacyQuote quote = quote("NÃO APROVADA", Map.of(LossReason.HIGH_PRICE,
+                "Sem tratativa do comercial, baixado pelo legado"));
+        when(store.eventProcessed("quote:15580:sem-tratativa")).thenReturn(true);
+
+        service.applyStatus(quote, 99);
+
+        verify(arpa).markLostWithReasonId(99, 317833);
+        verify(arpa, never()).markLost(anyLong(), any(), any());
+        verify(store).recordEvent(org.mockito.ArgumentMatchers.startsWith("quote:15580:status:NAO APROVADA"),
+                org.mockito.ArgumentMatchers.eq("COTACAO"), org.mockito.ArgumentMatchers.eq(15580L),
+                org.mockito.ArgumentMatchers.eq("PERDIDO"), org.mockito.ArgumentMatchers.eq("PROCESSADO"),
+                org.mockito.ArgumentMatchers.eq("Sem tratativa do comercial, baixado pelo legado"),
+                org.mockito.ArgumentMatchers.isNull());
+    }
+
     private LegacyQuote quote(String status, Map<LossReason, String> reasons) {
         return quote(status, reasons, new BigDecimal("150"));
     }

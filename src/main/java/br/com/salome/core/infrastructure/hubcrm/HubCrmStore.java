@@ -155,6 +155,18 @@ public class HubCrmStore {
         }
     }
 
+    /** Cotações com card no ArpaSuite e ABERTAS no último sync: cotação → negociação. */
+    public Map<Long, Long> openQuoteDeals() {
+        Map<Long, Long> result = new java.util.LinkedHashMap<>();
+        jdbc.query("""
+                SELECT legacy_quote_id, deal_id FROM hub_crm_quote
+                WHERE deal_id IS NOT NULL AND sync_status='INTEGRADO' AND legacy_status='ABERTA'
+                ORDER BY legacy_quote_id
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                result.put(rs.getLong("legacy_quote_id"), rs.getLong("deal_id")));
+        return result;
+    }
+
     public List<Long> trackedQuoteIds() {
         return jdbc.queryForList("""
                 SELECT legacy_quote_id FROM hub_crm_quote

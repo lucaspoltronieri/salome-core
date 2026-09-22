@@ -96,6 +96,14 @@ salome:
       legacy-password: ${SALOME_HUB_CRM_LEGACY_WRITE_PASSWORD:}
       # Valor do combo "Tipo" da aprovação no legado (Telefone / E-mail / Outro).
       approval-type: ${SALOME_HUB_CRM_AUTO_APPROVAL_TYPE:Outro}
+    # Baixa da proposta sem tratativa do comercial (HubCrmSemTratativaService): ABERTA há mais de
+    # days dias e sem atividade no card do ArpaSuite vira NÃO APROVADA (Preço) no legado e perdida no
+    # ArpaSuite com o motivo lost-reason-id ("Sem tratativa do comercial, baixado pelo legado").
+    sem-tratativa:
+      enabled: ${SALOME_HUB_CRM_SEM_TRATATIVA_ENABLED:false}
+      days: ${SALOME_HUB_CRM_SEM_TRATATIVA_DAYS:10}
+      lost-reason-id: ${SALOME_HUB_CRM_SEM_TRATATIVA_LOST_REASON_ID:317833}
+      description: ${SALOME_HUB_CRM_SEM_TRATATIVA_DESCRIPTION:Sem tratativa do comercial, baixado pelo legado}
     # PDF da cotação pelo WhatsApp (HubCrmQuoteWhatsappService): só em conversa já aberta com o
     # cliente (janela de 24h), sem template. Procura por wait-days a partir da data da cotação.
     whatsapp:

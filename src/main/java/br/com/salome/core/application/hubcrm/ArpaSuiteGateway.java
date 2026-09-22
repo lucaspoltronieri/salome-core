@@ -29,6 +29,12 @@ public interface ArpaSuiteGateway {
     long addAnnotation(long dealId, String text);
     void markWon(long dealId, LocalDateTime wonAt);
     void markLost(long dealId, LossReason reason, LocalDateTime lostAt);
+    /** Perde a negociação com um motivo do ArpaSuite que não existe no legado (ex.: 317833, sem tratativa). */
+    void markLostWithReasonId(long dealId, long lostReasonId);
+    /** Status da negociação (open, won, lost); vazio se o card foi apagado. */
+    Optional<String> findDealStatus(long dealId);
+    /** Alguma atividade (ligação, WhatsApp, reunião, tarefa, nota) não cancelada no card, criada a partir de {@code since}. */
+    boolean hasDealActivitySince(long dealId, java.time.LocalDate since);
     boolean hasWhatsappChannel();
     /**
      * Conversa do canal com janela de 24h aberta (o contato mandou mensagem nas últimas 24h) ligada

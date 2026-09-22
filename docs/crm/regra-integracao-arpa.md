@@ -126,6 +126,34 @@ mas a regra de negocio e as anotacoes mantem a grafia correta.
 `naoAprovacaoQualidade` e `naoAprovacaoSemMotivo` sao campos antigos e ficam
 fora da automacao.
 
+### Baixa automatica sem tratativa do comercial (v1.19.0, decisao do Lucas em 22/09/2026)
+
+`HubCrmSemTratativaService` roda uma vez por hora e baixa a proposta que ninguem
+tratou. A proposta precisa cumprir todas as condicoes abaixo:
+
+- cotacao da Fernanda ou da Jaci, ABERTA no legado e com card **aberto** no
+  ArpaSuite;
+- **10 dias ou mais** desde a data da cotacao;
+- **nenhuma atividade no card** (ligacao, WhatsApp, reuniao, tarefa ou nota, nao
+  cancelada) criada a partir da data da cotacao.
+
+A atividade no card e o sinal de "falei com o cliente, aguardando aprovacao". A
+anotacao do card nao serve para isso, porque a API do ArpaSuite so cria anotacoes
+e nao deixa le-las.
+
+O que o Hub faz:
+
+- No legado, a cotacao vira NAO APROVADA com o motivo **Preco** e a descricao
+  "Sem tratativa do comercial, baixado pelo legado". O legado nao tem um motivo
+  proprio para isso.
+- No ArpaSuite, o card fica perdido com o motivo **317833** "Sem tratativa do
+  comercial, baixado pelo legado", e nao com "Preço alto". O evento
+  `quote:<id>:sem-tratativa` faz o sync usar esse motivo e registrar uma anotacao.
+
+A regra liga e desliga por `SALOME_HUB_CRM_SEM_TRATATIVA_ENABLED`. O prazo fica em
+`SALOME_HUB_CRM_SEM_TRATATIVA_DAYS` (padrao 10) e o motivo em
+`SALOME_HUB_CRM_SEM_TRATATIVA_LOST_REASON_ID` (padrao 317833).
+
 ## Idempotencia
 
 Cada cliente e unico por CNPJ e cada cotacao e unica por `idCotacao`. O Hub
