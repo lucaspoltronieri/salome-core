@@ -30,8 +30,12 @@ public class LegacyQuoteApprovalWriter {
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
     private static final String USER = "crm_api";
     /** Colunas de motivo da tela de não aprovação do legado aceitas pelo Hub. */
-    static final java.util.Set<String> REJECT_COLUMNS = java.util.Set.of("naoAprovacaoPreco", "naoAprovacaoPrazo",
-            "naoAprovacaoConcorrente", "naoAprovacaoQualidade", "naoAprovacaoForaPerfil", "naoAprovacaoSemMotivo");
+    static final java.util.Set<String> REJECT_COLUMNS = java.util.stream.Stream.concat(
+            java.util.Arrays.stream(br.com.salome.core.domain.hubcrm.LossReason.values())
+                    .map(br.com.salome.core.domain.hubcrm.LossReason::legacyColumn),
+            // Campos antigos do legado, fora do catálogo do ArpaSuite.
+            java.util.stream.Stream.of("naoAprovacaoQualidade", "naoAprovacaoSemMotivo"))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     private final JdbcTemplate jdbc;
     private final HubCrmAutoApprovalProperties properties;

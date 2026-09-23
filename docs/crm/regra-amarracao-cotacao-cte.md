@@ -102,6 +102,12 @@ Quais cotações podem ser aprovadas:
 | Fernanda/Jaci | ABERTA | aprova no legado; card vira ganho no ArpaSuite |
 | Fernanda/Jaci | NÃO APROVADA | reverte para APROVADA; card sai de perdido para ganho |
 | Carlos e demais | ABERTA | aprova só no legado; nada vai ao ArpaSuite |
+| Carlos e demais | NÃO APROVADA | reverte para APROVADA só no legado (v1.21.0) |
+
+**A conferência é sempre feita (regra do Lucas, 23/09/2026):** cotação NÃO
+APROVADA de qualquer responsável volta a APROVADA quando aparece o CT-e
+correspondente, inclusive as baixadas pela regra dos 10 dias sem tratativa. Só
+cotação já APROVADA fica de fora.
 
 A gravação replica a tela `CotacaoAprovacao`: `status='APROVADA'`, `statusData`,
 `statusHora`, `tipoAprovacao='Outro'`, `contatoAprovacao='HUB CRM - CT-e <número>/<série>'` e uma linha no

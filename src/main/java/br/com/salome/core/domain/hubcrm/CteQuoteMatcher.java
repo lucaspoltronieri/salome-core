@@ -51,8 +51,22 @@ public final class CteQuoteMatcher {
     private CteQuoteMatcher() {}
 
     public static Match evaluate(LegacyCte cte, List<LegacyQuote> quotes, int windowDays) {
+        return evaluate(cte, quotes, windowDays, true);
+    }
+
+    /**
+     * Amarração do CT-e a uma cotação <b>já aprovada</b>: mesmos critérios e mesmo desempate, sem o
+     * filtro de status (a cotação já saiu de ABERTA) e sem aprovar nada. Serve para o
+     * acompanhamento da cotação aprovada à mão pelo comercial.
+     */
+    public static Match evaluateForBinding(LegacyCte cte, List<LegacyQuote> approved, int windowDays) {
+        return evaluate(cte, approved, windowDays, false);
+    }
+
+    private static Match evaluate(LegacyCte cte, List<LegacyQuote> quotes, int windowDays, boolean checkStatus) {
         List<Candidate> candidates = new ArrayList<>();
         for (LegacyQuote quote : quotes) {
+            if (checkStatus && !eligibleStatus(quote)) continue;
             candidate(cte, quote, windowDays).ifPresent(candidates::add);
         }
         if (candidates.isEmpty()) return new Match(Outcome.SEM_COTACAO, null, null, null, List.of(), false);
@@ -86,7 +100,6 @@ public final class CteQuoteMatcher {
     }
 
     static Optional<Candidate> candidate(LegacyCte cte, LegacyQuote quote, int windowDays) {
-        if (!eligibleStatus(quote)) return Optional.empty();
         if (quote.createdDate() == null || cte.issueDate() == null) return Optional.empty();
         long days = ChronoUnit.DAYS.between(quote.createdDate(), cte.issueDate());
         if (days < 0 || days > windowDays) return Optional.empty();
@@ -185,10 +198,14 @@ public final class CteQuoteMatcher {
         return value == null ? "" : value.replaceAll("\\D", "");
     }
 
+    /**
+     * ABERTA e NÃO APROVADA de qualquer responsável entram: aparecendo o CT-e depois da baixa, a
+     * cotação é reaprovada (regra do Lucas, 23/09/2026 — "se depois apareceu um CT-e correspondente
+     * você aprova"). Só APROVADA fica de fora.
+     */
     static boolean eligibleStatus(LegacyQuote quote) {
         String status = HubCrmNormalization.normalizedText(quote.status());
-        if ("ABERTA".equals(status)) return true;
-        return "NAO APROVADA".equals(status) && inArpaSuite(quote.responsible());
+        return "ABERTA".equals(status) || "NAO APROVADA".equals(status);
     }
 
     public static boolean inArpaSuite(String responsible) {

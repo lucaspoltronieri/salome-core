@@ -219,13 +219,13 @@ class CteQuoteMatcherTest {
     }
 
     @Test
-    void naoAprovadaSoRevertePararesponsaveisDoArpa() {
+    void naoAprovadaDeQualquerResponsavelPodeSerReaprovadaPeloCte() {
         LegacyQuote fernanda = quote(1, "NÃO APROVADA", "FERNANDA", LocalDate.of(2026, 9, 1), "150.00", "0");
         LegacyQuote carlos = quote(2, "NÃO APROVADA", "CARLOS", LocalDate.of(2026, 9, 1), "150.00", "0");
         LegacyQuote carlosAberta = quote(3, "ABERTA", "CARLOS", LocalDate.of(2026, 9, 1), "150.00", "0");
 
         assertThat(CteQuoteMatcher.eligibleStatus(fernanda)).isTrue();
-        assertThat(CteQuoteMatcher.eligibleStatus(carlos)).isFalse();
+        assertThat(CteQuoteMatcher.eligibleStatus(carlos)).isTrue();
         assertThat(CteQuoteMatcher.eligibleStatus(carlosAberta)).isTrue();
         assertThat(CteQuoteMatcher.eligibleStatus(quote(4, "APROVADA", "FERNANDA",
                 LocalDate.of(2026, 9, 1), "150.00", "0"))).isFalse();

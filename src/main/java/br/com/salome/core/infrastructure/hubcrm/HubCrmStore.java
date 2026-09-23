@@ -156,18 +156,6 @@ public class HubCrmStore {
         }
     }
 
-    /** Cotações com card no ArpaSuite e ABERTAS no último sync: cotação → negociação. */
-    public Map<Long, Long> openQuoteDeals() {
-        Map<Long, Long> result = new java.util.LinkedHashMap<>();
-        jdbc.query("""
-                SELECT legacy_quote_id, deal_id FROM hub_crm_quote
-                WHERE deal_id IS NOT NULL AND sync_status='INTEGRADO' AND legacy_status='ABERTA'
-                ORDER BY legacy_quote_id
-                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
-                result.put(rs.getLong("legacy_quote_id"), rs.getLong("deal_id")));
-        return result;
-    }
-
     public List<Long> trackedQuoteIds() {
         return jdbc.queryForList("""
                 SELECT legacy_quote_id FROM hub_crm_quote
@@ -394,9 +382,31 @@ public class HubCrmStore {
         }
     }
 
+    /** CT-e amarrado a uma cotação, venha da aprovação automática ou da amarração pós-aprovação. */
+    public Optional<CteRef> boundCte(long legacyQuoteId) {
+        return jdbc.query("""
+                SELECT id_conhecimento, cte_numero, cte_serie, cte_emissao FROM hub_crm_cte_match
+                WHERE legacy_quote_id=?
+                """, (rs, row) -> new CteRef(rs.getLong("id_conhecimento"), rs.getString("cte_numero"),
+                        rs.getString("cte_serie"),
+                        rs.getDate("cte_emissao") == null ? null : rs.getDate("cte_emissao").toLocalDate()),
+                legacyQuoteId).stream().findFirst();
+    }
+
+    /** Identificação curta do CT-e para o acompanhamento e para o card do ArpaSuite. */
+    public record CteRef(Long id, String number, String series, LocalDate issueDate) {
+        public static CteRef of(LegacyCte cte) {
+            return new CteRef(cte.id(), cte.number(), cte.series(), cte.issueDate());
+        }
+
+        public String label() {
+            return number + (series == null || series.isBlank() ? "" : "/" + series);
+        }
+    }
+
     /** Situação da cotação aprovada: quem aprovou, a coleta, o CT-e e o prazo sem CT-e. */
     public void upsertQuoteApproval(long legacyQuoteId, String responsavel, LocalDateTime approvedAt,
-            String origem, Long coletaId, String coletaStatus, LegacyCte cte, String amarracao, String status,
+            String origem, Long coletaId, String coletaStatus, CteRef cte, String amarracao, String status,
             int days, String detail) {
         jdbc.update("""
                 INSERT INTO hub_crm_quote_approval
@@ -417,6 +427,12 @@ public class HubCrmStore {
                 cte == null ? null : cte.series(),
                 cte == null || cte.issueDate() == null ? null : Date.valueOf(cte.issueDate()),
                 amarracao, status, days, truncate(detail, 1000));
+    }
+
+    /** Situação nova da cotação já acompanhada (ex.: reprovada pela triagem). */
+    public void markQuoteApprovalStatus(long legacyQuoteId, String status, String detail) {
+        jdbc.update("UPDATE hub_crm_quote_approval SET status=?, detalhe=? WHERE legacy_quote_id=?",
+                status, truncate(detail, 1000), legacyQuoteId);
     }
 
     /** Cotações aprovadas que ainda não têm CT-e amarrado nem foram reprovadas pela triagem. */

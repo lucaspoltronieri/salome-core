@@ -326,6 +326,25 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
+    public Optional<LossReason> findDealLostReason(long dealId) {
+        if (dealId <= 0) return Optional.empty();
+        if (lostReasonIds.isEmpty()) validateCatalog();
+        try {
+            JsonNode item = get("/deals/" + dealId);
+            JsonNode data = item.path("data").isObject() ? item.path("data") : item;
+            Long reasonId = nullableLong(data, "lostReasonId");
+            if (reasonId == null) return Optional.empty();
+            return lostReasonIds.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(reasonId))
+                    .map(Map.Entry::getKey)
+                    .findFirst();
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404) return Optional.empty();
+            throw exception;
+        }
+    }
+
+    @Override
     public boolean hasDealActivitySince(long dealId, java.time.LocalDate since) {
         JsonNode response = get("/activities?deal=" + dealId + "&perPage=100");
         return dataEntries(response).stream().anyMatch(activity -> {

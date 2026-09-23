@@ -33,6 +33,8 @@ public interface ArpaSuiteGateway {
     void markLostWithReasonId(long dealId, long lostReasonId);
     /** Status da negociação (open, won, lost); vazio se o card foi apagado. */
     Optional<String> findDealStatus(long dealId);
+    /** Motivo de perda já gravado no card, quando ele está perdido e o motivo está no catálogo. */
+    Optional<LossReason> findDealLostReason(long dealId);
     /** Alguma atividade (ligação, WhatsApp, reunião, tarefa, nota) não cancelada no card, criada a partir de {@code since}. */
     boolean hasDealActivitySince(long dealId, java.time.LocalDate since);
     boolean hasWhatsappChannel();

@@ -129,13 +129,18 @@ fora da automacao.
 ### Baixa automatica sem tratativa do comercial (v1.19.0, decisao do Lucas em 22/09/2026)
 
 `HubCrmSemTratativaService` roda uma vez por hora e baixa a proposta que ninguem
-tratou. A proposta precisa cumprir todas as condicoes abaixo:
+tratou: **toda cotacao ABERTA no legado ha 10 dias ou mais, de qualquer
+responsavel, com ou sem card no ArpaSuite** (ampliado na v1.21.0; a v1.19.0 so
+via card aberto e por isso 33 cotacoes se acumularam em 09/2026).
 
-- cotacao da Fernanda ou da Jaci, ABERTA no legado e com card **aberto** no
-  ArpaSuite;
-- **10 dias ou mais** desde a data da cotacao;
-- **nenhuma atividade no card** (ligacao, WhatsApp, reuniao, tarefa ou nota, nao
-  cancelada) criada a partir da data da cotacao.
+O que decide caso a caso:
+
+| Situacao do card | O que acontece |
+|---|---|
+| card **aberto** | so baixa se nao houver **nenhuma atividade** (ligacao, WhatsApp, reuniao, tarefa ou nota, nao cancelada) criada desde a data da cotacao |
+| card **ja perdido** | o legado recebe **o mesmo motivo do card**, para nao sobrescrever o que o comercial escolheu no ArpaSuite |
+| card **apagado**, cotacao **sem card** ou responsavel fora do ArpaSuite (Carlos) | baixa direto no legado |
+| card **ganho** | nao baixa; fica um evento em REVISAO para conferencia manual, porque o certo nesse caso costuma ser aprovar |
 
 A atividade no card e o sinal de "falei com o cliente, aguardando aprovacao". A
 anotacao do card nao serve para isso, porque a API do ArpaSuite so cria anotacoes
@@ -149,6 +154,10 @@ O que o Hub faz:
 - No ArpaSuite, o card fica perdido com o motivo **317833** "Sem tratativa do
   comercial, baixado pelo legado", e nao com "Preço alto". O evento
   `quote:<id>:sem-tratativa` faz o sync usar esse motivo e registrar uma anotacao.
+- **A baixa nao e definitiva:** aparecendo depois um CT-e que case com a cotacao,
+  o `HubCrmCteApprovalService` reaprova (ver regra-amarracao-cotacao-cte.md).
+- O mesmo motivo existe no ajuste manual como `SEM_TRATATIVA`
+  (`SALOME_HUB_CRM_ADJUST_REJECT=15731:SEM_TRATATIVA,...`, v1.20.0).
 
 A regra liga e desliga por `SALOME_HUB_CRM_SEM_TRATATIVA_ENABLED`. O prazo fica em
 `SALOME_HUB_CRM_SEM_TRATATIVA_DAYS` (padrao 10) e o motivo em
