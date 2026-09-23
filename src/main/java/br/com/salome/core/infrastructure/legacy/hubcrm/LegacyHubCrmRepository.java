@@ -159,7 +159,7 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
             """ + CTE_VALIDO + """
                    ) idConhecimento
             FROM coleta co
-            WHERE co.idCotacao IN (%s)
+            WHERE co.idCotacao IN (:ids)
             ORDER BY co.idCotacao, co.idColeta
             """;
 
@@ -226,7 +226,8 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
 
     @Override
     public List<LegacyQuoteChain> findQuoteChains(Collection<Long> quoteIds) {
-        return inChunks(quoteIds, (placeholders, batch) -> jdbc.query(CHAIN_SQL.formatted(placeholders),
+        // replace, não formatted: o SQL tem '%CANCEL%' e o Formatter leria o % como conversão.
+        return inChunks(quoteIds, (placeholders, batch) -> jdbc.query(CHAIN_SQL.replace(":ids", placeholders),
                 (rs, row) -> mapChain(rs), batch));
     }
 
