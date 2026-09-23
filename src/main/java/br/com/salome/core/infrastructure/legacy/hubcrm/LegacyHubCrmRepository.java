@@ -3,8 +3,10 @@ package br.com.salome.core.infrastructure.legacy.hubcrm;
 import br.com.salome.core.application.hubcrm.HubCrmLegacyRepository;
 import br.com.salome.core.domain.hubcrm.HubCrmNormalization;
 import br.com.salome.core.domain.hubcrm.LegacyCrmClient;
+import br.com.salome.core.domain.hubcrm.LegacyColeta;
 import br.com.salome.core.domain.hubcrm.LegacyCte;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
+import br.com.salome.core.domain.hubcrm.LegacyQuoteChain;
 import br.com.salome.core.domain.hubcrm.LegacyQuotePrint;
 import br.com.salome.core.domain.hubcrm.LossReason;
 import java.sql.ResultSet;
@@ -119,7 +121,7 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
     // Peso, valor e volumes vêm das notas do CT-e (conhecimentonotasfiscais), como na Torre.
     // cteCancelado é data no legado: preenchida = cancelado. situacao é enum
     // (Finalizada, Armazém, Em Viagem, Pendente, Aberta, Cancelada, Inutilizada).
-    private static final String CTE_SQL = """
+    private static final String CTE_SELECT = """
             SELECT c.idConhecimento, c.cte, c.cteSerie, c.cteChave, c.cteEmissao, c.cteHora,
                    c.tipoPagamento, c.valorTotal, c.fretePesoValor, c.freteValorValor, c.pedagioValor,
                    c.coletaValor, c.entregaValor, c.despachoValor, c.grisValor, c.redespacho, c.icms,
@@ -135,11 +137,30 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
             FROM conhecimento c
             LEFT JOIN cliente em ON em.idCliente=c.idClienteEmitente
             LEFT JOIN cliente de ON de.idCliente=c.idClienteDestinatario
-            WHERE c.cte IS NOT NULL AND c.cteEmissao >= ?
+            """;
+
+    // CT-e que conta como emitido: autorizado e não cancelado/inutilizado. Vale para a leitura por
+    // emissão e para a leitura pela coleta, que precisam enxergar exatamente os mesmos CT-es.
+    private static final String CTE_VALIDO = """
+            c.cte IS NOT NULL
               AND (c.cteCancelado IS NULL OR CAST(c.cteCancelado AS CHAR) IN ('','0','0000-00-00'))
               AND UPPER(COALESCE(c.situacao,'')) NOT LIKE '%CANCEL%'
               AND UPPER(COALESCE(c.situacao,'')) NOT LIKE '%INUTILIZ%'
-            ORDER BY c.idConhecimento
+            """;
+
+    // Corrente da cotação: a coleta lançada na aprovação (coleta.idCotacao, coluna nova do legado em
+    // 09/2026) e o CT-e que saiu no retorno dela (conhecimento.idColeta). O CT-e mais recente da
+    // coleta representa a linha; CT-es adicionais da mesma coleta aparecem na contagem da tela.
+    private static final String CHAIN_SQL = """
+            SELECT co.idCotacao, co.idColeta, co.status coletaStatus, co.data coletaData,
+                   co.dataColeta, co.cubagem, co.totalFrete,
+                   (SELECT MAX(c.idConhecimento) FROM conhecimento c
+                     WHERE c.idColeta=co.idColeta AND
+            """ + CTE_VALIDO + """
+                   ) idConhecimento
+            FROM coleta co
+            WHERE co.idCotacao IN (%s)
+            ORDER BY co.idCotacao, co.idColeta
             """;
 
     private final JdbcTemplate jdbc;
@@ -164,14 +185,19 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
 
     @Override
     public List<LegacyQuote> findQuotesByIds(Collection<Long> quoteIds) {
-        if (quoteIds == null || quoteIds.isEmpty()) return List.of();
-        List<Long> ids = new ArrayList<>(quoteIds);
-        List<LegacyQuote> result = new ArrayList<>();
-        for (int start = 0; start < ids.size(); start += 500) {
-            List<Long> batch = ids.subList(start, Math.min(start + 500, ids.size()));
+        return inChunks(quoteIds, (placeholders, batch) -> jdbc.query(
+                QUOTE_SELECT + " WHERE q.idCotacao IN (" + placeholders + ")", (rs, row) -> mapQuote(rs), batch));
+    }
+
+    /** Consulta por lista de ids em blocos de 500, para não estourar o limite de parâmetros. */
+    private <T> List<T> inChunks(Collection<Long> ids, java.util.function.BiFunction<String, Object[], List<T>> query) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        List<Long> all = new ArrayList<>(ids);
+        List<T> result = new ArrayList<>();
+        for (int start = 0; start < all.size(); start += 500) {
+            List<Long> batch = all.subList(start, Math.min(start + 500, all.size()));
             String placeholders = String.join(",", java.util.Collections.nCopies(batch.size(), "?"));
-            result.addAll(jdbc.query(QUOTE_SELECT + " WHERE q.idCotacao IN (" + placeholders + ")",
-                    (rs, row) -> mapQuote(rs), batch.toArray()));
+            result.addAll(query.apply(placeholders, batch.toArray()));
         }
         return result;
     }
@@ -186,7 +212,35 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
 
     @Override
     public List<LegacyCte> findRecentCtes(LocalDate since) {
-        return jdbc.query(CTE_SQL, (rs, row) -> mapCte(rs), java.sql.Date.valueOf(since));
+        return jdbc.query(CTE_SELECT + " WHERE " + CTE_VALIDO + " AND c.cteEmissao >= ? ORDER BY c.idConhecimento",
+                (rs, row) -> mapCte(rs), java.sql.Date.valueOf(since));
+    }
+
+    @Override
+    public List<LegacyCte> findCtesByIds(Collection<Long> cteIds) {
+        return inChunks(cteIds, (placeholders, batch) -> jdbc.query(
+                CTE_SELECT + " WHERE " + CTE_VALIDO + " AND c.idConhecimento IN (" + placeholders + ")"
+                        + " ORDER BY c.idConhecimento",
+                (rs, row) -> mapCte(rs), batch));
+    }
+
+    @Override
+    public List<LegacyQuoteChain> findQuoteChains(Collection<Long> quoteIds) {
+        return inChunks(quoteIds, (placeholders, batch) -> jdbc.query(CHAIN_SQL.formatted(placeholders),
+                (rs, row) -> mapChain(rs), batch));
+    }
+
+    /**
+     * Cotações APROVADAS a partir de {@code from} (data da aprovação), de qualquer responsável:
+     * é o universo do acompanhamento pós-aprovação, que não depende de quem aprovou.
+     */
+    @Override
+    public List<LegacyQuote> findApprovedQuotesSince(LocalDate from) {
+        return jdbc.query(QUOTE_SELECT + """
+                WHERE q.statusData >= ?
+                  AND UPPER(TRIM(COALESCE(q.status,''))) = 'APROVADA'
+                ORDER BY q.idCotacao
+                """, (rs, row) -> mapQuote(rs), java.sql.Date.valueOf(from));
     }
 
     @Override
@@ -224,6 +278,14 @@ public class LegacyHubCrmRepository implements HubCrmLegacyRepository {
                         rs.getBigDecimal("despachoValor"), rs.getBigDecimal("grisValor"),
                         rs.getBigDecimal("redespacho"), rs.getBigDecimal("icms"), rs.getBigDecimal("desconto"),
                         rs.getBigDecimal("acrescimo")));
+    }
+
+    private LegacyQuoteChain mapChain(ResultSet rs) throws SQLException {
+        LegacyColeta coleta = new LegacyColeta(rs.getLong("idColeta"), rs.getLong("idCotacao"),
+                trim(rs.getString("coletaStatus")), localDate(rs, "coletaData"), localDate(rs, "dataColeta"),
+                rs.getBigDecimal("cubagem"), rs.getBigDecimal("totalFrete"));
+        long cteId = rs.getLong("idConhecimento");
+        return new LegacyQuoteChain(coleta.quoteId(), coleta, rs.wasNull() || cteId == 0 ? null : cteId);
     }
 
     private LegacyQuotePrint.Party party(ResultSet rs, String prefix) throws SQLException {
