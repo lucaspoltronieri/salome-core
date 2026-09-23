@@ -215,14 +215,21 @@ public class HubCrmQuoteSyncService {
             arpa.addAnnotation(dealId, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt() + viaCte);
             store.recordEvent(eventKey, "COTACAO", quote.id(), "GANHO", "PROCESSADO", "Card ganho", null);
         } else if ("NAO APROVADA".equals(status)) {
-            if (store.eventProcessed("quote:" + quote.id() + ":sem-tratativa")) {
-                // Baixada pelo Hub por falta de tratativa: no legado vai como Preço (é o que existe),
-                // no ArpaSuite com o motivo próprio.
+            // Baixada pelo Hub pelos 10 dias, seja a proposta parada seja a aprovada sem CT-e: no
+            // legado cada uma vai com o motivo que o legado tem, e no ArpaSuite as duas vão com o
+            // mesmo motivo próprio (decisão do Lucas, 23/09/2026).
+            boolean semTratativaDoHub = store.eventProcessed("quote:" + quote.id() + ":sem-tratativa");
+            boolean aprovadaSemCte = store.eventProcessed("quote:" + quote.id() + ":aprovada-sem-cte");
+            if (semTratativaDoHub || aprovadaSemCte) {
                 if (store.eventProcessed(eventKey)) return;
                 arpa.markLostWithReasonId(dealId, semTratativa.lostReasonId());
                 arpa.addAnnotation(dealId, "Cotação " + quote.id() + " não aprovada automaticamente: "
-                        + semTratativa.days() + " dias sem nenhuma atividade no card. Motivo: "
-                        + semTratativa.description() + ". No legado ficou com o motivo Preço.");
+                        + (aprovadaSemCte
+                                ? "aprovada há " + semTratativa.days() + " dias e sem CT-e emitido."
+                                        + " No legado ficou com o motivo Arrependimento do frete."
+                                : semTratativa.days() + " dias sem nenhuma atividade no card."
+                                        + " No legado ficou com o motivo Preço.")
+                        + " Motivo no Cubo: " + semTratativa.description() + ".");
                 store.recordEvent(eventKey, "COTACAO", quote.id(), "PERDIDO", "PROCESSADO",
                         semTratativa.description(), null);
                 return;

@@ -338,9 +338,13 @@ não recebe nada.
 **Triagem dos 10 dias (`HubCrmAprovadaSemCteService`, 1x por hora).** Cotação aprovada há
 10 dias ou mais, sem CT-e amarrado e **sem coleta PENDENTE ou EM VIAGEM**, volta a NÃO
 APROVADA no legado com o motivo **Arrependimento do frete**
-(`naoAprovacaoArrependimentoFrete`). Como esse motivo é um dos dez do catálogo, o card
-ganho vira perdido pelo caminho normal do sync, sem evento especial. Vale para qualquer
-responsável; só o ArpaSuite continua restrito a Fernanda/Jaci.
+(`naoAprovacaoArrependimentoFrete`). Vale para qualquer responsável; só o ArpaSuite continua
+restrito a Fernanda/Jaci.
+
+No ArpaSuite, essa baixa e a da proposta sem tratativa vão com o **mesmo motivo 317833**
+("Sem tratativa do comercial, baixado pelo legado"), por decisão do Lucas em 23/09/2026 —
+no legado cada uma mantém o motivo que o legado tem (Arrependimento do frete e Preço), e a
+observação no card diz qual foi o caso.
 
 A triagem só alcança cotações aprovadas a partir da **data em que a regra foi ligada**,
 gravada uma única vez em `hub_crm_checkpoint('pos-aprovacao:ativacao')`. O histórico

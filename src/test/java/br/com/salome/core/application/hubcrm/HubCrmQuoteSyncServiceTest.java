@@ -393,6 +393,20 @@ class HubCrmQuoteSyncServiceTest {
                 org.mockito.ArgumentMatchers.isNull());
     }
 
+    @Test
+    void aprovadaSemCtePerdeNoArpaComOMesmoMotivoDaSemTratativa() {
+        LegacyQuote quote = quote("NÃO APROVADA", Map.of(LossReason.FREIGHT_REGRET,
+                "Aprovada sem CT-e emitido no prazo"));
+        when(store.eventProcessed("quote:15580:aprovada-sem-cte")).thenReturn(true);
+
+        service.applyStatus(quote, 99);
+
+        verify(arpa).markLostWithReasonId(99, 317833);
+        verify(arpa, never()).markLost(anyLong(), any(), any());
+        verify(arpa).addAnnotation(org.mockito.ArgumentMatchers.eq(99L),
+                org.mockito.ArgumentMatchers.contains("sem CT-e emitido"));
+    }
+
     private LegacyQuote quote(String status, Map<LossReason, String> reasons) {
         return quote(status, reasons, new BigDecimal("150"));
     }
