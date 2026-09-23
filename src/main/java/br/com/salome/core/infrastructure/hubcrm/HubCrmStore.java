@@ -9,6 +9,7 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -357,6 +358,73 @@ public class HubCrmStore {
                 truncate(criteria, 1000), truncate(divergences, 1000));
     }
 
+    public Set<Long> cteMatchIds(Collection<Long> idsConhecimento) {
+        if (idsConhecimento == null || idsConhecimento.isEmpty()) return Set.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(idsConhecimento.size(), "?"));
+        return new HashSet<>(jdbc.queryForList(
+                "SELECT id_conhecimento FROM hub_crm_cte_match WHERE id_conhecimento IN (" + placeholders + ")",
+                Long.class, idsConhecimento.toArray()));
+    }
+
+    /**
+     * Amarra o CT-e a uma cotação já aprovada, sem reaprovar nada no legado. Diferente do
+     * {@link #recordCteMatch}, não sobrescreve linha existente: a tabela tem duas chaves únicas
+     * (CT-e e cotação) e um UPDATE cego apagaria a amarração de outro CT-e.
+     *
+     * @return {@code true} quando a linha foi criada; {@code false} quando o CT-e ou a cotação já
+     *         estavam amarrados.
+     */
+    public boolean recordCteBinding(LegacyCte cte, LegacyQuote quote, String status, String criteria,
+            String divergences) {
+        try {
+            return jdbc.update("""
+                    INSERT INTO hub_crm_cte_match
+                      (id_conhecimento, cte_numero, cte_serie, cte_chave, cte_emissao, cte_frete, pagador_cnpj,
+                       legacy_quote_id, quote_responsavel, quote_status_anterior, quote_frete, status,
+                       criterios, divergencias)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE id=id
+                    """, cte.id(), cte.number(), cte.series(), cte.accessKey(),
+                    cte.issueDate() == null ? null : Date.valueOf(cte.issueDate()), cte.totalFreight(),
+                    cte.payerCnpj(), quote.id(), quote.responsible(), quote.status(), quote.totalFreight(),
+                    status, truncate(criteria, 1000), truncate(divergences, 1000)) == 1;
+        } catch (org.springframework.dao.DuplicateKeyException exception) {
+            // Corrida com a aprovação automática ou com uma ação manual da tela: quem gravou primeiro vale.
+            return false;
+        }
+    }
+
+    /** Situação da cotação aprovada: quem aprovou, a coleta, o CT-e e o prazo sem CT-e. */
+    public void upsertQuoteApproval(long legacyQuoteId, String responsavel, LocalDateTime approvedAt,
+            String origem, Long coletaId, String coletaStatus, LegacyCte cte, String amarracao, String status,
+            int days, String detail) {
+        jdbc.update("""
+                INSERT INTO hub_crm_quote_approval
+                  (legacy_quote_id, quote_responsavel, aprovada_em, origem_aprovacao, id_coleta, coleta_status,
+                   id_conhecimento, cte_numero, cte_serie, cte_emissao, amarracao, status, dias_desde_aprovacao,
+                   detalhe)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE quote_responsavel=VALUES(quote_responsavel),
+                  aprovada_em=VALUES(aprovada_em), origem_aprovacao=VALUES(origem_aprovacao),
+                  id_coleta=VALUES(id_coleta), coleta_status=VALUES(coleta_status),
+                  id_conhecimento=VALUES(id_conhecimento), cte_numero=VALUES(cte_numero),
+                  cte_serie=VALUES(cte_serie), cte_emissao=VALUES(cte_emissao), amarracao=VALUES(amarracao),
+                  status=VALUES(status), dias_desde_aprovacao=VALUES(dias_desde_aprovacao),
+                  detalhe=VALUES(detalhe)
+                """, legacyQuoteId, responsavel, approvedAt == null ? null : Timestamp.valueOf(approvedAt),
+                origem, coletaId, coletaStatus,
+                cte == null ? null : cte.id(), cte == null ? null : cte.number(),
+                cte == null ? null : cte.series(),
+                cte == null || cte.issueDate() == null ? null : Date.valueOf(cte.issueDate()),
+                amarracao, status, days, truncate(detail, 1000));
+    }
+
+    /** Cotações aprovadas que ainda não têm CT-e amarrado nem foram reprovadas pela triagem. */
+    public Set<Long> quotesInReview() {
+        return new HashSet<>(jdbc.queryForList(
+                "SELECT legacy_quote_id FROM hub_crm_quote_approval WHERE status='REVISAO'", Long.class));
+    }
+
     /**
      * A mudança de status veio do próprio Hub (lote ou aprovação pelo CT-e)? Nesses casos
      * cotação sem card no ArpaSuite não ganha card novo — só se atualiza quem já está lá.
@@ -421,6 +489,44 @@ public class HubCrmStore {
         return rows;
     }
 
+    /**
+     * Aba "Aprovação por CT-e": o acompanhamento das cotações aprovadas (com ou sem CT-e) mais as
+     * linhas de {@code hub_crm_cte_match} que pedem olho humano (empate, concorrência), que não
+     * estão presas a uma cotação acompanhada.
+     */
+    public List<Map<String, Object>> cteApprovalPanel(int limit) {
+        int max = Math.min(Math.max(limit, 1), 500);
+        List<Map<String, Object>> rows = new java.util.ArrayList<>(jdbc.queryForList("""
+                SELECT a.updated_at created_at, a.status, a.legacy_quote_id, a.quote_responsavel,
+                       a.origem_aprovacao, a.aprovada_em, a.dias_desde_aprovacao, a.id_coleta,
+                       a.coleta_status, a.amarracao, a.cte_numero, a.cte_serie, a.cte_emissao,
+                       a.id_conhecimento, m.criterios, m.divergencias, m.pagador_cnpj,
+                       m.quote_frete, m.cte_frete, a.detalhe
+                FROM hub_crm_quote_approval a
+                LEFT JOIN hub_crm_cte_match m ON m.legacy_quote_id=a.legacy_quote_id
+                ORDER BY a.aprovada_em DESC, a.legacy_quote_id DESC LIMIT ?
+                """, max));
+        rows.addAll(jdbc.queryForList("""
+                SELECT m.created_at, m.status, m.legacy_quote_id, m.quote_responsavel,
+                       NULL origem_aprovacao, NULL aprovada_em, NULL dias_desde_aprovacao, NULL id_coleta,
+                       NULL coleta_status, NULL amarracao, m.cte_numero, m.cte_serie, m.cte_emissao,
+                       m.id_conhecimento, m.criterios, m.divergencias, m.pagador_cnpj,
+                       m.quote_frete, m.cte_frete, NULL detalhe
+                FROM hub_crm_cte_match m
+                WHERE m.legacy_quote_id IS NULL
+                   OR NOT EXISTS (SELECT 1 FROM hub_crm_quote_approval a
+                                   WHERE a.legacy_quote_id=m.legacy_quote_id)
+                ORDER BY m.id DESC LIMIT ?
+                """, max));
+        rows.forEach(row -> {
+            if (row.get("legacy_quote_id") == null) {
+                String quotes = quotesInCriteria((String) row.get("criterios"));
+                if (quotes != null) row.put("legacy_quote_id", quotes);
+            }
+        });
+        return rows;
+    }
+
     static String quotesInCriteria(String criteria) {
         if (criteria == null) return null;
         for (String prefix : List.of("Ajuste manual: cotação ", "Cotações empatadas: ")) {
@@ -453,6 +559,9 @@ public class HubCrmStore {
                 "cotacoes", count("hub_crm_quote"),
                 "cotacoesIntegradas", countWhere("hub_crm_quote", "sync_status='INTEGRADO'"),
                 "aprovadasPorCte", countWhere("hub_crm_cte_match", "status='APROVADA_AUTO'"),
+                "amarradasPosAprovacao", countWhere("hub_crm_quote_approval", "status='AMARRADA'"),
+                "aprovadasSemCte", countWhere("hub_crm_quote_approval", "status='SEM_CTE'"),
+                "reprovadasSemCte", countWhere("hub_crm_quote_approval", "status='REPROVADA_SEM_CTE'"),
                 "erros", countWhere("hub_crm_event", "status IN ('ERRO','REVISAO')"));
     }
 

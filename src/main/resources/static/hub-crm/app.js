@@ -8,13 +8,13 @@ async function status(){try{const data=await request('/api/hub-crm/status');stat
 // Colunas com nome amigável por aba (as demais abas mostram as colunas cruas da API).
 const COLUMNS={
   'cotacoes':[['legacy_quote_id','Cotação'],['legacy_responsible','Responsável'],['legacy_status','Status legado'],['payer_cnpj','Pagador'],['total_freight','Frete'],['deal_id','Card Arpa'],['assigned_user_id','Usuário Arpa'],['pdf_status','PDF'],['whatsapp_status','WhatsApp'],['sync_status','Sincronização'],['last_error','Erro'],['updated_at','Atualizada em']],
-  'aprovacoes-cte':[['legacy_quote_id','Cotação'],['created_at','Quando'],['status','Situação'],['quote_responsavel','Responsável'],['quote_status_anterior','Status anterior'],['cte_numero','CT-e'],['cte_serie','Série'],['cte_emissao','Emissão'],['pagador_cnpj','Pagador'],['quote_frete','Frete cotação'],['cte_frete','Frete CT-e'],['criterios','Critérios'],['divergencias','Divergências']],
+  'aprovacoes-cte':[['legacy_quote_id','Cotação'],['status','Situação'],['origem_aprovacao','Aprovação'],['aprovada_em','Aprovada em'],['dias_desde_aprovacao','Dias'],['quote_responsavel','Responsável'],['id_coleta','Coleta'],['coleta_status','Status da coleta'],['amarracao','Amarração'],['cte_numero','CT-e'],['cte_serie','Série'],['cte_emissao','Emissão'],['pagador_cnpj','Pagador'],['quote_frete','Frete cotação'],['cte_frete','Frete CT-e'],['criterios','Critérios'],['divergencias','Divergências'],['created_at','Atualizada em']],
   'logs':[['created_at','Quando'],['entity_type','Tipo'],['entity_id','ID'],['event_type','Evento'],['status','Situação'],['response_summary','Resultado'],['last_error','Erro']],
   'lote':[['acao','Ação'],['resultado','Resultado'],['cotacao','Cotação'],['responsavel','Responsável'],['statusAnterior','Status anterior'],['criada','Criada'],['cte','CT-e'],['emissao','Emissão'],['freteCotacao','Frete cotação'],['freteCte','Frete CT-e'],['detalhe','Detalhe']]
 };
-const STATUS_CLASS={APROVADA_AUTO:'ok',PROCESSADO:'ok',INTEGRADO:'ok',APROVADA:'ok',NAO_APROVADA:'neutral',SIMULADO:'neutral',AMBIGUO:'warn',REVISAO:'warn',CONCORRENCIA:'warn',ERRO:'error'};
+const STATUS_CLASS={APROVADA_AUTO:'ok',PROCESSADO:'ok',INTEGRADO:'ok',APROVADA:'ok',AMARRADA:'ok',AMARRADA_COLETA:'ok',AMARRADA_CTE:'ok',NAO_APROVADA:'neutral',SIMULADO:'neutral',SEM_CTE:'neutral',AMBIGUO:'warn',REVISAO:'warn',CONCORRENCIA:'warn',REPROVADA_SEM_CTE:'warn',ERRO:'error'};
 const HINTS={
-  'aprovacoes-cte':'CT-es que aprovaram (ou quase aprovaram) uma cotação no legado. AMBIGUO/CONCORRENCIA pedem conferência manual.',
+  'aprovacoes-cte':'Cotação aprovada e o que veio depois: a coleta lançada pelo legado e o CT-e emitido. SEM_CTE ainda espera o CT-e; AMARRADA já tem; REPROVADA_SEM_CTE passou do prazo e voltou a NÃO APROVADA (Arrependimento do frete). AMBIGUO/CONCORRENCIA/REVISAO pedem conferência manual.',
   'logs':'Histórico de tudo que o Hub fez: aprovações por CT-e, cotações e clientes enviados ao ArpaSuite, com o erro quando houver.',
   'lote':'Lote único: aprova toda cotação que tem CT-e correspondente (CT-es desde 2021) e marca como NÃO APROVADA (motivo Preço) as ABERTAS anteriores a 31/08/2026 sem CT-e. Simule primeiro, confira a lista e só então execute.'
 };

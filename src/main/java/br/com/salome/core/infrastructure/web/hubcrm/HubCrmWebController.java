@@ -107,7 +107,7 @@ public class HubCrmWebController {
     @GetMapping("/api/hub-crm/aprovacoes-cte")
     @ResponseBody
     public Object cteMatches(@RequestParam(defaultValue = "100") int limit) {
-        return store.cteMatches(limit);
+        return store.cteApprovalPanel(limit);
     }
 
     @GetMapping("/api/hub-crm/logs")
