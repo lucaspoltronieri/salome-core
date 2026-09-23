@@ -5,6 +5,7 @@ import br.com.salome.core.domain.hubcrm.HubCrmNormalization;
 import br.com.salome.core.domain.hubcrm.LegacyCte;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmAutoApprovalProperties;
+import br.com.salome.core.infrastructure.hubcrm.HubCrmSemTratativaProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
 import br.com.salome.core.infrastructure.legacy.hubcrm.LegacyQuoteApprovalWriter;
 import java.time.Clock;
@@ -49,17 +50,27 @@ public class HubCrmBatchService {
     private final HubCrmStore store;
     private final LegacyQuoteApprovalWriter writer;
     private final HubCrmAutoApprovalProperties properties;
+    private final HubCrmSemTratativaProperties semTratativa;
     private final Clock clock;
     private final AtomicReference<BatchState> state = new AtomicReference<>(BatchState.idle());
 
     @Autowired
     public HubCrmBatchService(HubCrmLegacyRepository legacy, HubCrmStore store,
-            LegacyQuoteApprovalWriter writer, HubCrmAutoApprovalProperties properties) {
-        this(legacy, store, writer, properties, Clock.system(HubCrmCteApprovalService.LEGACY_ZONE));
+            LegacyQuoteApprovalWriter writer, HubCrmAutoApprovalProperties properties,
+            HubCrmSemTratativaProperties semTratativa) {
+        this(legacy, store, writer, properties, semTratativa,
+                Clock.system(HubCrmCteApprovalService.LEGACY_ZONE));
     }
 
     HubCrmBatchService(HubCrmLegacyRepository legacy, HubCrmStore store,
             LegacyQuoteApprovalWriter writer, HubCrmAutoApprovalProperties properties, Clock clock) {
+        this(legacy, store, writer, properties, HubCrmSemTratativaProperties.defaults(), clock);
+    }
+
+    HubCrmBatchService(HubCrmLegacyRepository legacy, HubCrmStore store,
+            LegacyQuoteApprovalWriter writer, HubCrmAutoApprovalProperties properties,
+            HubCrmSemTratativaProperties semTratativa, Clock clock) {
+        this.semTratativa = semTratativa;
         this.legacy = legacy;
         this.store = store;
         this.writer = writer;
@@ -246,11 +257,21 @@ public class HubCrmBatchService {
                     add(items, totals, "NAO_APROVAR", quote, null, "já estava " + quote.status(), "IGNORADA");
                     continue;
                 }
-                String description = reason == Reason.PRECO ? priceDescription
-                        : "Não aprovada por " + reason.label() + " (ajuste Hub CRM " + BR.format(now.toLocalDate())
-                                + ", decisão do Lucas)";
+                String description = switch (reason) {
+                    case PRECO -> priceDescription;
+                    case SEM_TRATATIVA -> semTratativa.description();
+                    default -> "Não aprovada por " + reason.label() + " (ajuste Hub CRM "
+                            + BR.format(now.toLocalDate()) + ", decisão do Lucas)";
+                };
                 try {
                     if (writer.reject(quote, reason.column(), description, now)) {
+                        if (reason == Reason.SEM_TRATATIVA) {
+                            // Marca igual à baixa automática: o sync perde o card com o motivo 317833.
+                            store.recordEvent("quote:" + quote.id() + ":sem-tratativa", "COTACAO", quote.id(),
+                                    "SEM_TRATATIVA", "PROCESSADO", "Ajuste manual (decisão do Lucas): "
+                                            + description + "; no ArpaSuite, motivo "
+                                            + semTratativa.lostReasonId(), null);
+                        }
                         store.recordEvent("quote:" + quote.id() + ":lote:nao-aprovada", "COTACAO", quote.id(),
                                 "LOTE_NAO_APROVADA", "PROCESSADO",
                                 "Ajuste manual: " + quote.status() + " → NÃO APROVADA (" + reason.label() + ")", null);
@@ -330,7 +351,9 @@ public class HubCrmBatchService {
         CONCORRENTE("naoAprovacaoConcorrente", "Concorrente"),
         QUALIDADE("naoAprovacaoQualidade", "Qualidade"),
         FORA_PERFIL("naoAprovacaoForaPerfil", "Fora do perfil"),
-        SEM_MOTIVO("naoAprovacaoSemMotivo", "Sem motivo");
+        SEM_MOTIVO("naoAprovacaoSemMotivo", "Sem motivo"),
+        /** Baixa sem tratativa: no legado vai como Preço, no ArpaSuite com o motivo próprio. */
+        SEM_TRATATIVA("naoAprovacaoPreco", "Sem tratativa do comercial");
 
         private final String column;
         private final String label;
