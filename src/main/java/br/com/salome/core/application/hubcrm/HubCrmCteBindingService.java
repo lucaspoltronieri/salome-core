@@ -5,6 +5,7 @@ import br.com.salome.core.domain.hubcrm.LegacyColeta;
 import br.com.salome.core.domain.hubcrm.LegacyCte;
 import br.com.salome.core.domain.hubcrm.LegacyQuote;
 import br.com.salome.core.domain.hubcrm.LegacyQuoteChain;
+import br.com.salome.core.domain.hubcrm.QuoteIntegration;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmAutoApprovalProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmPosAprovacaoProperties;
 import br.com.salome.core.infrastructure.hubcrm.HubCrmStore;
@@ -51,23 +52,27 @@ import org.springframework.stereotype.Service;
 public class HubCrmCteBindingService {
     /** O prazo é em dias; quatro passagens por hora bastam e poupam o legado. */
     private static final Duration INTERVAL = Duration.ofMinutes(15);
+    private static final java.time.format.DateTimeFormatter BR =
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final HubCrmLegacyRepository legacy;
     private final HubCrmStore store;
+    private final ArpaSuiteGateway arpa;
     private final HubCrmAutoApprovalProperties autoApproval;
     private final Clock clock;
     private final AtomicReference<Instant> lastRun = new AtomicReference<>();
 
     @Autowired
-    public HubCrmCteBindingService(HubCrmLegacyRepository legacy, HubCrmStore store,
+    public HubCrmCteBindingService(HubCrmLegacyRepository legacy, HubCrmStore store, ArpaSuiteGateway arpa,
             HubCrmAutoApprovalProperties autoApproval) {
-        this(legacy, store, autoApproval, Clock.system(HubCrmCteApprovalService.LEGACY_ZONE));
+        this(legacy, store, arpa, autoApproval, Clock.system(HubCrmCteApprovalService.LEGACY_ZONE));
     }
 
-    HubCrmCteBindingService(HubCrmLegacyRepository legacy, HubCrmStore store,
+    HubCrmCteBindingService(HubCrmLegacyRepository legacy, HubCrmStore store, ArpaSuiteGateway arpa,
             HubCrmAutoApprovalProperties autoApproval, Clock clock) {
         this.legacy = legacy;
         this.store = store;
+        this.arpa = arpa;
         this.autoApproval = autoApproval;
         this.clock = clock;
     }
@@ -160,16 +165,41 @@ public class HubCrmCteBindingService {
                 dropCte(ctesByPayer, quote, result.cte());
                 store.recordEvent("quote:" + quote.id() + ":cte-amarrada", "COTACAO", quote.id(),
                         "AMARRACAO_CTE", "PROCESSADO", detail, null);
+                annotate(quote, "quote:" + quote.id() + ":anotacao:cte-" + result.cte().id(),
+                        "Cotação " + quote.id() + ": CT-e " + result.cte().label()
+                                + (result.cte().issueDate() == null ? ""
+                                        : " emitido em " + BR.format(result.cte().issueDate()))
+                                + (coleta == null ? "" : ", pela coleta " + coleta.id())
+                                + ". Frete do CT-e: R$ " + result.cte().totalFreight() + ".");
             }
         }
 
         if (cte.isEmpty() && coleta != null && coleta.alive()) {
             detail = "Coleta " + coleta.id() + " em andamento (" + coleta.status() + ")";
+            // Sem campo de coleta no ArpaSuite (decisão do Lucas): o rastro vai na timeline.
+            annotate(quote, "quote:" + quote.id() + ":anotacao:coleta-" + coleta.id(),
+                    "Cotação " + quote.id() + ": coleta " + coleta.id() + " lançada em "
+                            + (coleta.data() == null ? "—" : BR.format(coleta.data()))
+                            + " e " + coleta.status().toLowerCase(java.util.Locale.ROOT)
+                            + ". O CT-e entra aqui quando a coleta retornar.");
         }
         store.upsertQuoteApproval(quote.id(), quote.responsible(), quote.statusAt(), origin,
                 coleta == null ? null : coleta.id(), coleta == null ? null : coleta.status(),
                 cte.orElse(null), binding, cte.isPresent() ? "AMARRADA" : "SEM_CTE", days, detail);
         return bindings;
+    }
+
+    /**
+     * Rastro na timeline do card: o ArpaSuite não tem campo de coleta nem de CT-e (decisão do
+     * Lucas, 23/09/2026), então a coleta e o CT-e vão como observação, uma vez cada
+     * ({@code eventKey}). Cotação sem card — Carlos, ou card apagado — não recebe nada.
+     */
+    private void annotate(LegacyQuote quote, String eventKey, String text) {
+        if (store.eventProcessed(eventKey)) return;
+        Long dealId = store.findQuote(quote.id()).map(QuoteIntegration::dealId).orElse(null);
+        if (dealId == null) return;
+        arpa.addAnnotation(dealId, text);
+        store.recordEvent(eventKey, "COTACAO", quote.id(), "AMARRACAO_CTE", "PROCESSADO", text, null);
     }
 
     /** Procura o CT-e da cotação: primeiro pela coleta, depois pelas regras de sempre. */

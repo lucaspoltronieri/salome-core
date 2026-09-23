@@ -37,13 +37,15 @@ class HubCrmCteBindingServiceTest {
     private static final String PAGADOR = "46299584000149";
     private HubCrmLegacyRepository legacy;
     private HubCrmStore store;
+    private ArpaSuiteGateway arpa;
     private HubCrmCteBindingService service;
 
     @BeforeEach
     void setUp() {
         legacy = mock(HubCrmLegacyRepository.class);
         store = mock(HubCrmStore.class);
-        service = new HubCrmCteBindingService(legacy, store,
+        arpa = mock(ArpaSuiteGateway.class);
+        service = new HubCrmCteBindingService(legacy, store, arpa,
                 new HubCrmAutoApprovalProperties(true, 30, 3, null, null, null, "Outro"),
                 Clock.fixed(TODAY.atTime(10, 0).atZone(ZONE).toInstant(), ZONE));
         when(store.recordCteBinding(any(), any(), anyString(), anyString(), isNull())).thenReturn(true);
@@ -68,6 +70,35 @@ class HubCrmCteBindingServiceTest {
                 eq("PROCESSADO"), contains("CT-e 320401"), isNull());
         verify(store).upsertQuoteApproval(eq(15910L), anyString(), any(), eq("MANUAL"), eq(4801L),
                 eq("REALIZADA"), any(), eq("COLETA"), eq("AMARRADA"), eq(3), anyString());
+    }
+
+    @Test
+    void coletaECteEntramNaTimelineDoCard() {
+        LegacyQuote quote = quote(15919, TODAY.minusDays(3), new BigDecimal("500"));
+        when(legacy.findApprovedQuotesSince(any())).thenReturn(List.of(quote));
+        when(legacy.findQuoteChains(any())).thenReturn(List.of(new LegacyQuoteChain(15919,
+                new LegacyColeta(4805, 15919, "REALIZADA", TODAY.minusDays(2), TODAY.minusDays(1),
+                        BigDecimal.ZERO, new BigDecimal("500")), 710816L)));
+        when(legacy.findCtesByIds(List.of(710816L)))
+                .thenReturn(List.of(cte(710816, "320401", new BigDecimal("1632.40"))));
+        when(store.findQuote(15919)).thenReturn(java.util.Optional.of(integration(15919, 2315185L)));
+
+        service.bindNow();
+
+        verify(arpa).addAnnotation(eq(2315185L), contains("CT-e 320401/1"));
+        verify(arpa).addAnnotation(eq(2315185L), contains("pela coleta 4805"));
+    }
+
+    @Test
+    void cotacaoSemCardNaoRecebeAnotacao() {
+        LegacyQuote quote = quote(15920, TODAY.minusDays(3), new BigDecimal("100"));
+        when(legacy.findApprovedQuotesSince(any())).thenReturn(List.of(quote));
+        when(legacy.findRecentCtes(any())).thenReturn(List.of(cte(710905, "320505", new BigDecimal("100"))));
+        when(store.findQuote(15920)).thenReturn(java.util.Optional.empty());
+
+        service.bindNow();
+
+        verify(arpa, never()).addAnnotation(anyLong(), anyString());
     }
 
     @Test
@@ -164,6 +195,11 @@ class HubCrmCteBindingServiceTest {
         service.bindApprovedQuotes();
 
         verify(legacy, times(1)).findApprovedQuotesSince(any());
+    }
+
+    private static br.com.salome.core.domain.hubcrm.QuoteIntegration integration(long quoteId, Long dealId) {
+        return new br.com.salome.core.domain.hubcrm.QuoteIntegration(quoteId, PAGADOR, "APROVADA", dealId,
+                1L, 2L, 3L, BigDecimal.TEN, "hash", "INTEGRADO", "ENVIADO");
     }
 
     private static LegacyCte cte(long id, String number, BigDecimal freight) {

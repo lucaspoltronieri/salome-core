@@ -305,3 +305,50 @@ adicionais abaixo:
   da data final informada.
 
 Esses indicadores sao somente leitura e nao alteram o cadastro do legado.
+
+## Acompanhamento depois da aprovação (v1.22.0, decisão do Lucas em 23/09/2026)
+
+O comercial voltou a aprovar a cotação à mão no legado, e a tela de aprovação passa a
+lançar a coleta quando `cotacao.coleta='Sim'`, gravando `coleta.idCotacao`. A coluna já
+existe no banco (o snapshot em `salome-legacy/` está desatualizado e não a mostra). Com
+ela nasce uma corrente exata, sem heurística:
+
+`cotacao` → `coleta.idCotacao` → `conhecimento.idColeta` → CT-e
+
+A aprovação automática pelo CT-e **continua igual**, porque a aprovação pode não ser
+manual. O que foi somado:
+
+**Amarração pós-aprovação (`HubCrmCteBindingService`, a cada 15 minutos).** Cotação
+APROVADA sem CT-e continua sendo acompanhada. Quando o CT-e aparece, ele é amarrado à
+cotação **sem reaprovar e sem alterar valor nenhum**, por duas vias, nesta ordem:
+
+1. **pela coleta** (`AMARRADA_COLETA`): o vínculo veio do próprio legado, então os valores
+   não são conferidos;
+2. **pelas regras acima** (`AMARRADA_CTE`, `CteQuoteMatcher.evaluateForBinding`): mesmos
+   critérios da aprovação automática, para o CT-e emitido no balcão, sem coleta.
+
+Um CT-e já amarrado a outra cotação não é sobrescrito: a cotação fica em `REVISAO` e a
+triagem não a reprova.
+
+**Timeline do card.** O ArpaSuite não tem campo de coleta nem de CT-e, e por decisão do
+Lucas não vai ter: o rastro vai como observação na timeline, uma vez cada — a coleta
+lançada e, depois, o CT-e emitido com o frete. Cotação sem card (Carlos, ou card apagado)
+não recebe nada.
+
+**Triagem dos 10 dias (`HubCrmAprovadaSemCteService`, 1x por hora).** Cotação aprovada há
+10 dias ou mais, sem CT-e amarrado e **sem coleta PENDENTE ou EM VIAGEM**, volta a NÃO
+APROVADA no legado com o motivo **Arrependimento do frete**
+(`naoAprovacaoArrependimentoFrete`). Como esse motivo é um dos dez do catálogo, o card
+ganho vira perdido pelo caminho normal do sync, sem evento especial. Vale para qualquer
+responsável; só o ArpaSuite continua restrito a Fernanda/Jaci.
+
+A triagem só alcança cotações aprovadas a partir da **data em que a regra foi ligada**,
+gravada uma única vez em `hub_crm_checkpoint('pos-aprovacao:ativacao')`. O histórico
+anterior fica como está.
+
+Se o CT-e aparecer depois da reprovação, a aprovação automática reverte a cotação sozinha.
+
+O acompanhamento fica em `hub_crm_quote_approval` (migration V4) e aparece na aba
+**Aprovação por CT-e** com a origem da aprovação (manual ou Hub), a coleta e seu status,
+o CT-e e os dias desde a aprovação. Liga/desliga por
+`salome.hub-crm.pos-aprovacao.binding-enabled` e `...triagem-enabled`.
