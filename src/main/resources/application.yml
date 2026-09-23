@@ -104,6 +104,17 @@ salome:
       days: ${SALOME_HUB_CRM_SEM_TRATATIVA_DAYS:10}
       lost-reason-id: ${SALOME_HUB_CRM_SEM_TRATATIVA_LOST_REASON_ID:317833}
       description: ${SALOME_HUB_CRM_SEM_TRATATIVA_DESCRIPTION:Sem tratativa do comercial, baixado pelo legado}
+    # Acompanhamento da cotação depois de aprovada (HubCrmCteBindingService e
+    # HubCrmAprovadaSemCteService): amarra o CT-e que sair depois da aprovação (pela coleta lançada
+    # no legado ou pelas regras de sempre) e, passados days dias sem CT-e e sem coleta em andamento,
+    # devolve a cotação para NÃO APROVADA com o motivo Arrependimento do frete. A triagem só alcança
+    # cotações aprovadas a partir de activation-date; vazio = a data em que ela for ligada.
+    pos-aprovacao:
+      binding-enabled: ${SALOME_HUB_CRM_POS_APROVACAO_BINDING_ENABLED:false}
+      triagem-enabled: ${SALOME_HUB_CRM_POS_APROVACAO_TRIAGEM_ENABLED:false}
+      days: ${SALOME_HUB_CRM_POS_APROVACAO_DAYS:10}
+      activation-date: ${SALOME_HUB_CRM_POS_APROVACAO_ATIVACAO:}
+      description: ${SALOME_HUB_CRM_POS_APROVACAO_DESCRICAO:}
     # PDF da cotação pelo WhatsApp (HubCrmQuoteWhatsappService): só em conversa já aberta com o
     # cliente (janela de 24h), sem template. Procura por wait-days a partir da data da cotação.
     whatsapp:

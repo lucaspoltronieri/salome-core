@@ -1,8 +1,10 @@
 package br.com.salome.core.infrastructure.hubcrm;
 
+import br.com.salome.core.application.hubcrm.HubCrmAprovadaSemCteService;
 import br.com.salome.core.application.hubcrm.HubCrmClientSyncService;
 import br.com.salome.core.application.hubcrm.HubCrmClientTransportNoteService;
 import br.com.salome.core.application.hubcrm.HubCrmCteApprovalService;
+import br.com.salome.core.application.hubcrm.HubCrmCteBindingService;
 import br.com.salome.core.application.hubcrm.HubCrmQuoteSyncService;
 import br.com.salome.core.application.hubcrm.HubCrmSemTratativaService;
 import java.time.Instant;
@@ -25,7 +27,9 @@ public class HubCrmScheduler {
     private final HubCrmClientTransportNoteService clientNotes;
     private final HubCrmQuoteSyncService quotes;
     private final Optional<HubCrmCteApprovalService> cteApproval;
+    private final Optional<HubCrmCteBindingService> cteBinding;
     private final Optional<HubCrmSemTratativaService> semTratativa;
+    private final Optional<HubCrmAprovadaSemCteService> aprovadaSemCte;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicReference<Instant> lastStarted = new AtomicReference<>();
     private final AtomicReference<Instant> lastFinished = new AtomicReference<>();
@@ -33,12 +37,15 @@ public class HubCrmScheduler {
 
     public HubCrmScheduler(HubCrmClientSyncService clients, HubCrmClientTransportNoteService clientNotes,
             HubCrmQuoteSyncService quotes, Optional<HubCrmCteApprovalService> cteApproval,
-            Optional<HubCrmSemTratativaService> semTratativa) {
+            Optional<HubCrmCteBindingService> cteBinding, Optional<HubCrmSemTratativaService> semTratativa,
+            Optional<HubCrmAprovadaSemCteService> aprovadaSemCte) {
         this.semTratativa = semTratativa;
+        this.aprovadaSemCte = aprovadaSemCte;
         this.clients = clients;
         this.clientNotes = clientNotes;
         this.quotes = quotes;
         this.cteApproval = cteApproval;
+        this.cteBinding = cteBinding;
     }
 
     @Scheduled(fixedDelayString = "${salome.hub-crm.polling-delay-ms:30000}")
@@ -53,7 +60,13 @@ public class HubCrmScheduler {
             addError(errors, run("clientes", clients::syncNewClients));
             addError(errors, run("observação de transportes", clientNotes::annotatePending));
             cteApproval.ifPresent(service -> addError(errors, run("aprovação por CT-e", service::approveFromCtes)));
+            // Depois da aprovação automática (que tem prioridade sobre um CT-e livre) e antes das
+            // cotações, para o card já sair atualizado no mesmo ciclo.
+            cteBinding.ifPresent(service -> addError(errors,
+                    run("amarração pós-aprovação", service::bindApprovedQuotes)));
             semTratativa.ifPresent(service -> addError(errors, run("sem tratativa", service::closeStaleQuotes)));
+            aprovadaSemCte.ifPresent(service -> addError(errors,
+                    run("aprovada sem CT-e", service::rejectApprovedWithoutCte)));
             addError(errors, run("cotações", quotes::syncQuotes));
             lastError.set(errors.isEmpty() ? null : String.join(" | ", errors));
         } finally {
