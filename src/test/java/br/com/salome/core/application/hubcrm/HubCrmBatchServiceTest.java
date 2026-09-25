@@ -179,6 +179,32 @@ class HubCrmBatchServiceTest {
         assertThat(service.status().totals()).containsEntry("NAO_APROVAR:NAO_APROVADA", 1);
     }
 
+    /** Cotação 15814: baixada por engano, volta para ABERTA com o evento que reabre o card. */
+    @Test
+    void ajusteManualReabreCotacaoNaoAprovadaPorEngano() {
+        LegacyQuote naoAprovada = quote(15814, "NÃO APROVADA", "FERNANDA", LocalDate.of(2026, 9, 14), "A");
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of(naoAprovada));
+        when(writer.reopen(eq(naoAprovada), anyString(), any())).thenReturn(true);
+
+        service.runManual(Map.of(), Map.of(), List.of(15814L));
+
+        verify(writer).reopen(eq(naoAprovada), org.mockito.ArgumentMatchers.contains("engano"), any());
+        verify(store).recordEvent(eq("quote:15814:reaberta:2026-09-11"), eq("COTACAO"), eq(15814L),
+                eq("REABERTA"), eq("PROCESSADO"), anyString(), any());
+        assertThat(service.status().totals()).containsEntry("REABRIR:ABERTA", 1);
+    }
+
+    @Test
+    void ajusteManualNaoReabreCotacaoQueJaEstaAberta() {
+        LegacyQuote aberta = quote(15815, "ABERTA", "FERNANDA", LocalDate.of(2026, 9, 14), "A");
+        when(legacy.findQuotesByIds(any())).thenReturn(List.of(aberta));
+
+        service.runManual(Map.of(), Map.of(), List.of(15815L));
+
+        verify(writer, never()).reopen(any(), anyString(), any());
+        assertThat(service.status().totals()).containsEntry("REABRIR:IGNORADA", 1);
+    }
+
     @Test
     void ajusteManualNaoAprovaSemAchaOCte() {
         LegacyQuote par1 = quote(20, "ABERTA", "CARLOS", LocalDate.of(2025, 6, 12), "A");

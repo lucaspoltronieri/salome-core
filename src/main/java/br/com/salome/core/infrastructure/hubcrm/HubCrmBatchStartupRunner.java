@@ -19,8 +19,9 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>o lote de limpeza, quando {@code SALOME_HUB_CRM_BATCH_TOKEN} é definido;</li>
  *   <li>o ajuste manual ({@code SALOME_HUB_CRM_ADJUST_APPROVE} = "cotação:CT-e,...",
- *       {@code SALOME_HUB_CRM_ADJUST_REJECT} = "cotação" ou "cotação:MOTIVO",...), quando
- *       {@code SALOME_HUB_CRM_ADJUST_TOKEN} é definido.</li>
+ *       {@code SALOME_HUB_CRM_ADJUST_REJECT} = "cotação" ou "cotação:MOTIVO",...,
+ *       {@code SALOME_HUB_CRM_ADJUST_REOPEN} = "cotação,cotação,..." para voltar a ABERTA),
+ *       quando {@code SALOME_HUB_CRM_ADJUST_TOKEN} é definido.</li>
  * </ul>
  * Cada token executado fica em {@code hub_crm_checkpoint}; o mesmo token nunca roda de novo.
  */
@@ -36,13 +37,15 @@ public class HubCrmBatchStartupRunner {
     private final String adjustToken;
     private final String adjustApprove;
     private final String adjustReject;
+    private final String adjustReopen;
 
     public HubCrmBatchStartupRunner(HubCrmBatchService batch, HubCrmStore store,
             @Value("${salome.hub-crm.batch.execute-token:}") String token,
             @Value("${salome.hub-crm.batch.cutoff:2026-08-31}") String cutoff,
             @Value("${salome.hub-crm.batch.adjust-token:}") String adjustToken,
             @Value("${salome.hub-crm.batch.adjust-approve:}") String adjustApprove,
-            @Value("${salome.hub-crm.batch.adjust-reject:}") String adjustReject) {
+            @Value("${salome.hub-crm.batch.adjust-reject:}") String adjustReject,
+            @Value("${salome.hub-crm.batch.adjust-reopen:}") String adjustReopen) {
         this.batch = batch;
         this.store = store;
         this.token = token;
@@ -50,6 +53,7 @@ public class HubCrmBatchStartupRunner {
         this.adjustToken = adjustToken;
         this.adjustApprove = adjustApprove;
         this.adjustReject = adjustReject;
+        this.adjustReopen = adjustReopen;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -61,9 +65,10 @@ public class HubCrmBatchStartupRunner {
         if (firstTime("ajuste_token", adjustToken)) {
             Map<Long, String> approve = parseApprove(adjustApprove);
             Map<Long, String> reject = parseReject(adjustReject);
-            log.info("Iniciando ajuste manual do Hub CRM (token {}): aprovar {}, não aprovar {}",
-                    adjustToken, approve, reject);
-            Thread.ofVirtual().name("hub-crm-ajuste").start(() -> batch.runManual(approve, reject));
+            Set<Long> reopen = parseIds(adjustReopen);
+            log.info("Iniciando ajuste manual do Hub CRM (token {}): aprovar {}, não aprovar {}, reabrir {}",
+                    adjustToken, approve, reject, reopen);
+            Thread.ofVirtual().name("hub-crm-ajuste").start(() -> batch.runManual(approve, reject, reopen));
         }
     }
 

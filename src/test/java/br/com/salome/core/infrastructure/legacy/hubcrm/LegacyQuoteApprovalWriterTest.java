@@ -115,6 +115,35 @@ class LegacyQuoteApprovalWriterTest {
         assertThat(sql.getValue()).contains("status='APROVADA'", "statusData=?").doesNotContain("valorNf");
     }
 
+    @Test
+    void reabreLimpandoOsMotivosEOContatoDaAprovacao() {
+        LegacyQuote naoAprovada = new LegacyQuote(15814, LocalDate.of(2026, 9, 14), "10:06", "FERNANDA",
+                "NÃO APROVADA", LocalDateTime.of(2026, 9, 20, 9, 11), "Emitente (CIF)", "A", "A", "X", "B", "B",
+                "Y", "B", "B", "", "", "DIVERSOS", 1, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ZERO,
+                BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ONE, "HUB CRM - CT-e 320274/1",
+                Map.of(br.com.salome.core.domain.hubcrm.LossReason.COMPETITOR, "concorrente"));
+
+        assertThat(writer.reopen(naoAprovada, "engano", NOW)).isTrue();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(sql.capture(), args.capture());
+        assertThat(sql.getValue())
+                .contains("status='ABERTA'", "statusData=?", "contatoAprovacao=NULL",
+                        "naoAprovacaoConcorrente=NULL", "naoAprovacaoConcorrenteDescricao=NULL",
+                        "naoAprovacaoPreco=NULL", "naoAprovacaoSemMotivo=NULL")
+                .endsWith("WHERE idCotacao=? AND status=?");
+        List<Object> values = Arrays.asList(args.getValue());
+        assertThat(values).contains(15814L, "NÃO APROVADA");
+        assertThat(values).anySatisfy(value -> assertThat(String.valueOf(value))
+                .contains("[crm_api] [status] [NÃO APROVADA] [ABERTA]")
+                .contains("[naoAprovacaoConcorrente] [Sim] [null]")
+                .contains("[contatoAprovacao] [HUB CRM - CT-e 320274/1] [null]")
+                .contains("[reabertura] [null] [engano]"));
+    }
+
     private static LegacyQuote quote(String status) {
         BigDecimal zero = BigDecimal.ZERO;
         return new LegacyQuote(15813, LocalDate.of(2026, 9, 14), "10:06", "FERNANDA", status,

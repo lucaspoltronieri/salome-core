@@ -80,9 +80,13 @@ public class HubCrmSemTratativaService {
         lastRun.set(now);
 
         LocalDate limit = LocalDate.now(clock).minusDays(properties.days());
+        // Reaberta há menos que o prazo da regra: fica de fora, senão a baixa desfaria em uma
+        // hora a reabertura que alguém acabou de pedir (a régua conta a idade da cotação).
+        var reopened = store.quotesReopenedAfter(limit);
         List<LegacyQuote> quotes = legacy.findApprovableQuotes(limit.minusDays(EXTRA_DAYS)).stream()
                 .filter(quote -> "ABERTA".equals(HubCrmNormalization.normalizedText(quote.status())))
                 .filter(quote -> quote.createdDate() != null && !quote.createdDate().isAfter(limit))
+                .filter(quote -> !reopened.contains(quote.id()))
                 .toList();
         int closed = 0;
         for (LegacyQuote quote : quotes) {

@@ -356,3 +356,33 @@ O acompanhamento fica em `hub_crm_quote_approval` (migration V4) e aparece na ab
 **Aprovação por CT-e** com a origem da aprovação (manual ou Hub), a coleta e seu status,
 o CT-e e os dias desde a aprovação. Liga/desliga por
 `salome.hub-crm.pos-aprovacao.binding-enabled` e `...triagem-enabled`.
+
+## Reabertura da cotação (v1.24.0, 25/09/2026)
+
+Decisão errada acontece: a cotação foi baixada (ou aprovada) por engano e precisa voltar a
+ABERTA. O Hub passou a saber fazer isso, pelo ajuste manual:
+
+```
+SALOME_HUB_CRM_ADJUST_TOKEN=<token novo>
+SALOME_HUB_CRM_ADJUST_REOPEN=15814,15815
+```
+
+No legado, `LegacyQuoteApprovalWriter.reopen` grava `status='ABERTA'`, a data e a hora,
+**limpa todas as colunas de motivo de não aprovação** (e suas descrições) e o
+`contatoAprovacao`, com a linha do `crm_api` no `log` e a mesma trava `AND status=?`. Limpar
+todos os motivos, e não só o que estava marcado, evita que um motivo esquecido em `'Sim'`
+faça a próxima não aprovação cair em revisão por ter dois motivos ativos. Só vale para
+cotação APROVADA ou NÃO APROVADA; a que já está ABERTA é ignorada.
+
+No ArpaSuite, o `HubCrmQuoteSyncService` devolve o card para **aberto em Proposta Enviada**
+e escreve a reabertura na timeline — mas **só quando o Hub já tinha ganho ou perdido aquele
+card** (`hub_crm_event` com GANHO ou PERDIDO). Sem essa condição, toda cotação nova, que
+também nasce ABERTA, ganharia uma anotação de reabertura que nunca aconteceu.
+
+O evento `quote:<id>:reaberta:<data>` também **segura a baixa dos 10 dias** pelo prazo da
+regra: a baixa sem tratativa conta a idade da cotação, então sem isso ela desfaria em uma
+hora a reabertura que o usuário acabou de pedir.
+
+O que a reabertura **não** faz: não desamarra o CT-e já registrado em `hub_crm_cte_match`
+(o CT-e continua consumido) e não muda o motivo de perda já gravado no card — ele fica
+aberto com o motivo antigo guardado, sem efeito enquanto estiver aberto.

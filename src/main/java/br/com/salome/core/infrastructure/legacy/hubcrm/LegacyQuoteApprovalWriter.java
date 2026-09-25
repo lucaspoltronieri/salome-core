@@ -150,6 +150,40 @@ public class LegacyQuoteApprovalWriter {
     }
 
     /**
+     * Volta a cotação para ABERTA: a decisão anterior (aprovada ou não aprovada) foi engano.
+     * Limpa os motivos de não aprovação e o contato da aprovação, para a cotação ficar como
+     * estava antes da decisão; o rastro completo fica no {@code log}. Mesma trava de status.
+     *
+     * @return {@code true} quando reabriu; {@code false} se o status mudou no meio.
+     */
+    public boolean reopen(LegacyQuote quote, String description, LocalDateTime now) {
+        String prefix = "[" + LOG_TIME.format(now) + "] [" + USER + "]";
+        StringBuilder log = new StringBuilder()
+                .append(prefix).append(" [status] [").append(quote.status()).append("] [ABERTA] && ")
+                .append(prefix).append(" [statusData] [")
+                .append(quote.statusAt() == null ? null : LOG_DATE.format(quote.statusAt()))
+                .append("] [").append(LOG_DATE.format(now)).append("] && ");
+        quote.selectedLossReasons().keySet().stream()
+                .map(br.com.salome.core.domain.hubcrm.LossReason::legacyColumn).sorted()
+                .forEach(column -> log.append(prefix).append(" [").append(column).append("] [Sim] [null] && "));
+        if (quote.approvalContact() != null && !quote.approvalContact().isBlank()) {
+            log.append(prefix).append(" [contatoAprovacao] [").append(quote.approvalContact())
+                    .append("] [null] && ");
+        }
+        log.append(prefix).append(" [reabertura] [null] [").append(description).append("] && ");
+        // Limpa todas as colunas de motivo, e não só as que o Hub enxerga: motivo esquecido em
+        // 'Sim' faria a próxima não aprovação cair em revisão por ter dois motivos ativos.
+        StringBuilder sets = new StringBuilder("status='ABERTA', statusData=?, statusHora=?, "
+                + "contatoAprovacao=NULL");
+        REJECT_COLUMNS.stream().sorted()
+                .forEach(column -> sets.append(", ").append(column).append("=NULL, ")
+                        .append(column).append("Descricao=NULL"));
+        sets.append(", log=CONCAT(IFNULL(log,''), ?)");
+        return jdbc.update("UPDATE cotacao SET " + sets + " WHERE idCotacao=? AND status=?",
+                Timestamp.valueOf(now), HOUR.format(now), log.toString(), quote.id(), quote.status()) == 1;
+    }
+
+    /**
      * Marca a cotação como NÃO APROVADA com o motivo Preço (lote de limpeza das cotações
      * abertas sem CT-e). Mesmos campos da tela de não aprovação e mesma trava de status.
      */

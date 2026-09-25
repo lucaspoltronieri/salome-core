@@ -214,6 +214,15 @@ public class HubCrmQuoteSyncService {
                     .map(note -> " automaticamente pelo " + note).orElse("");
             arpa.addAnnotation(dealId, "Cotação " + quote.id() + " aprovada no legado em " + quote.statusAt() + viaCte);
             store.recordEvent(eventKey, "COTACAO", quote.id(), "GANHO", "PROCESSADO", "Card ganho", null);
+        } else if ("ABERTA".equals(status) && store.quoteDecidedInArpa(quote.id())) {
+            // Reaberta no legado depois de decidida: o card volta para aberto em Proposta
+            // Enviada. Sem o quoteDecidedInArpa, toda cotação nova (que nasce ABERTA) cairia
+            // aqui e ganharia uma anotação de reabertura que nunca aconteceu.
+            if (store.eventProcessed(eventKey)) return;
+            arpa.markOpen(dealId);
+            arpa.addAnnotation(dealId, "Cotação " + quote.id() + " reaberta no legado em " + quote.statusAt()
+                    + ". O card voltou para aberto em Proposta Enviada.");
+            store.recordEvent(eventKey, "COTACAO", quote.id(), "REABERTO", "PROCESSADO", "Card reaberto", null);
         } else if ("NAO APROVADA".equals(status)) {
             // Baixada pelo Hub pelos 10 dias, seja a proposta parada seja a aprovada sem CT-e: no
             // legado cada uma vai com o motivo que o legado tem, e no ArpaSuite as duas vão com o

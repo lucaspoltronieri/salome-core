@@ -194,6 +194,15 @@ public class HubCrmBatchService {
 
     /** {@code reject}: cotação → motivo (PRECO, PRAZO...). */
     public void runManual(Map<Long, String> approveWithCte, Map<Long, String> reject) {
+        runManual(approveWithCte, reject, java.util.List.of());
+    }
+
+    /**
+     * {@code reopen}: cotações que voltam para ABERTA porque a decisão anterior foi engano
+     * (decisão do Lucas, 25/09/2026). Vale para APROVADA e para NÃO APROVADA.
+     */
+    public void runManual(Map<Long, String> approveWithCte, Map<Long, String> reject,
+            java.util.Collection<Long> reopen) {
         List<BatchItem> items = new ArrayList<>();
         Map<String, Integer> totals = new LinkedHashMap<>();
         state.set(BatchState.started(true, null, Instant.now(clock)));
@@ -201,6 +210,7 @@ public class HubCrmBatchService {
             LocalDateTime now = LocalDateTime.now(clock);
             List<Long> ids = new ArrayList<>(approveWithCte.keySet());
             ids.addAll(reject.keySet());
+            ids.addAll(reopen);
             Map<Long, LegacyQuote> quotes = legacy.findQuotesByIds(ids).stream()
                     .collect(Collectors.toMap(LegacyQuote::id, quote -> quote, (a, b) -> a));
             List<LegacyCte> ctes = approveWithCte.isEmpty() ? List.of() : legacy.findRecentCtes(MANUAL_CTE_SINCE);
@@ -282,6 +292,36 @@ public class HubCrmBatchService {
                     }
                 } catch (Exception exception) {
                     add(items, totals, "NAO_APROVAR", quote, null, exception.getMessage(), "ERRO");
+                }
+            }
+            String reopenDescription = "Reaberta pelo Hub CRM em " + BR.format(now.toLocalDate())
+                    + " (decisão do Lucas): a decisão anterior foi engano";
+            for (Long id : reopen) {
+                LegacyQuote quote = quotes.get(id);
+                if (quote == null) {
+                    totals.merge("REABRIR:NAO_ENCONTRADA", 1, Integer::sum);
+                    continue;
+                }
+                String status = HubCrmNormalization.normalizedText(quote.status());
+                if (!"APROVADA".equals(status) && !"NAO APROVADA".equals(status)) {
+                    add(items, totals, "REABRIR", quote, null, "já estava " + quote.status(), "IGNORADA");
+                    continue;
+                }
+                try {
+                    if (writer.reopen(quote, reopenDescription, now)) {
+                        // O evento REABERTA faz o card voltar para aberto no sync e segura a baixa
+                        // dos 10 dias pelo prazo da regra.
+                        store.recordEvent("quote:" + quote.id() + ":reaberta:" + now.toLocalDate(), "COTACAO",
+                                quote.id(), "REABERTA", "PROCESSADO",
+                                "Ajuste manual: " + quote.status() + " → ABERTA", null);
+                        store.markQuoteApprovalStatus(quote.id(), "REABERTA", reopenDescription);
+                        add(items, totals, "REABRIR", quote, null, "ajuste manual", "ABERTA");
+                    } else {
+                        add(items, totals, "REABRIR", quote, null, "status mudou antes da gravação",
+                                "CONCORRENCIA");
+                    }
+                } catch (Exception exception) {
+                    add(items, totals, "REABRIR", quote, null, exception.getMessage(), "ERRO");
                 }
             }
             state.set(state.get().finish(totals, items, null, Instant.now(clock)));

@@ -311,6 +311,14 @@ public class ArpaSuiteHttpGateway implements ArpaSuiteGateway {
     }
 
     @Override
+    public void markOpen(long dealId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", "open");
+        payload.put("stageId", properties.arpa().propostaStageId());
+        put("/deals/" + dealId, payload);
+    }
+
+    @Override
     public Optional<String> findDealStatus(long dealId) {
         if (dealId <= 0) return Optional.empty();
         try {

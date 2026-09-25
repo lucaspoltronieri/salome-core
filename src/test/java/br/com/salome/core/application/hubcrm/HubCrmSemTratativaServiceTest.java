@@ -62,6 +62,18 @@ class HubCrmSemTratativaServiceTest {
         when(arpa.findDealStatus(dealId)).thenReturn(status == null ? Optional.empty() : Optional.of(status));
     }
 
+    /** Reaberta à mão hoje: a baixa não pode desfazer em uma hora o que o usuário acabou de pedir. */
+    @Test
+    void cotacaoReabertaHaMenosDeDezDiasNaoEBaixada() {
+        LegacyQuote reaberta = quote(15814, "FERNANDA", TODAY.minusDays(22));
+        legado(reaberta);
+        when(store.quotesReopenedAfter(TODAY.minusDays(10))).thenReturn(java.util.Set.of(15814L));
+
+        assertThat(service.closeStaleQuotes()).isZero();
+
+        verify(writer, never()).reject(any(), anyString(), anyString(), any());
+    }
+
     @Test
     void cotacaoSemCardNoArpaTambemEBaixada() {
         LegacyQuote carlos = quote(15731, "CARLOS", TODAY.minusDays(22));

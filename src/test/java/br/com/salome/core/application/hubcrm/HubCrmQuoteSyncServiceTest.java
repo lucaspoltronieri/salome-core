@@ -407,6 +407,26 @@ class HubCrmQuoteSyncServiceTest {
                 org.mockito.ArgumentMatchers.contains("sem CT-e emitido"));
     }
 
+    @Test
+    void cotacaoReabertaNoLegadoDevolveOCardParaAberto() {
+        when(store.quoteDecidedInArpa(15580)).thenReturn(true);
+
+        service.applyStatus(quote("ABERTA", Map.of()), 99);
+
+        verify(arpa).markOpen(99);
+        verify(arpa).addAnnotation(org.mockito.ArgumentMatchers.eq(99L),
+                org.mockito.ArgumentMatchers.contains("reaberta no legado"));
+    }
+
+    /** Cotação nova também chega ABERTA: o card dela já nasce aberto e não leva anotação de reabertura. */
+    @Test
+    void cotacaoAbertaQueNuncaFoiDecididaNaoMexeNoCard() {
+        service.applyStatus(quote("ABERTA", Map.of()), 99);
+
+        verify(arpa, never()).markOpen(anyLong());
+        verify(arpa, never()).addAnnotation(anyLong(), anyString());
+    }
+
     private LegacyQuote quote(String status, Map<LossReason, String> reasons) {
         return quote(status, reasons, new BigDecimal("150"));
     }

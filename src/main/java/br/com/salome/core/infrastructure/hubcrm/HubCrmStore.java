@@ -297,6 +297,19 @@ public class HubCrmStore {
         return count != null && count > 0;
     }
 
+    /**
+     * Card já ganho ou perdido pelo Hub. Só nesse caso a volta para ABERTA no legado mexe no
+     * ArpaSuite: cotação nova também chega ABERTA e o card dela já nasce aberto.
+     */
+    public boolean quoteDecidedInArpa(long legacyQuoteId) {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM hub_crm_event
+                WHERE entity_type='COTACAO' AND entity_id=? AND event_type IN ('GANHO','PERDIDO')
+                  AND status='PROCESSADO'
+                """, Long.class, legacyQuoteId);
+        return count != null && count > 0;
+    }
+
     public boolean hasProcessedQuoteContentEvent(long quoteId) {
         return hasProcessedEventPrefix("quote:" + quoteId + ":content:");
     }
@@ -433,6 +446,19 @@ public class HubCrmStore {
     public void markQuoteApprovalStatus(long legacyQuoteId, String status, String detail) {
         jdbc.update("UPDATE hub_crm_quote_approval SET status=?, detalhe=? WHERE legacy_quote_id=?",
                 status, truncate(detail, 1000), legacyQuoteId);
+    }
+
+    /**
+     * Cotações reabertas pelo Hub depois de {@code since}. Elas ficam fora da baixa dos 10 dias
+     * pelo prazo da regra: quem reabriu acabou de decidir que a proposta está viva de novo, e a
+     * baixa conta a idade da cotação, não a da reabertura.
+     */
+    public Set<Long> quotesReopenedAfter(LocalDate since) {
+        return new HashSet<>(jdbc.queryForList("""
+                SELECT entity_id FROM hub_crm_event
+                WHERE entity_type='COTACAO' AND event_type='REABERTA' AND status='PROCESSADO'
+                  AND processed_at >= ?
+                """, Long.class, Timestamp.valueOf(since.atStartOfDay())));
     }
 
     /** Cotações aprovadas que ainda não têm CT-e amarrado nem foram reprovadas pela triagem. */

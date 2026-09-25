@@ -31,6 +31,8 @@ public interface ArpaSuiteGateway {
     void markLost(long dealId, LossReason reason, LocalDateTime lostAt);
     /** Perde a negociação com um motivo do ArpaSuite que não existe no legado (ex.: 317833, sem tratativa). */
     void markLostWithReasonId(long dealId, long lostReasonId);
+    /** Devolve a negociação para aberta em Proposta Enviada: a cotação foi reaberta no legado. */
+    void markOpen(long dealId);
     /** Status da negociação (open, won, lost); vazio se o card foi apagado. */
     Optional<String> findDealStatus(long dealId);
     /** Motivo de perda já gravado no card, quando ele está perdido e o motivo está no catálogo. */
